@@ -1,0 +1,3130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Utopia 插件系统开发说明</title>
+<style>
+  /* ============================================================
+     设计系统变量
+     ============================================================ */
+  :root {
+    --color-primary: #6c5ce7;
+    --color-primary-light: #a29bfe;
+    --color-primary-dark: #4a3db8;
+    --color-primary-gradient: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+
+    --color-secondary: #00b894;
+    --color-secondary-light: #55efc4;
+    --color-danger: #e17055;
+    --color-warning: #fdcb6e;
+    --color-info: #74b9ff;
+
+    --color-gray-50: #f8f9fd;
+    --color-gray-100: #f0f2f8;
+    --color-gray-200: #e8ecf4;
+    --color-gray-300: #d5dae8;
+    --color-gray-500: #8a8aaa;
+    --color-gray-700: #4a4a6a;
+    --color-gray-900: #1a1a2e;
+
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f8f9fd;
+    --color-bg-sidebar: #f0f2f8;
+    --color-bg-code: #1e1e2e;
+    --color-text-primary: #1a1a2e;
+    --color-text-secondary: #4a4a6a;
+    --color-text-muted: #8a8aaa;
+    --color-text-code: #e8e8f0;
+    --color-border: #e8ecf4;
+    --color-border-light: #f0f2f8;
+
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-full: 9999px;
+
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 16px rgba(108, 92, 231, 0.12);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+    --spacing-sm: 0.5rem;
+    --spacing-md: 0.75rem;
+    --spacing-base: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-mono: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+
+    --sidebar-width: 280px;
+  }
+
+  /* ============================================================
+     全局重置
+     ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; scroll-padding-top: 20px; }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--color-text-primary);
+    background: var(--color-bg-secondary);
+  }
+
+  /* ============================================================
+     布局
+     ============================================================ */
+  .app {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* 侧栏 */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--color-bg-sidebar);
+    border-right: 1px solid var(--color-border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+    padding: var(--spacing-lg) 0;
+    z-index: 10;
+  }
+
+  .sidebar-header {
+    padding: 0 var(--spacing-lg) var(--spacing-base);
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: var(--spacing-base);
+  }
+
+  .sidebar-logo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    background: var(--color-primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .sidebar-subtitle {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-top: 0.2rem;
+  }
+
+  .nav-group {
+    margin-bottom: var(--spacing-base);
+  }
+
+  .nav-group-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    padding: 0 var(--spacing-lg);
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 0.35rem var(--spacing-lg);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .nav-link:hover {
+    background: rgba(108, 92, 231, 0.06);
+    color: var(--color-primary);
+  }
+
+  .nav-link.active {
+    background: rgba(108, 92, 231, 0.08);
+    color: var(--color-primary);
+    border-left-color: var(--color-primary);
+    font-weight: 500;
+  }
+
+  .nav-link.sub {
+    padding-left: calc(var(--spacing-lg) + 12px);
+    font-size: 0.82rem;
+  }
+
+  /* 主体 */
+  .main {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    min-width: 0;
+    background: var(--color-bg-primary);
+  }
+
+  .content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 3rem var(--spacing-xl) 5rem;
+  }
+
+  /* ============================================================
+     文档内容样式
+     ============================================================ */
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: var(--color-primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 3rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--color-border);
+    scroll-margin-top: 20px;
+  }
+
+  h2::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 1.2rem;
+    background: var(--color-primary);
+    border-radius: 2px;
+    margin-right: 0.6rem;
+    vertical-align: -2px;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-text-primary);
+    scroll-margin-top: 20px;
+  }
+
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--color-text-secondary);
+  }
+
+  p {
+    margin-bottom: 1rem;
+    color: var(--color-text-secondary);
+  }
+
+  .lead {
+    font-size: 1.05rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 1.5rem;
+  }
+
+  ul, ol {
+    margin: 0.5rem 0 1rem 1.5rem;
+    color: var(--color-text-secondary);
+  }
+
+  li { margin-bottom: 0.3rem; }
+
+  strong { color: var(--color-text-primary); font-weight: 600; }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.87em;
+    background: var(--color-bg-secondary);
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-primary-dark);
+    border: 1px solid var(--color-border-light);
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(108, 92, 231, 0.3);
+    transition: all 0.15s;
+  }
+
+  a:hover {
+    color: var(--color-primary-dark);
+    border-bottom-color: var(--color-primary-dark);
+  }
+
+  /* ============================================================
+     代码块
+     ============================================================ */
+  .code-block {
+    position: relative;
+    margin: 1rem 0;
+    background: var(--color-bg-code);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .code-lang {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 600;
+  }
+
+  .code-copy {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.72rem;
+    transition: all 0.15s;
+  }
+
+  .code-copy:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  .code-copy.copied { color: var(--color-secondary-light); }
+
+  pre {
+    margin: 0;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--color-text-code);
+  }
+
+  pre code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  /* 简单语法高亮（通过 CSS 类） */
+  .tok-key { color: #ff79c6; }
+  .tok-str { color: #f1fa8c; }
+  .tok-num { color: #bd93f9; }
+  .tok-com { color: #6272a4; font-style: italic; }
+  .tok-fn { color: #50fa7b; }
+  .tok-op { color: #ff79c6; }
+  .tok-var { color: #8be9fd; }
+
+  /* ============================================================
+     表格
+     ============================================================ */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 1rem 0;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.87rem;
+  }
+
+  th {
+    background: var(--color-bg-secondary);
+    padding: 0.6rem 0.9rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    border-bottom: 2px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.55rem 0.9rem;
+    border-bottom: 1px solid var(--color-border-light);
+    color: var(--color-text-secondary);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td code { font-size: 0.82em; }
+
+  /* ============================================================
+     提示框
+     ============================================================ */
+  .callout {
+    padding: 0.9rem 1.2rem;
+    margin: 1rem 0;
+    border-radius: var(--radius-md);
+    border-left: 4px solid;
+    font-size: 0.9rem;
+  }
+
+  .callout-title {
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .callout p:last-child { margin-bottom: 0; }
+
+  .callout-info {
+    background: rgba(116, 185, 255, 0.1);
+    border-color: var(--color-info);
+  }
+  .callout-info .callout-title { color: #2980b9; }
+
+  .callout-tip {
+    background: rgba(0, 184, 148, 0.1);
+    border-color: var(--color-secondary);
+  }
+  .callout-tip .callout-title { color: #00897b; }
+
+  .callout-warn {
+    background: rgba(253, 203, 110, 0.15);
+    border-color: var(--color-warning);
+  }
+  .callout-warn .callout-title { color: #b8860b; }
+
+  .callout-danger {
+    background: rgba(225, 112, 85, 0.1);
+    border-color: var(--color-danger);
+  }
+  .callout-danger .callout-title { color: #c0392b; }
+
+  /* ============================================================
+     卡片 / 特性网格
+     ============================================================ */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.2rem 0;
+  }
+
+  .feature-card {
+    background: var(--color-bg-secondary);
+    padding: 1rem 1.2rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    transition: all 0.15s;
+  }
+
+  .feature-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .feature-card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-card-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+    color: var(--color-text-primary);
+  }
+
+  .feature-card-desc {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  /* ============================================================
+     徽章 / 标签
+     ============================================================ */
+  .badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.5;
+    vertical-align: middle;
+  }
+
+  .badge-primary { background: rgba(108, 92, 231, 0.15); color: var(--color-primary-dark); }
+  .badge-success { background: rgba(0, 184, 148, 0.15); color: #00897b; }
+  .badge-warn { background: rgba(253, 203, 110, 0.25); color: #b8860b; }
+  .badge-danger { background: rgba(225, 112, 85, 0.15); color: #c0392b; }
+  .badge-info { background: rgba(116, 185, 255, 0.15); color: #2980b9; }
+  .badge-neutral { background: var(--color-border); color: var(--color-text-secondary); }
+
+  /* ============================================================
+     步骤
+     ============================================================ */
+  .steps {
+    counter-reset: step;
+    margin: 1rem 0;
+  }
+
+  .step {
+    position: relative;
+    padding-left: 2.5rem;
+    margin-bottom: 1.2rem;
+    counter-increment: step;
+  }
+
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    background: var(--color-primary-gradient);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+
+  .step-title {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 0.3rem;
+  }
+
+  /* ============================================================
+     架构图
+     ============================================================ */
+  .arch-diagram {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin: 1.2rem 0;
+  }
+
+  .arch-layer {
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.6rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid;
+    font-size: 0.85rem;
+  }
+
+  .arch-layer-title {
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+  }
+
+  .arch-layer-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .arch-chip {
+    padding: 0.15rem 0.6rem;
+    background: var(--color-bg-primary);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+  }
+
+  .arch-layer-html { border-color: #f39c12; }
+  .arch-layer-html .arch-layer-title { color: #d68910; }
+
+  .arch-layer-ui { border-color: #3498db; }
+  .arch-layer-ui .arch-layer-title { color: #2874a6; }
+
+  .arch-layer-plugin { border-color: var(--color-primary); }
+  .arch-layer-plugin .arch-layer-title { color: var(--color-primary-dark); }
+
+  .arch-layer-engine { border-color: var(--color-secondary); }
+  .arch-layer-engine .arch-layer-title { color: #00897b; }
+
+  .arch-layer-core { border-color: #95a5a6; }
+  .arch-layer-core .arch-layer-title { color: #566573; }
+
+  .arch-arrow {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 1.2rem;
+    margin: 0.2rem 0;
+  }
+
+  /* ============================================================
+     权限卡
+     ============================================================ */
+  .perm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+    margin: 1rem 0;
+  }
+
+  .perm-item {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    font-size: 0.82rem;
+  }
+
+  .perm-item code {
+    font-size: 0.78em;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--color-primary-dark);
+    font-weight: 600;
+  }
+
+  .perm-item-label {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    margin-top: 0.15rem;
+  }
+
+  /* ============================================================
+     响应式
+     ============================================================ */
+  @media (max-width: 900px) {
+    .sidebar {
+      transform: translateX(-100%);
+      transition: transform 0.25s;
+    }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .content { padding: 2rem 1rem 4rem; }
+    .mobile-toggle {
+      display: flex !important;
+    }
+  }
+
+  .mobile-toggle {
+    display: none;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 20;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--color-primary-gradient);
+    color: #fff;
+    border: none;
+    box-shadow: var(--shadow-md);
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+
+  /* 顶部进度条 */
+  .progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: var(--color-primary-gradient);
+    z-index: 100;
+    width: 0;
+    transition: width 0.1s;
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<button class="mobile-toggle" id="mobileToggle">☰</button>
+
+<div class="app">
+  <!-- ============================================================
+       侧栏导航
+       ============================================================ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">🧩 Utopia 插件系统</div>
+      <div class="sidebar-subtitle">开发说明 · v1.0</div>
+    </div>
+
+    <nav>
+      <div class="nav-group">
+        <div class="nav-group-title">入门</div>
+        <a class="nav-link" href="#overview">概览</a>
+        <a class="nav-link" href="#quickstart">快速开始</a>
+        <a class="nav-link" href="#architecture">系统架构</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">插件结构</div>
+        <a class="nav-link" href="#manifest">manifest.json</a>
+        <a class="nav-link" href="#main-js">main.js（Worker 侧）</a>
+        <a class="nav-link" href="#ui-js">ui.js（界面侧）</a>
+        <a class="nav-link" href="#lifecycle">生命周期</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">权限系统</div>
+        <a class="nav-link" href="#permissions">权限模型</a>
+        <a class="nav-link" href="#permission-list">权限清单</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Worker 侧 API</div>
+        <a class="nav-link" href="#api-overview">API 总览</a>
+        <a class="nav-link" href="#api-state">api.state</a>
+        <a class="nav-link" href="#api-events">api.events</a>
+        <a class="nav-link" href="#api-hooks">api.hooks</a>
+        <a class="nav-link" href="#api-modules">业务模块 API</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">UI 侧 API</div>
+        <a class="nav-link" href="#uiapi-overview">uiApi 总览</a>
+        <a class="nav-link" href="#uiapi-dom">dom / h</a>
+        <a class="nav-link" href="#uiapi-dialog">dialog / modal</a>
+        <a class="nav-link" href="#uiapi-hotkey">hotkey / tooltip</a>
+        <a class="nav-link" href="#uiapi-contextmenu">contextMenu</a>
+        <a class="nav-link" href="#uiapi-loading">loading / dragDrop</a>
+        <a class="nav-link" href="#uiapi-storage">storage / config / logger</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">扩展点</div>
+        <a class="nav-link" href="#slots">UI 槽位系统</a>
+        <a class="nav-link" href="#hooks">钩子系统</a>
+        <a class="nav-link" href="#commands">自定义命令</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">实践</div>
+        <a class="nav-link" href="#best-practices">最佳实践</a>
+        <a class="nav-link" href="#debugging">调试与测试</a>
+        <a class="nav-link" href="#examples">完整示例</a>
+        <a class="nav-link" href="#faq">常见问题</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ============================================================
+       主体内容
+       ============================================================ -->
+  <main class="main">
+    <div class="content">
+
+      <h1>Utopia 插件系统开发说明</h1>
+      <p class="lead">
+        本文档面向插件开发者，系统介绍 Utopia 插件系统的架构设计、插件标准格式、
+        完整 API 参考与最佳实践，帮助你快速构建安全、稳定、可扩展的插件。
+      </p>
+
+      <!-- ============================================================
+           1. 概览
+           ============================================================ -->
+      <h2 id="overview">概览</h2>
+
+      <h3>什么是 Utopia 插件？</h3>
+      <p>
+        Utopia 插件是运行在<strong>独立 Worker</strong> 中的可扩展单元。它通过<strong>声明式权限</strong>
+        与主应用进行受控交互，可以：
+      </p>
+      <ul>
+        <li>监听并拦截核心模块的方法调用（钩子系统）</li>
+        <li>读取或修改角色、会话、世界书、朋友圈等数据</li>
+        <li>向界面注入按钮、面板、槽位组件</li>
+        <li>注册自定义命令（<code>/yourcommand</code>）</li>
+        <li>订阅系统事件（消息发送、角色切换、群组变更等）</li>
+        <li>使用 TTS / STT / API 等共享服务</li>
+      </ul>
+
+      <h3>核心特性</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card-icon">🛡️</div>
+          <div class="feature-card-title">Worker 隔离</div>
+          <div class="feature-card-desc">每个插件在独立 Worker 中运行，崩溃不影响主应用</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🔐</div>
+          <div class="feature-card-title">权限声明</div>
+          <div class="feature-card-desc">Manifest 显式声明所需权限，安装时用户确认</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🪝</div>
+          <div class="feature-card-title">钩子系统</div>
+          <div class="feature-card-desc">核心方法自动支持 before / after / error 钩子</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🎯</div>
+          <div class="feature-card-title">UI 槽位</div>
+          <div class="feature-card-desc">通过 data-plugin-slot 标注锚点，无需侵入式 DOM 操作</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">💾</div>
+          <div class="feature-card-title">独立存储</div>
+          <div class="feature-card-desc">每个插件拥有独立的 KV 存储与配置命名空间</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🧰</div>
+          <div class="feature-card-title">全套 UI 工具</div>
+          <div class="feature-card-desc">对话框、热键、右键菜单、提示、拖拽等开箱即用</div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           2. 快速开始
+           ============================================================ -->
+      <h2 id="quickstart">快速开始</h2>
+
+      <p>一个最小可用的 Utopia 插件包含三个文件：</p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">目录结构</span>
+        </div>
+        <pre><code>my-plugin/
+├── manifest.json   ← 插件清单
+├── main.js         ← Worker 侧逻辑（必需）
+└── ui.js           ← 界面侧脚本（可选）</code></pre>
+      </div>
+
+      <h3>Step 1 · 编写 manifest.json</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">manifest.json</span>
+          <button class="code-copy" data-copy="manifest">复制</button>
+        </div>
+        <pre><code>{
+  "id": "com.example.hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "一个最简示例插件",
+  "author": "Your Name",
+  "main": "main.js",
+  "ui": "ui.js",
+  "permissions": [
+    "character:read",
+    "event:subscribe"
+  ],
+  "utopia": {
+    "minVersion": "1.0.0"
+  }
+}</code></pre>
+      </div>
+
+      <h3>Step 2 · 编写 main.js</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">main.js</span>
+          <button class="code-copy" data-copy="main">复制</button>
+        </div>
+        <pre><code>// Worker 侧入口：导出 setup(api, manifest)
+export function setup(api, manifest) {
+  // 1. 订阅角色切换事件
+  api.events.on('character:switched', (payload) =&gt; {
+    console.log('[HelloWorld] 切换到角色:', payload.characterId);
+  });
+
+  // 2. 订阅会话开始
+  api.events.on('app:started', () =&gt; {
+    console.log('[HelloWorld] 插件已就绪');
+  });
+
+  // 3. 返回 teardown 函数（可选）
+  return function teardown() {
+    console.log('[HelloWorld] 插件卸载');
+  };
+}</code></pre>
+      </div>
+
+      <h3>Step 3 · 编写 ui.js（可选）</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">ui.js</span>
+          <button class="code-copy" data-copy="ui">复制</button>
+        </div>
+        <pre><code>// 界面侧入口：导出 setup(uiApi, manifest)
+export function setup(uiApi, manifest) {
+  // 在设置面板底部注入一个区块
+  uiApi.registerSlot('settings-bottom', () =&gt; {
+    const div = uiApi.dom.h('div', {
+      style: 'padding: 0.5rem; border-top: 1px solid var(--color-border);'
+    }, [
+      uiApi.dom.h('strong', {}, 'Hello World 插件'),
+      uiApi.dom.h('p', { style: 'color: var(--color-text-muted); font-size: 0.85rem;' },
+        '这是由插件注入的区块。'),
+    ]);
+    return div;
+  });
+
+  return function teardown() {
+    // uiApi.registerSlot 返回的取消函数会自动处理；此处可做额外清理
+  };
+}</code></pre>
+      </div>
+
+      <h3>Step 4 · 安装</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-title">打包为 ZIP</div>
+          <p>将整个插件目录压缩为 <code>my-plugin.zip</code>，确保 <code>manifest.json</code> 位于 ZIP 根目录。</p>
+        </div>
+        <div class="step">
+          <div class="step-title">在应用中安装</div>
+          <p>打开 侧栏 → 插件 → 从文件安装，选择 ZIP。确认权限对话框。</p>
+        </div>
+        <div class="step">
+          <div class="step-title">启用并验证</div>
+          <p>点击「启用」，打开浏览器控制台，观察日志输出。</p>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           3. 系统架构
+           ============================================================ -->
+      <h2 id="architecture">系统架构</h2>
+
+      <p>Utopia 插件系统由<strong>主线程侧</strong>与<strong>Worker 侧</strong>两部分组成：</p>
+
+      <div class="arch-diagram">
+        <div class="arch-layer arch-layer-ui">
+          <div class="arch-layer-title">🎨 UI 层（主线程 DOM）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">uiBridge</span>
+            <span class="arch-chip">uiRuntime</span>
+            <span class="arch-chip">data-plugin-slot</span>
+            <span class="arch-chip">渲染器覆写</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↕</div>
+
+        <div class="arch-layer arch-layer-plugin">
+          <div class="arch-layer-title">🧩 插件管理层（主线程）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">pluginManager</span>
+            <span class="arch-chip">pluginApi</span>
+            <span class="arch-chip">hookSystem</span>
+            <span class="arch-chip">permissionChecker</span>
+            <span class="arch-chip">pluginVfs</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↕ RPC / 钩子 / 事件</div>
+
+        <div class="arch-layer arch-layer-plugin">
+          <div class="arch-layer-title">⚙️ 插件运行时（Worker 隔离）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">workerRuntime</span>
+            <span class="arch-chip">pluginRuntime</span>
+            <span class="arch-chip">Blob URL 模块打包</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↕ 受控 API</div>
+
+        <div class="arch-layer arch-layer-engine">
+          <div class="arch-layer-title">🔧 业务模块层</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">character</span>
+            <span class="arch-chip">conversation</span>
+            <span class="arch-chip">chat</span>
+            <span class="arch-chip">groupChat</span>
+            <span class="arch-chip">emotion</span>
+            <span class="arch-chip">bodyState</span>
+            <span class="arch-chip">worldBook</span>
+            <span class="arch-chip">social</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↕</div>
+
+        <div class="arch-layer arch-layer-core">
+          <div class="arch-layer-title">⚡ 核心基础设施</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">db (IndexedDB)</span>
+            <span class="arch-chip">state</span>
+            <span class="arch-chip">api</span>
+            <span class="arch-chip">eventBus</span>
+            <span class="arch-chip">utils</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>关键设计</h3>
+
+      <h4>1. Worker 隔离</h4>
+      <p>
+        每个插件运行在独立 Worker 中。Worker 无法直接访问 DOM，所有界面操作通过
+        <code>uiApi</code>（运行在主线程）完成。这一设计确保：
+      </p>
+      <ul>
+        <li>插件崩溃不影响主应用</li>
+        <li>插件无法绕过权限校验直接操作 DOM</li>
+        <li>插件可以执行 CPU 密集任务而不阻塞 UI</li>
+      </ul>
+
+      <h4>2. 声明式权限</h4>
+      <p>
+        Manifest 中通过 <code>permissions</code> 数组声明所需权限。主线程在执行每次
+        RPC 调用前会通过 <code>assertPermission()</code> 校验，未声明的权限直接拒绝。
+      </p>
+
+      <h4>3. 自动化钩子注入</h4>
+      <p>
+        <code>pluginApi.js</code> 通过 Proxy 自动包装所有业务模块方法，在方法调用前后
+        触发 <code>:before</code> / <code>:after</code> / <code>:error</code> 钩子。插件
+        通过 <code>api.hooks.register()</code> 注册钩子，即可拦截任意核心方法。
+      </p>
+
+      <h4>4. 槽位式 UI 注入</h4>
+      <p>
+        核心界面通过 <code>data-plugin-slot="xxx"</code> 标注锚点。<code>uiRuntime</code>
+        通过 MutationObserver 监听 DOM 变化，自动填充新出现的槽位。插件通过
+        <code>uiApi.registerSlot()</code> 注册渲染函数，无需关心 DOM 生命周期。
+      </p>
+
+      <!-- ============================================================
+           4. manifest.json
+           ============================================================ -->
+      <h2 id="manifest">manifest.json 详解</h2>
+
+      <p>插件清单是所有插件的入口元数据。完整字段说明如下：</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>字段</th>
+              <th>类型</th>
+              <th>必填</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>string</td>
+              <td><span class="badge badge-danger">是</span></td>
+              <td>反向域名格式，如 <code>com.example.my-plugin</code>，全局唯一</td>
+            </tr>
+            <tr>
+              <td><code>name</code></td>
+              <td>string</td>
+              <td><span class="badge badge-danger">是</span></td>
+              <td>显示名称</td>
+            </tr>
+            <tr>
+              <td><code>version</code></td>
+              <td>string</td>
+              <td><span class="badge badge-danger">是</span></td>
+              <td>语义化版本，如 <code>1.0.0</code> 或 <code>1.0.0-beta</code></td>
+            </tr>
+            <tr>
+              <td><code>main</code></td>
+              <td>string</td>
+              <td><span class="badge badge-danger">是</span></td>
+              <td>Worker 侧入口文件，如 <code>main.js</code></td>
+            </tr>
+            <tr>
+              <td><code>ui</code></td>
+              <td>string</td>
+              <td><span class="badge badge-neutral">否</span></td>
+              <td>界面侧入口文件，如 <code>ui.js</code></td>
+            </tr>
+            <tr>
+              <td><code>description</code></td>
+              <td>string</td>
+              <td><span class="badge badge-neutral">否</span></td>
+              <td>功能描述</td>
+            </tr>
+            <tr>
+              <td><code>author</code></td>
+              <td>string</td>
+              <td><span class="badge badge-neutral">否</span></td>
+              <td>作者名</td>
+            </tr>
+            <tr>
+              <td><code>permissions</code></td>
+              <td>string[]</td>
+              <td><span class="badge badge-neutral">否</span></td>
+              <td>所需权限列表。缺省视为无需权限</td>
+            </tr>
+            <tr>
+              <td><code>utopia</code></td>
+              <td>object</td>
+              <td><span class="badge badge-neutral">否</span></td>
+              <td>兼容性声明，见下</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>兼容性声明（utopia 字段）</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">manifest.json</span></div>
+        <pre><code>"utopia": {
+  "minVersion": "1.0.0",   // 要求的最低 API 版本
+  "maxVersion": "2.0.0"    // 支持的最高 API 版本（可选）
+}</code></pre>
+      </div>
+
+      <h3>ID 规范</h3>
+      <div class="callout callout-warn">
+        <div class="callout-title">⚠️ 命名约束</div>
+        <p>插件 ID 必须符合反向域名格式：<code>^[a-z0-9]+(\.[a-z0-9-]+)+$</code></p>
+        <p>✅ 正确：<code>com.example.my-plugin</code> · <code>io.github.alice.tools</code></p>
+        <p>❌ 错误：<code>my-plugin</code> · <code>MyPlugin</code> · <code>com..example</code></p>
+      </div>
+
+      <!-- ============================================================
+           5. main.js
+           ============================================================ -->
+      <h2 id="main-js">main.js（Worker 侧）</h2>
+
+      <p>
+        <code>main.js</code> 运行在独立 Worker 中，是插件的逻辑主体。它必须导出
+        <code>setup</code> 函数。
+      </p>
+
+      <h3>导出契约</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// 方式 1：具名导出 setup
+export function setup(api, manifest) {
+  // api:      完整 API 对象（受权限控制）
+  // manifest: 插件元数据
+  return function teardown() { /* 可选 */ };
+}
+
+// 方式 2：默认导出对象
+export default {
+  setup(api, manifest) {
+    return function teardown() { /* 可选 */ };
+  },
+  teardown() { /* 备用 teardown */ }
+};</code></pre>
+      </div>
+
+      <h3>支持的模块语法</h3>
+      <ul>
+        <li>ES Module（<code>import</code> / <code>export</code>）</li>
+        <li>相对导入：<code>import { foo } from './utils.js'</code></li>
+        <li>父级导入：<code>import { bar } from '../lib/helper.js'</code></li>
+        <li>支持多文件拆分，导入自动重写为 Blob URL</li>
+        <li>不支持外部 URL 导入（安全限制）</li>
+      </ul>
+
+      <h3>可用 API</h3>
+      <p>Worker 侧可访问的 API 详见「Worker 侧 API」章节。</p>
+
+      <h3>限制</h3>
+      <div class="callout callout-danger">
+        <div class="callout-title">🚫 Worker 侧不可用</div>
+        <ul style="margin: 0.3rem 0 0 1rem;">
+          <li>无法访问 <code>document</code> / <code>window</code> / DOM</li>
+          <li>无法使用 <code>state.subscribe</code> / <code>state.subscribeAll</code>（回调无法跨 Worker 传递）</li>
+          <li>无法传递函数给主线程（结构化克隆限制）</li>
+          <li>无法直接读写 localStorage</li>
+        </ul>
+        <p style="margin-top: 0.4rem;">
+          如需订阅状态，请使用 <code>api.events.on()</code> 或在 <code>ui.js</code> 中使用
+          <code>uiApi.api.state.subscribe()</code>。
+        </p>
+      </div>
+
+      <!-- ============================================================
+           6. ui.js
+           ============================================================ -->
+      <h2 id="ui-js">ui.js（界面侧）</h2>
+
+      <p>
+        <code>ui.js</code> 运行在主线程，用于操作 DOM、注册槽位、绑定热键等。它是
+        <strong>可选的</strong>——如果插件无界面需求，可以省略。
+      </p>
+
+      <h3>导出契约</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>export function setup(uiApi, manifest) {
+  // uiApi: 全套界面工具对象
+  return function teardown() { /* 可选 */ };
+}</code></pre>
+      </div>
+
+      <h3>与 Worker 通信</h3>
+      <p>UI 与 Worker 通过消息通道通信：</p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// UI → Worker
+uiApi.sendToWorker({ action: 'fetchData', id: 123 });
+
+// Worker → UI
+uiApi.onWorkerMessage((payload) =&gt; {
+  console.log('收到 Worker 消息:', payload);
+});
+
+// Worker 侧发送
+api.postToUI({ type: 'dataReady', data: [...] });</code></pre>
+      </div>
+
+      <!-- ============================================================
+           7. 生命周期
+           ============================================================ -->
+      <h2 id="lifecycle">生命周期</h2>
+
+      <div class="arch-diagram">
+        <div class="arch-layer arch-layer-html">
+          <div class="arch-layer-title">安装（Install）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">下载 ZIP</span>
+            <span class="arch-chip">解压校验</span>
+            <span class="arch-chip">权限确认</span>
+            <span class="arch-chip">写入 VFS</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↓</div>
+
+        <div class="arch-layer arch-layer-plugin">
+          <div class="arch-layer-title">启用（Enable）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">创建 Worker</span>
+            <span class="arch-chip">Blob URL 打包</span>
+            <span class="arch-chip">加载 ui.js</span>
+            <span class="arch-chip">调用 setup()</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↓</div>
+
+        <div class="arch-layer arch-layer-engine">
+          <div class="arch-layer-title">运行（Running）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">响应事件</span>
+            <span class="arch-chip">触发钩子</span>
+            <span class="arch-chip">渲染槽位</span>
+            <span class="arch-chip">执行命令</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↓</div>
+
+        <div class="arch-layer arch-layer-core">
+          <div class="arch-layer-title">禁用 / 卸载（Disable / Uninstall）</div>
+          <div class="arch-layer-items">
+            <span class="arch-chip">调用 teardown()</span>
+            <span class="arch-chip">清理钩子</span>
+            <span class="arch-chip">清理槽位</span>
+            <span class="arch-chip">终止 Worker</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>setup 与 teardown 的契约</h3>
+      <ul>
+        <li><code>setup</code> 可以是同步或异步函数（返回 Promise 也可以）</li>
+        <li><code>teardown</code> 通过以下两种方式之一提供：
+          <ul>
+            <li><code>setup</code> 的返回值（推荐）</li>
+            <li>模块导出的 <code>teardown</code> 函数</li>
+          </ul>
+        </li>
+        <li><code>teardown</code> 应清理所有副作用：定时器、监听器、外部连接</li>
+        <li>框架会自动清理：钩子、事件订阅、槽位、热键、loading、右键菜单</li>
+      </ul>
+
+      <!-- ============================================================
+           8. 权限系统
+           ============================================================ -->
+      <h2 id="permissions">权限模型</h2>
+
+      <p>
+        权限是插件系统的安全边界。每次 <code>api.xxx.yyy()</code> 调用都会在主线程侧
+        校验权限，未声明的调用会抛出错误。
+      </p>
+
+      <h3>权限粒度</h3>
+      <p>权限采用「资源:操作」的命名规范：</p>
+      <ul>
+        <li><code>character:read</code> / <code>character:write</code></li>
+        <li><code>conversation:read</code> / <code>conversation:write</code></li>
+        <li><code>group:read</code> / <code>group:write</code></li>
+        <li>……</li>
+      </ul>
+
+      <h3>通配符</h3>
+      <p>
+        <code>*</code> 表示完全访问权限。声明 <code>*</code> 后所有方法均可调用。
+        <strong>强烈不建议</strong>在公开插件中使用。
+      </p>
+
+      <div class="callout callout-danger">
+        <div class="callout-title">⚠️ 关于完全访问权限</div>
+        <p>
+          声明 <code>"*"</code> 会在安装时向用户展示醒目的红色警告。用户对来源不明的
+          插件授予此权限存在风险，请仅在自用插件中使用。
+        </p>
+      </div>
+
+      <h3 id="permission-list">完整权限清单</h3>
+
+      <h4>资源读写</h4>
+      <div class="perm-grid">
+        <div class="perm-item">
+          <code>character:read</code>
+          <span class="perm-item-label">读取角色信息</span>
+        </div>
+        <div class="perm-item">
+          <code>character:write</code>
+          <span class="perm-item-label">创建/修改/删除角色</span>
+        </div>
+        <div class="perm-item">
+          <code>conversation:read</code>
+          <span class="perm-item-label">读取会话记录</span>
+        </div>
+        <div class="perm-item">
+          <code>conversation:write</code>
+          <span class="perm-item-label">修改会话记录</span>
+        </div>
+        <div class="perm-item">
+          <code>chat:read</code>
+          <span class="perm-item-label">读取聊天消息</span>
+        </div>
+        <div class="perm-item">
+          <code>chat:write</code>
+          <span class="perm-item-label">发送消息</span>
+        </div>
+        <div class="perm-item">
+          <code>group:read</code>
+          <span class="perm-item-label">读取群聊</span>
+        </div>
+        <div class="perm-item">
+          <code>group:write</code>
+          <span class="perm-item-label">发送群聊消息</span>
+        </div>
+        <div class="perm-item">
+          <code>memory:read</code>
+          <span class="perm-item-label">读取记忆</span>
+        </div>
+        <div class="perm-item">
+          <code>memory:write</code>
+          <span class="perm-item-label">写入/删除记忆</span>
+        </div>
+        <div class="perm-item">
+          <code>worldbook:read</code>
+          <span class="perm-item-label">读取世界书</span>
+        </div>
+        <div class="perm-item">
+          <code>worldbook:write</code>
+          <span class="perm-item-label">修改世界书</span>
+        </div>
+        <div class="perm-item">
+          <code>social:read</code>
+          <span class="perm-item-label">读取朋友圈</span>
+        </div>
+        <div class="perm-item">
+          <code>social:write</code>
+          <span class="perm-item-label">发布朋友圈</span>
+        </div>
+        <div class="perm-item">
+          <code>settings:read</code>
+          <span class="perm-item-label">读取设置</span>
+        </div>
+        <div class="perm-item">
+          <code>settings:write</code>
+          <span class="perm-item-label">修改设置</span>
+        </div>
+        <div class="perm-item">
+          <code>time:read</code>
+          <span class="perm-item-label">读取游戏时间</span>
+        </div>
+        <div class="perm-item">
+          <code>time:write</code>
+          <span class="perm-item-label">修改游戏时间</span>
+        </div>
+        <div class="perm-item">
+          <code>injector:read</code>
+          <span class="perm-item-label">读取注入器</span>
+        </div>
+        <div class="perm-item">
+          <code>injector:write</code>
+          <span class="perm-item-label">修改注入规则</span>
+        </div>
+      </div>
+
+      <h4>系统能力</h4>
+      <div class="perm-grid">
+        <div class="perm-item">
+          <code>hook:register</code>
+          <span class="perm-item-label">注册钩子（拦截系统行为）</span>
+        </div>
+        <div class="perm-item">
+          <code>command:register</code>
+          <span class="perm-item-label">注册自定义命令</span>
+        </div>
+        <div class="perm-item">
+          <code>ui:inject</code>
+          <span class="perm-item-label">注入界面元素</span>
+        </div>
+        <div class="perm-item">
+          <code>event:subscribe</code>
+          <span class="perm-item-label">订阅系统事件</span>
+        </div>
+        <div class="perm-item">
+          <code>event:emit</code>
+          <span class="perm-item-label">发布系统事件</span>
+        </div>
+        <div class="perm-item">
+          <code>api:call</code>
+          <span class="perm-item-label">调用 AI API</span>
+        </div>
+        <div class="perm-item">
+          <code>tts:use</code>
+          <span class="perm-item-label">使用语音合成</span>
+        </div>
+        <div class="perm-item">
+          <code>stt:use</code>
+          <span class="perm-item-label">使用语音识别</span>
+        </div>
+        <div class="perm-item">
+          <code>http:request</code>
+          <span class="perm-item-label">发起网络请求</span>
+        </div>
+        <div class="perm-item">
+          <code>storage:local</code>
+          <span class="perm-item-label">使用 localStorage</span>
+        </div>
+        <div class="perm-item">
+          <code>storage:indexeddb</code>
+          <span class="perm-item-label">使用 IndexedDB</span>
+        </div>
+        <div class="perm-item" style="border-color: var(--color-danger);">
+          <code style="color: var(--color-danger);">*</code>
+          <span class="perm-item-label" style="color: var(--color-danger);">完全访问（不推荐）</span>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           9. Worker 侧 API 概览
+           ============================================================ -->
+      <h2 id="api-overview">Worker 侧 API 总览</h2>
+
+      <p>Worker 侧的 <code>api</code> 对象提供以下命名空间：</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>命名空间</th>
+              <th>用途</th>
+              <th>所需权限</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>api.state</code></td>
+              <td>读取 / 修改全局状态</td>
+              <td><code>settings:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.events</code></td>
+              <td>订阅 / 发布事件</td>
+              <td><code>event:subscribe/emit</code></td>
+            </tr>
+            <tr>
+              <td><code>api.hooks</code></td>
+              <td>注册 / 注销钩子</td>
+              <td><code>hook:register</code></td>
+            </tr>
+            <tr>
+              <td><code>api.character</code></td>
+              <td>角色管理</td>
+              <td><code>character:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.conversation</code></td>
+              <td>会话管理</td>
+              <td><code>conversation:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.chat</code></td>
+              <td>单聊消息</td>
+              <td><code>chat:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.groupChat</code></td>
+              <td>群聊管理</td>
+              <td><code>group:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.groupChatEngine</code></td>
+              <td>群聊引擎</td>
+              <td><code>group:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.groupChatOps</code></td>
+              <td>群聊高级操作</td>
+              <td><code>group:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.emotion</code></td>
+              <td>情感引擎</td>
+              <td><code>character:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.bodyState</code></td>
+              <td>身体状态引擎</td>
+              <td><code>character:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.profileDefaults</code></td>
+              <td>个性化参数</td>
+              <td><code>character:read</code></td>
+            </tr>
+            <tr>
+              <td><code>api.memory</code></td>
+              <td>长期记忆</td>
+              <td><code>memory:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.time</code></td>
+              <td>游戏时间</td>
+              <td><code>time:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.worldBook</code></td>
+              <td>世界书</td>
+              <td><code>worldbook:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.injector</code></td>
+              <td>提示词注入</td>
+              <td><code>injector:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.personality</code></td>
+              <td>性格量化</td>
+              <td><code>character:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.social</code></td>
+              <td>朋友圈</td>
+              <td><code>social:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.proactiveChat</code></td>
+              <td>主动对话</td>
+              <td><code>character:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.settings</code></td>
+              <td>设置</td>
+              <td><code>settings:read/write</code></td>
+            </tr>
+            <tr>
+              <td><code>api.commandEngine</code></td>
+              <td>命令引擎</td>
+              <td><code>command:register</code></td>
+            </tr>
+            <tr>
+              <td><code>api.summary</code></td>
+              <td>对话摘要</td>
+              <td><code>conversation:read</code></td>
+            </tr>
+            <tr>
+              <td><code>api.suggestions</code></td>
+              <td>推荐回复</td>
+              <td><code>chat:read</code></td>
+            </tr>
+            <tr>
+              <td><code>api.firstMessage</code></td>
+              <td>动态开场白</td>
+              <td><code>character:read</code></td>
+            </tr>
+            <tr>
+              <td><code>api.api</code></td>
+              <td>AI API 调用</td>
+              <td><code>api:call</code></td>
+            </tr>
+            <tr>
+              <td><code>api.db</code></td>
+              <td>数据库访问</td>
+              <td><code>storage:indexeddb</code></td>
+            </tr>
+            <tr>
+              <td><code>api.utils</code></td>
+              <td>工具函数</td>
+              <td>无需权限</td>
+            </tr>
+            <tr>
+              <td><code>api.tts</code></td>
+              <td>语音合成</td>
+              <td><code>tts:use</code></td>
+            </tr>
+            <tr>
+              <td><code>api.stt</code></td>
+              <td>语音识别</td>
+              <td><code>stt:use</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================
+           10. api.state
+           ============================================================ -->
+      <h2 id="api-state">api.state</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>方法</th>
+              <th>签名</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>get</code></td>
+              <td><code>(path) =&gt; any</code></td>
+              <td>读取状态。<code>path</code> 为点号路径，如 <code>"settings.theme"</code></td>
+            </tr>
+            <tr>
+              <td><code>set</code></td>
+              <td><code>(path, value) =&gt; void</code></td>
+              <td>修改状态</td>
+            </tr>
+            <tr>
+              <td><code>subscribe</code></td>
+              <td><code>(path, cb) =&gt; unsubscribe</code></td>
+              <td><span class="badge badge-warn">Worker 侧不可用</span>请使用 <code>uiApi.api.state.subscribe</code></td>
+            </tr>
+            <tr>
+              <td><code>subscribeAll</code></td>
+              <td><code>(cb) =&gt; unsubscribe</code></td>
+              <td><span class="badge badge-warn">Worker 侧不可用</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// 读取当前角色
+const charId = await api.state.get('currentCharacterId');
+
+// 读取所有角色
+const characters = await api.state.get('characters');
+
+// 修改状态（需 settings:write）
+await api.state.set('sidebarOpen', true);</code></pre>
+      </div>
+
+      <!-- ============================================================
+           11. api.events
+           ============================================================ -->
+      <h2 id="api-events">api.events</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>方法</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>on(event, handler)</code></td><td>订阅事件，返回取消函数</td></tr>
+            <tr><td><code>once(event, handler)</code></td><td>单次订阅，触发后自动取消</td></tr>
+            <tr><td><code>off(event, handler)</code></td><td>取消订阅</td></tr>
+            <tr><td><code>emit(event, ...args)</code></td><td>发布事件（需 <code>event:emit</code>）</td></tr>
+            <tr><td><code>emitAsync(event, ...args)</code></td><td>异步发布，等待所有订阅者</td></tr>
+            <tr><td><code>getEventNames()</code></td><td>获取所有已注册的事件名</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>常用系统事件</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>事件名</th>
+              <th>触发时机</th>
+              <th>Payload</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>app:started</code></td>
+              <td>应用启动完成</td>
+              <td><code>{ version, timestamp, settings }</code></td>
+            </tr>
+            <tr>
+              <td><code>character:switched</code></td>
+              <td>切换角色</td>
+              <td><code>{ characterId, character, timestamp }</code></td>
+            </tr>
+            <tr>
+              <td><code>message:before-send</code></td>
+              <td>用户消息发送前</td>
+              <td><code>{ characterId, content, timestamp }</code></td>
+            </tr>
+            <tr>
+              <td><code>message:received</code></td>
+              <td>AI 回复完成</td>
+              <td><code>{ characterId, content, timestamp }</code></td>
+            </tr>
+            <tr>
+              <td><code>emotion:interaction</code></td>
+              <td>情感引擎响应事件</td>
+              <td><code>{ characterId, eventType, intensity, state }</code></td>
+            </tr>
+            <tr>
+              <td><code>emotion:updated</code></td>
+              <td>情感状态随时间变化</td>
+              <td><code>{ characterId, state }</code></td>
+            </tr>
+            <tr>
+              <td><code>body:updated</code></td>
+              <td>身体状态随时间变化</td>
+              <td><code>{ characterId, state }</code></td>
+            </tr>
+            <tr>
+              <td><code>body:wakeup</code></td>
+              <td>角色被唤醒</td>
+              <td><code>{ characterId, state }</code></td>
+            </tr>
+            <tr>
+              <td><code>body:injury</code></td>
+              <td>角色受伤</td>
+              <td><code>{ characterId, injury }</code></td>
+            </tr>
+            <tr>
+              <td><code>worldbook:rule-triggered</code></td>
+              <td>世界书规则触发</td>
+              <td><code>{ ruleId, content }</code></td>
+            </tr>
+            <tr>
+              <td><code>time:updated</code></td>
+              <td>游戏时间更新</td>
+              <td><code>{ gameTime, realTime, speed, paused }</code></td>
+            </tr>
+            <tr>
+              <td><code>time:advanced</code></td>
+              <td>游戏时间被推进</td>
+              <td><code>{ gameTime, delta }</code></td>
+            </tr>
+            <tr>
+              <td><code>group:created</code></td>
+              <td>群组创建</td>
+              <td><code>{ group }</code></td>
+            </tr>
+            <tr>
+              <td><code>group:message</code></td>
+              <td>群聊新消息</td>
+              <td><code>{ groupId, message }</code></td>
+            </tr>
+            <tr>
+              <td><code>group:member-added</code></td>
+              <td>群成员加入</td>
+              <td><code>{ groupId, member }</code></td>
+            </tr>
+            <tr>
+              <td><code>group:member-removed</code></td>
+              <td>群成员移除</td>
+              <td><code>{ groupId, memberId, memberType }</code></td>
+            </tr>
+            <tr>
+              <td><code>proactive:new</code></td>
+              <td>角色发起主动消息</td>
+              <td><code>{ characterId, type, content }</code></td>
+            </tr>
+            <tr>
+              <td><code>voice:call-ended</code></td>
+              <td>语音通话结束</td>
+              <td><code>{ characterId, duration }</code></td>
+            </tr>
+            <tr>
+              <td><code>settings:updated</code></td>
+              <td>设置被修改</td>
+              <td><code>{ oldSettings, newSettings }</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// 订阅消息接收
+api.events.on('message:received', ({ characterId, content }) =&gt; {
+  console.log(`角色 ${characterId} 回复: ${content}`);
+});
+
+// 发布自定义事件（需 event:emit 权限）
+api.events.emit('myplugin:something-happened', { data: 123 });
+
+// 其他插件可以订阅
+api.events.on('myplugin:something-happened', (payload) =&gt; {
+  console.log('收到自定义事件:', payload);
+});</code></pre>
+      </div>
+
+      <!-- ============================================================
+           12. api.hooks
+           ============================================================ -->
+      <h2 id="api-hooks">api.hooks</h2>
+
+      <p>
+        钩子系统允许插件拦截核心模块的方法调用。所有通过 <code>pluginApi.js</code>
+        暴露的方法都自动支持 <code>:before</code> / <code>:after</code> / <code>:error</code> 三类钩子。
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>方法</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>register(hookName, handler, opts)</code></td>
+              <td>注册钩子。<code>opts.priority</code> 控制执行顺序（越小越先）</td>
+            </tr>
+            <tr>
+              <td><code>unregister(hookName)</code></td>
+              <td>注销钩子</td>
+            </tr>
+            <tr>
+              <td><code>unregisterAll()</code></td>
+              <td>注销该插件的所有钩子</td>
+            </tr>
+            <tr>
+              <td><code>list()</code></td>
+              <td>列出所有已注册的钩子</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>钩子命名规范</h3>
+      <p>格式为 <code>module:event</code>，常见的钩子名：</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>钩子名</th>
+              <th>触发时机</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>character.createCharacter:before</code></td><td>创建角色前，可修改参数或取消</td></tr>
+            <tr><td><code>character.updateCharacter:after</code></td><td>更新角色后，可修改返回值</td></tr>
+            <tr><td><code>chat.sendMessage:before</code></td><td>发送单聊消息前</td></tr>
+            <tr><td><code>chat.sendMessage:after</code></td><td>发送单聊消息后</td></tr>
+            <tr><td><code>groupChat.sendGroupMessage:before</code></td><td>发送群聊消息前</td></tr>
+            <tr><td><code>memory.addMemory:before</code></td><td>添加记忆前</td></tr>
+            <tr><td><code>worldBook.addRule:after</code></td><td>添加世界书规则后</td></tr>
+            <tr><td><code>injector.applyInjection:before</code></td><td>应用注入前</td></tr>
+            <tr><td><code>api.sendChatRequest:before</code></td><td>调用 AI API 前</td></tr>
+            <tr><td><code>settings.updateSettings:after</code></td><td>更新设置后</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>钩子处理函数签名</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// before 钩子：可修改参数、取消调用
+api.hooks.register('chat.sendMessage:before', (context) =&gt; {
+  // context = { args, module, method, cancelled }
+  // 修改参数
+  context.args[0] = context.args[0].replace(/敏感词/g, '***');
+  // 返回 context 或 { args: [...] } 生效
+
+  // 取消调用（抛异常）
+  // return false;  // 或 context.cancelled = true;
+}, { priority: 100 });
+
+// after 钩子：可修改返回值
+api.hooks.register('chat.sendMessage:after', (context) =&gt; {
+  // context = { args, result }
+  // 修改 result 生效
+  context.result = { ...context.result, injected: true };
+});
+
+// error 钩子：捕获异常
+api.hooks.register('chat.sendMessage:error', (context) =&gt; {
+  // context = { args, error }
+  console.error('sendMessage 失败:', context.error);
+});</code></pre>
+      </div>
+
+      <h3>取消调用</h3>
+      <div class="callout callout-info">
+        <div class="callout-title">💡 如何取消方法调用</div>
+        <p>
+          <code>before</code> 钩子返回 <code>false</code> 或设置 <code>context.cancelled = true</code>
+          即可取消调用。主线程会抛出带 <code>_cancelled</code> 标记的异常，调用方需自行处理。
+        </p>
+      </div>
+
+      <!-- ============================================================
+           13. 业务模块 API
+           ============================================================ -->
+      <h2 id="api-modules">业务模块 API（节选）</h2>
+
+      <h3>api.character</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>方法</th><th>权限</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>getCurrentCharacter()</code></td><td>character:read</td><td>获取当前角色</td></tr>
+            <tr><td><code>loadCharacters()</code></td><td>character:read</td><td>重新加载角色列表</td></tr>
+            <tr><td><code>createCharacter(data)</code></td><td>character:write</td><td>创建角色</td></tr>
+            <tr><td><code>updateCharacter(id, updates)</code></td><td>character:write</td><td>更新角色</td></tr>
+            <tr><td><code>deleteCharacter(id)</code></td><td>character:write</td><td>删除角色</td></tr>
+            <tr><td><code>selectCharacter(id)</code></td><td>character:read</td><td>切换角色</td></tr>
+            <tr><td><code>exportCharacter(id, format)</code></td><td>character:read</td><td>导出角色卡</td></tr>
+            <tr><td><code>syncCharacterState(id)</code></td><td>character:write</td><td>同步角色引擎状态</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// 获取当前角色
+const char = await api.character.getCurrentCharacter();
+console.log(char.name, char.emotionState);
+
+// 修改角色描述
+await api.character.updateCharacter(char.id, {
+  description: '一个全新的简介'
+});</code></pre>
+      </div>
+
+      <h3>api.emotion</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>方法</th><th>权限</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>getEmotionLabel(state)</code></td><td>character:read</td><td>获取情绪标签</td></tr>
+            <tr><td><code>getEmotionDescription(character)</code></td><td>character:read</td><td>获取情绪描述</td></tr>
+            <tr><td><code>buildEmotionPrompt(character)</code></td><td>character:read</td><td>构建情感提示词</td></tr>
+            <tr><td><code>handleInteraction(character, type, intensity)</code></td><td>character:write</td><td>处理情感事件</td></tr>
+            <tr><td><code>classifyUserMessage(text, useLLM)</code></td><td>character:read</td><td>分类用户消息</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>api.worldBook</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>方法</th><th>权限</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>getAllRules()</code></td><td>worldbook:read</td><td>获取所有规则</td></tr>
+            <tr><td><code>addRule(ruleData)</code></td><td>worldbook:write</td><td>添加规则</td></tr>
+            <tr><td><code>updateRule(id, updates)</code></td><td>worldbook:write</td><td>更新规则</td></tr>
+            <tr><td><code>deleteRule(id)</code></td><td>worldbook:write</td><td>删除规则</td></tr>
+            <tr><td><code>toggleRule(id)</code></td><td>worldbook:write</td><td>启用/禁用规则</td></tr>
+            <tr><td><code>getEnabledRules(context)</code></td><td>worldbook:read</td><td>获取生效的规则</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// 添加一条"深夜提示"规则
+await api.worldBook.addRule({
+  name: '深夜提示',
+  type: 'conditional',
+  condition: {
+    path: 'gameTime.hour',
+    op: 'gte',
+    value: 23,
+  },
+  content: '现在是深夜，你感到困倦。',
+  position: 'before',
+  priority: 50,
+  enabled: true,
+});</code></pre>
+      </div>
+
+      <h3>api.api</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>方法</th><th>权限</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>sendChatRequest(params)</code></td><td>api:call</td><td>发送 AI 请求（支持流式）</td></tr>
+            <tr><td><code>fetchModels()</code></td><td>api:call</td><td>获取可用模型列表</td></tr>
+            <tr><td><code>testApiConnection()</code></td><td>api:call</td><td>测试 API 连通性</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js · 自定义 AI 调用</span></div>
+        <pre><code>// 用 AI 分析一段文本
+const response = await api.api.sendChatRequest({
+  messages: [
+    { role: 'user', content: '分析这段话的情绪：今天心情很好' }
+  ],
+  systemPrompt: '你是情感分析专家。',
+  temperature: 0.1,
+  maxTokens: 50,
+  stream: false,
+});
+
+console.log(response.content);</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-title">⚠️ 关于 api.sendChatRequest 的流式模式</div>
+        <p>
+          流式模式下，<code>onChunk</code> 回调会传递每个文本块。注意：如果插件在 Worker 中调用，
+          <code>onChunk</code> 是异步执行的，请确保错误处理正确。
+        </p>
+      </div>
+
+      <!-- ============================================================
+           14. UI 侧 API 总览
+           ============================================================ -->
+      <h2 id="uiapi-overview">uiApi 总览</h2>
+
+      <p><code>ui.js</code> 的 <code>setup(uiApi, manifest)</code> 中，<code>uiApi</code> 提供以下工具：</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>模块</th><th>用途</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>uiApi.api</code></td><td>与 Worker 侧 api 等价（带权限校验的代理）</td></tr>
+            <tr><td><code>uiApi.storage</code></td><td>插件专属持久化存储</td></tr>
+            <tr><td><code>uiApi.config</code></td><td>插件配置管理</td></tr>
+            <tr><td><code>uiApi.dialog</code></td><td>对话框工具</td></tr>
+            <tr><td><code>uiApi.logger</code></td><td>命名空间日志</td></tr>
+            <tr><td><code>uiApi.dom</code></td><td>DOM 便捷方法</td></tr>
+            <tr><td><code>uiApi.hotkey</code></td><td>快捷键注册</td></tr>
+            <tr><td><code>uiApi.contextMenu</code></td><td>右键菜单</td></tr>
+            <tr><td><code>uiApi.tooltip</code></td><td>悬停提示</td></tr>
+            <tr><td><code>uiApi.loading</code></td><td>加载遮罩</td></tr>
+            <tr><td><code>uiApi.dragDrop</code></td><td>拖拽支持</td></tr>
+            <tr><td><code>uiApi.modal</code></td><td>模态框</td></tr>
+            <tr><td><code>uiApi.utils</code></td><td>快捷方法（toast/banner/markdown 等）</td></tr>
+            <tr><td><code>uiApi.loadModule</code></td><td>动态加载核心模块</td></tr>
+            <tr><td><code>uiApi.registerSlot</code></td><td>注册 UI 槽位</td></tr>
+            <tr><td><code>uiApi.overrideRenderer</code></td><td>覆写渲染器</td></tr>
+            <tr><td><code>uiApi.injectPanel</code></td><td>注入面板（兼容旧 API）</td></tr>
+            <tr><td><code>uiApi.injectMessageAction</code></td><td>注入消息操作（兼容旧 API）</td></tr>
+            <tr><td><code>uiApi.injectSettingsSection</code></td><td>注入设置区块（兼容旧 API）</td></tr>
+            <tr><td><code>uiApi.injectSidebarButton</code></td><td>注入侧栏按钮（兼容旧 API）</td></tr>
+            <tr><td><code>uiApi.onWorkerMessage</code></td><td>接收 Worker 消息</td></tr>
+            <tr><td><code>uiApi.sendToWorker</code></td><td>向 Worker 发送消息</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================
+           15. uiApi.dom
+           ============================================================ -->
+      <h2 id="uiapi-dom">uiApi.dom · DOM 工具</h2>
+
+      <h3>h(tag, attrs, ...children)</h3>
+      <p>快速创建 DOM 元素，支持 CSS 选择器式 tag：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 基础用法
+const btn = uiApi.dom.h('button.btn.btn-primary', { onclick: () =&gt; alert('点击') }, '点击我');
+
+// 复杂结构
+const box = uiApi.dom.h('div#container', { style: 'padding: 1rem;' }, [
+  uiApi.dom.h('h3', {}, '标题'),
+  uiApi.dom.h('p', {}, '段落'),
+  uiApi.dom.h('img', { src: '/avatar.png', alt: '头像' }),
+]);
+
+// 事件绑定
+uiApi.dom.h('input', {
+  type: 'text',
+  placeholder: '输入...',
+  oninput: (e) =&gt; console.log(e.target.value),
+});</code></pre>
+      </div>
+
+      <h3>其他方法</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>方法</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>cssVar(name, fallback)</code></td><td>读取主题 CSS 变量</td></tr>
+            <tr><td><code>createIcon(name, opts)</code></td><td>创建 Font Awesome 图标</td></tr>
+            <tr><td><code>observe(selector, cb, opts)</code></td><td>监听元素出现</td></tr>
+            <tr><td><code>debounce(fn, delay)</code></td><td>防抖</td></tr>
+            <tr><td><code>throttle(fn, delay)</code></td><td>节流</td></tr>
+            <tr><td><code>waitFor(selector, timeout)</code></td><td>等待元素出现</td></tr>
+            <tr><td><code>escapeHtml(text)</code></td><td>转义 HTML</td></tr>
+            <tr><td><code>fromHTML(html)</code></td><td>从 HTML 字符串解析元素</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================
+           16. uiApi.dialog / modal
+           ============================================================ -->
+      <h2 id="uiapi-dialog">uiApi.dialog · 对话框工具</h2>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 确认框
+const ok = await uiApi.dialog.confirm('确定要删除吗？', {
+  title: '危险操作',
+  okText: '删除',
+  danger: true,
+});
+
+// 输入框
+const name = await uiApi.dialog.prompt('请输入新名称', '默认值', {
+  placeholder: '名称...',
+});
+
+// 提示框
+await uiApi.dialog.alert('操作完成！', { type: 'success' });
+
+// 多字段表单
+const result = await uiApi.dialog.form({
+  title: '插件设置',
+  fields: [
+    { name: 'apiKey', label: 'API Key', type: 'password' },
+    { name: 'model', label: '模型', type: 'select', options: ['gpt-4o', 'claude-3'], value: 'gpt-4o' },
+    { name: 'enabled', label: '启用', type: 'checkbox', value: true },
+  ],
+});
+console.log(result); // { apiKey: '...', model: 'gpt-4o', enabled: true }</code></pre>
+      </div>
+
+      <h3>uiApi.modal</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 打开自定义模态框
+await uiApi.modal.open(`
+  &lt;button class="modal-close"&gt;&times;&lt;/button&gt;
+  &lt;h2 class="modal-title"&gt;自定义内容&lt;/h2&gt;
+  &lt;div&gt;...你的 HTML...&lt;/div&gt;
+`, () =&gt; {
+  console.log('模态框关闭');
+});
+
+// 关闭当前模态框
+uiApi.modal.close();
+
+// 创建标准模态框 HTML
+const html = uiApi.modal.create('标题', '&lt;p&gt;内容&lt;/p&gt;');</code></pre>
+      </div>
+
+      <!-- ============================================================
+           17. uiApi.hotkey / tooltip
+           ============================================================ -->
+      <h2 id="uiapi-hotkey">uiApi.hotkey · 快捷键</h2>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 注册快捷键
+const off = uiApi.hotkey.register('Ctrl+K', (e) =&gt; {
+  console.log('Ctrl+K 按下');
+  return true;  // 返回 true 阻止浏览器默认行为
+});
+
+// 取消注册
+off();
+
+// 列出所有已注册的快捷键
+console.log(uiApi.hotkey.list());</code></pre>
+      </div>
+
+      <h3>uiApi.tooltip · 悬停提示</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 为某选择器的所有元素绑定 tooltip
+const off = uiApi.tooltip.attach('.my-button', '点击保存', {
+  placement: 'top',
+  delay: 300,
+});
+
+// 支持动态内容
+uiApi.tooltip.attach('.avatar', (el) =&gt; `用户：${el.alt}`, {
+  placement: 'bottom',
+});
+
+// 手动显示
+uiApi.tooltip.show(targetEl, '这是提示内容');
+
+// 隐藏
+uiApi.tooltip.hide();</code></pre>
+      </div>
+
+      <!-- ============================================================
+           18. uiApi.contextMenu
+           ============================================================ -->
+      <h2 id="uiapi-contextmenu">uiApi.contextMenu · 右键菜单</h2>
+
+      <p>插件注册的右键菜单会与核心菜单<strong>自动合并</strong>，按 priority 排序。</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 为消息气泡添加自定义菜单项
+uiApi.contextMenu.register('.message', [
+  {
+    label: '📋 复制内容',
+    onClick: (e, target) =&gt; {
+      const text = target.querySelector('.bubble-content')?.textContent;
+      navigator.clipboard.writeText(text);
+    },
+  },
+  { separator: true },
+  {
+    label: '🔍 分析情绪',
+    danger: false,
+    onClick: async (e, target) =&gt; {
+      const text = target.querySelector('.bubble-content')?.textContent;
+      // ...调用 API 分析
+    },
+  },
+], {
+  priority: 150,  // 数字越小越先合并
+});
+
+// 动态生成菜单项
+uiApi.contextMenu.register('.character-item', (target) =&gt; {
+  const id = target.dataset.id;
+  return [
+    { label: `编辑 ${id.slice(0, 6)}...`, onClick: () =&gt; edit(id) },
+  ];
+});</code></pre>
+      </div>
+
+      <h3>菜单项配置</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>label</code></td><td>string</td><td>菜单项文字</td></tr>
+            <tr><td><code>icon</code></td><td>string</td><td>Font Awesome 图标名（可选）</td></tr>
+            <tr><td><code>onClick</code></td><td>Function</td><td>点击回调 <code>(event, target) =&gt; void</code></td></tr>
+            <tr><td><code>danger</code></td><td>boolean</td><td>危险操作（红色）</td></tr>
+            <tr><td><code>disabled</code></td><td>boolean</td><td>禁用状态</td></tr>
+            <tr><td><code>separator</code></td><td>boolean</td><td>分隔线（此时其他字段忽略）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>选项说明</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>选项</th><th>默认</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>priority</code></td><td>100</td><td>数字越小越先执行。核心菜单为 50</td></tr>
+            <tr><td><code>exclusive</code></td><td>false</td><td>返回非空后，其他 provider 不执行</td></tr>
+            <tr><td><code>claim</code></td><td>false</td><td>返回非空后，跳过后续 provider</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================
+           19. uiApi.loading / dragDrop
+           ============================================================ -->
+      <h2 id="uiapi-loading">uiApi.loading · 加载遮罩</h2>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 显示加载遮罩（支持嵌套计数）
+uiApi.loading.show('正在处理...');
+
+// 隐藏
+uiApi.loading.hide();
+
+// 或使用 wrap 自动管理
+const result = await uiApi.loading.wrap(async () =&gt; {
+  return await fetchData();
+}, '加载数据中...');</code></pre>
+      </div>
+
+      <h3>uiApi.dragDrop · 拖拽</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 让元素可拖动
+const cleanup = uiApi.dragDrop.draggable(myEl, {
+  data: { type: 'message', id: 'xxx' },
+  onDragEnd: (data, e) =&gt; console.log('拖动结束', data),
+});
+
+// 让元素可接收拖放
+uiApi.dragDrop.droppable(dropZone, {
+  accepts: (data) =&gt; data.type === 'message',
+  onDrop: (data, e) =&gt; console.log('接收到', data),
+});
+
+// 自定义拖拽（不用原生 drag）
+uiApi.dragDrop.customDrag(source, data, {
+  onDrop: (target, data) =&gt; {},
+});</code></pre>
+      </div>
+
+      <!-- ============================================================
+           20. uiApi.storage / config / logger
+           ============================================================ -->
+      <h2 id="uiapi-storage">uiApi.storage · 独立存储</h2>
+
+      <p>每个插件拥有独立的 KV 存储命名空间，无需担心 key 冲突：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js / main.js</span></div>
+        <pre><code>// 读写
+await uiApi.storage.set('myKey', { foo: 'bar' });
+const value = await uiApi.storage.get('myKey', 'default');
+await uiApi.storage.remove('myKey');
+
+// 批量操作
+await uiApi.storage.setMany({ a: 1, b: 2 });
+const all = await uiApi.storage.getMany(['a', 'b']);
+
+// 前缀查询
+const keys = await uiApi.storage.keys('user:');
+
+// 检查存在
+if (await uiApi.storage.has('myKey')) { ... }
+
+// 清空该插件的所有数据
+await uiApi.storage.clear();</code></pre>
+      </div>
+
+      <h2>uiApi.config · 配置管理</h2>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 设置默认值
+uiApi.config.setDefaults({
+  enabled: true,
+  threshold: 0.5,
+  apiKey: '',
+});
+
+// 读取配置（合并默认值）
+const config = await uiApi.config.get();
+console.log(config.threshold);  // 0.5
+
+// 读写单项
+await uiApi.config.set('threshold', 0.8);
+const threshold = await uiApi.config.getItem('threshold');
+
+// 批量更新
+await uiApi.config.update({ threshold: 0.6, apiKey: 'xxx' });
+
+// 重置为默认值
+await uiApi.config.reset();
+
+// 订阅变更
+const off = uiApi.config.onChange((config, changes) =&gt; {
+  console.log('配置变更:', changes);
+  applyConfig(config);
+});</code></pre>
+      </div>
+
+      <h2>uiApi.logger · 命名空间日志</h2>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js / main.js</span></div>
+        <pre><code>// 自动添加插件前缀
+uiApi.logger.debug('调试信息');
+uiApi.logger.info('普通信息');
+uiApi.logger.warn('警告');
+uiApi.logger.error('错误');
+
+// 打印表格
+uiApi.logger.table([{ a: 1 }, { a: 2 }]);
+
+// 计时
+const stop = uiApi.logger.time('耗时任务');
+// ... 执行任务
+const elapsed = stop();  // 返回毫秒数</code></pre>
+      </div>
+
+      <!-- ============================================================
+           21. UI 槽位系统
+           ============================================================ -->
+      <h2 id="slots">UI 槽位系统</h2>
+
+      <p>
+        槽位系统是插件注入界面的<strong>推荐方式</strong>。核心界面通过
+        <code>data-plugin-slot="xxx"</code> 标注锚点，插件只需提供渲染函数。
+      </p>
+
+      <h3>可用槽位</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>槽位名</th><th>位置</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>sidebar-top</code></td><td>侧栏顶部</td></tr>
+            <tr><td><code>sidebar-bottom</code></td><td>侧栏底部（footer 上方）</td></tr>
+            <tr><td><code>sidebar-footer-extra</code></td><td>侧栏 footer 内附加按钮</td></tr>
+            <tr><td><code>chat-header-actions</code></td><td>聊天头部右侧按钮区</td></tr>
+            <tr><td><code>welcome-content</code></td><td>欢迎页内容</td></tr>
+            <tr><td><code>input-actions-left</code></td><td>输入框左侧按钮</td></tr>
+            <tr><td><code>input-actions-right</code></td><td>输入框右侧按钮</td></tr>
+            <tr><td><code>message</code></td><td>每条消息容器</td></tr>
+            <tr><td><code>message-bubble</code></td><td>消息气泡</td></tr>
+            <tr><td><code>message-actions</code></td><td>消息操作区</td></tr>
+            <tr><td><code>character-item</code></td><td>角色列表项</td></tr>
+            <tr><td><code>character-item-actions</code></td><td>角色项操作区</td></tr>
+            <tr><td><code>character-form-top</code></td><td>角色表单顶部</td></tr>
+            <tr><td><code>character-form-middle</code></td><td>角色表单中部</td></tr>
+            <tr><td><code>character-form-bottom</code></td><td>角色表单底部</td></tr>
+            <tr><td><code>group-item</code></td><td>群组列表项</td></tr>
+            <tr><td><code>settings-top</code></td><td>设置面板顶部</td></tr>
+            <tr><td><code>settings-sections</code></td><td>设置面板 sections 区</td></tr>
+            <tr><td><code>settings-bottom</code></td><td>设置面板底部</td></tr>
+            <tr><td><code>worldbook-header</code></td><td>世界书面板头部</td></tr>
+            <tr><td><code>worldbook-toolbar</code></td><td>世界书工具栏</td></tr>
+            <tr><td><code>worldbook-rule-actions</code></td><td>世界书规则操作区</td></tr>
+            <tr><td><code>social-header-actions</code></td><td>朋友圈头部按钮</td></tr>
+            <tr><td><code>social-post-actions</code></td><td>朋友圈帖子操作区</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>registerSlot</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 注册槽位
+uiApi.registerSlot('message-actions', (context) =&gt; {
+  // context 包含 messageEl / messageId / messageRole 等
+  const btn = uiApi.dom.h('button.icon-btn', {
+    title: '收藏',
+    onclick: () =&gt; favorite(context.messageId),
+  }, '⭐');
+  return btn;
+}, { priority: 100 });</code></pre>
+      </div>
+
+      <h3>context 字段说明</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>字段</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>slotName</code></td><td>槽位名称</td></tr>
+            <tr><td><code>slotEl</code></td><td>槽位 DOM 元素</td></tr>
+            <tr><td><code>messageEl</code></td><td>所在消息元素（如果在消息内）</td></tr>
+            <tr><td><code>messageId</code></td><td>消息 ID</td></tr>
+            <tr><td><code>messageRole</code></td><td>消息角色（user / assistant）</td></tr>
+            <tr><td><code>characterId</code></td><td>角色 ID</td></tr>
+            <tr><td><code>groupId</code></td><td>群组 ID</td></tr>
+            <tr><td><code>query(sel)</code></td><td>在消息范围内查询元素</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>渲染器覆写</h3>
+      <p>覆写核心渲染器，用于改造气泡样式等高级用途：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// 覆写消息气泡渲染器
+uiApi.overrideRenderer('message-bubble', (msg, defaultRender) =&gt; {
+  const html = defaultRender(msg);
+  // 在原始 HTML 后追加内容
+  return html + '&lt;div class="my-marker"&gt;✨&lt;/div&gt;';
+});</code></pre>
+      </div>
+
+      <!-- ============================================================
+           22. 钩子系统（在 ui 场景下）
+           ============================================================ -->
+      <h2 id="hooks">钩子系统（补充说明）</h2>
+
+      <p>
+        除了 Worker 侧的 <code>api.hooks</code>，UI 侧通过 <code>uiApi.api.hooks</code>
+        也能注册钩子：
+      </p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>uiApi.api.hooks.register('chat.sendMessage:before', (context) =&gt; {
+  // 修改参数
+  context.args[0] = context.args[0].trim();
+  return context;
+});
+
+// 注意：uiApi.api 的权限校验与 Worker 侧一致
+// 需要在 manifest 中声明 hook:register 权限</code></pre>
+      </div>
+
+      <!-- ============================================================
+           23. 自定义命令
+           ============================================================ -->
+      <h2 id="commands">自定义命令</h2>
+
+      <p>注册自定义命令后，用户可以在输入框中通过 <code>/yourcommand</code> 触发。</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// 注册命令（需 command:register 权限）
+api.commandEngine.registerCommand(
+  'weather',                         // 命令名
+  async (args, context) =&gt; {
+    // args:      命令参数（字符串）
+    // context:   { character, conversation, state, settings }
+
+    const city = args.trim() || '北京';
+    const result = await api.api.sendChatRequest({
+      messages: [{ role: 'user', content: `查询${city}的天气` }],
+      systemPrompt: '只输出一句话天气描述。',
+      temperature: 0.3,
+      maxTokens: 50,
+      stream: false,
+    });
+
+    return {
+      // 输出到控制台气泡
+      console: `🌤️ ${city}: ${result.content}`,
+      consoleType: 'info',
+      // 顶部旁白提示
+      banner: `天气查询成功`,
+    };
+  },
+  {
+    description: '查询天气',
+    aliases: ['w'],  // 别名 /w
+  }
+);</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">💡 命令返回值</div>
+        <ul style="margin: 0.3rem 0 0 1rem;">
+          <li><code>{ console, consoleType }</code> — 输出到控制台气泡</li>
+          <li><code>{ banner }</code> — 顶部旁白提示</li>
+          <li><code>{ handled: false }</code> — 交由后续命令处理（罕见）</li>
+        </ul>
+      </div>
+
+      <!-- ============================================================
+           24. 最佳实践
+           ============================================================ -->
+      <h2 id="best-practices">最佳实践</h2>
+
+      <h3>1. 权限最小化</h3>
+      <div class="callout callout-tip">
+        <div class="callout-title">✅ 只申请必要权限</div>
+        <p>
+          用户会在安装时看到权限列表。仅申请真正需要的权限，可以大幅提升安装转化率。
+          例如：只读取角色信息的插件不要申请 <code>character:write</code>。
+        </p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">manifest.json · 推荐</span></div>
+        <pre><code>{
+  "permissions": [
+    "character:read",
+    "event:subscribe"
+  ]
+}</code></pre>
+      </div>
+
+      <h3>2. teardown 必做</h3>
+      <p>
+        所有在 <code>setup</code> 中创建的资源都应在 <code>teardown</code> 中清理。
+        虽然框架会自动处理钩子、槽位、事件订阅等，但以下需要<strong>手动清理</strong>：
+      </p>
+      <ul>
+        <li>定时器（<code>setInterval</code> / <code>setTimeout</code>）</li>
+        <li>Worker 侧的外部连接（WebSocket 等）</li>
+        <li>UI 侧手动绑定的事件监听器（<code>addEventListener</code>）</li>
+        <li>UI 侧手动创建的 DOM 元素</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>export function setup(uiApi, manifest) {
+  const timer = setInterval(() =&gt; {
+    console.log('tick');
+  }, 1000);
+
+  return function teardown() {
+    clearInterval(timer);  // ← 必做
+  };
+}</code></pre>
+      </div>
+
+      <h3>3. 错误处理</h3>
+      <p>
+        Worker 中的未捕获异常会通过 <code>plugin:error</code> 消息通知主线程，但建议
+        在关键路径显式捕获：
+      </p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>api.events.on('message:received', async (payload) =&gt; {
+  try {
+    const result = await someRiskyOperation(payload);
+    // ...
+  } catch (err) {
+    console.error('[MyPlugin] 处理失败:', err);
+    // 不要把异常抛回框架
+  }
+});</code></pre>
+      </div>
+
+      <h3>4. 异步钩子慎用</h3>
+      <div class="callout callout-warn">
+        <div class="callout-title">⚠️ 钩子有 5 秒超时</div>
+        <p>
+          钩子处理函数超过 5 秒会被强制终止。如果需要长时间处理，请使用
+          <code>api.events</code> 异步触发，而非在钩子中阻塞。
+        </p>
+      </div>
+
+      <h3>5. 使用槽位而非侵入式 DOM 操作</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// ❌ 不推荐：直接操作 DOM
+document.querySelector('#chatHeader').innerHTML += '&lt;button&gt;...&lt;/button&gt;';
+
+// ✅ 推荐：使用槽位
+uiApi.registerSlot('chat-header-actions', () =&gt; {
+  return uiApi.dom.h('button.icon-btn', {}, '点击');
+});</code></pre>
+      </div>
+
+      <h3>6. Worker 侧不做 DOM 相关推断</h3>
+      <p>
+        Worker 无法访问 DOM。如果插件需要基于界面状态做决策，请通过
+        <code>api.state</code> 读取状态，或在 <code>ui.js</code> 中处理。
+      </p>
+
+      <h3>7. 状态隔离</h3>
+      <p>
+        插件自己的运行时状态不要放在 <code>api.state</code> 的全局状态中（除了 UI 状态），
+        而是使用 <code>uiApi.storage</code> 或闭包变量：
+      </p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>// ✅ 推荐：闭包内的模块级变量
+let counter = 0;
+
+export function setup(api, manifest) {
+  api.events.on('message:received', () =&gt; {
+    counter++;
+  });
+}
+
+// ❌ 不推荐：污染全局状态
+api.state.set('myplugin.counter', 0);</code></pre>
+      </div>
+
+      <h3>8. 版本控制</h3>
+      <p>
+        使用语义化版本。当权限或 API 契约发生<strong>不兼容变化</strong>时，主版本号递增：
+      </p>
+      <ul>
+        <li><code>1.0.0</code> → <code>1.0.1</code>：修复 bug</li>
+        <li><code>1.0.0</code> → <code>1.1.0</code>：新增功能（向后兼容）</li>
+        <li><code>1.0.0</code> → <code>2.0.0</code>：破坏性变更</li>
+      </ul>
+
+      <h3>9. 日志规范</h3>
+      <p>
+        使用 <code>uiApi.logger</code> 而非直接 <code>console.log</code>。日志器会自动
+        添加插件前缀，便于用户排查问题：
+      </p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>// ✅ 推荐
+uiApi.logger.info('插件已加载');
+uiApi.logger.error('API 调用失败', err);
+
+// ❌ 不推荐
+console.log('[MyPlugin] 插件已加载');
+console.error('[MyPlugin] API 调用失败', err);</code></pre>
+      </div>
+
+      <h3>10. 配置默认值</h3>
+      <p>
+        始终为配置项提供合理的默认值，使用户在首次使用时无需配置即可工作：
+      </p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>uiApi.config.setDefaults({
+  enabled: true,
+  threshold: 0.5,
+  model: 'gpt-4o-mini',
+});</code></pre>
+      </div>
+
+      <!-- ============================================================
+           25. 调试与测试
+           ============================================================ -->
+      <h2 id="debugging">调试与测试</h2>
+
+      <h3>全局调试 API</h3>
+      <p>打开浏览器控制台，访问 <code>window.__utopiaPlugins</code>：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">浏览器控制台</span></div>
+        <pre><code>// 列出所有已安装插件
+__utopiaPlugins.list()
+
+// 列出运行中的插件
+__utopiaPlugins.running()
+
+// 启用 / 禁用 / 重载
+await __utopiaPlugins.enable('com.example.my-plugin')
+await __utopiaPlugins.disable('com.example.my-plugin')
+await __utopiaPlugins.reload('com.example.my-plugin')
+
+// 查看已注册的钩子
+await __utopiaPlugins.hooks()
+
+// 查看槽位注册表
+await __utopiaPlugins.slots()
+
+// 查看 API 方法列表
+await __utopiaPlugins.api()
+
+// 查看运行状态
+__utopiaPlugins.runtime('com.example.my-plugin')</code></pre>
+      </div>
+
+      <h3>日志级别控制</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">浏览器控制台</span></div>
+        <pre><code>// 设置全局日志级别
+localStorage.setItem('utopia:plugin-log-level', 'debug');
+// 可选：debug / info / warn / error</code></pre>
+      </div>
+
+      <h3>Worker 调试</h3>
+      <p>
+        Chrome DevTools 支持 Worker 独立调试：Sources 面板 → 左侧选择插件 Worker →
+        即可设置断点、查看变量。
+      </p>
+
+      <h3>卸载清理测试</h3>
+      <p>验证插件的清理逻辑，请检查以下场景：</p>
+      <ul>
+        <li>禁用后，钩子、事件、槽位是否全部移除？</li>
+        <li>禁用后，Worker 是否终止？</li>
+        <li>重新启用是否正常工作（不残留旧监听器）？</li>
+        <li>卸载后，重新安装相同 ID 是否成功？</li>
+      </ul>
+
+      <!-- ============================================================
+           26. 完整示例
+           ============================================================ -->
+      <h2 id="examples">完整示例</h2>
+
+      <h3>示例 1：消息发送前自动检测敏感词</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">manifest.json</span></div>
+        <pre><code>{
+  "id": "com.example.word-filter",
+  "name": "敏感词过滤器",
+  "version": "1.0.0",
+  "description": "发送消息前自动替换敏感词",
+  "main": "main.js",
+  "permissions": [
+    "hook:register",
+    "event:subscribe"
+  ]
+}</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>const WORDS = ['测试敏感词1', '测试敏感词2'];
+
+export function setup(api, manifest) {
+  api.hooks.register('chat.sendMessage:before', (context) =&gt; {
+    if (!context.args || !context.args[0]) return context;
+
+    let text = context.args[0];
+    for (const w of WORDS) {
+      text = text.replace(new RegExp(w, 'g'), '*'.repeat(w.length));
+    }
+    context.args[0] = text;
+    return context;
+  }, { priority: 100 });
+
+  return () =&gt; {};
+}</code></pre>
+      </div>
+
+      <h3>示例 2：侧栏添加自定义按钮 + 自定义对话框</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">manifest.json</span></div>
+        <pre><code>{
+  "id": "com.example.sidebar-tool",
+  "name": "侧栏工具",
+  "version": "1.0.0",
+  "main": "main.js",
+  "ui": "ui.js",
+  "permissions": [
+    "ui:inject",
+    "character:read"
+  ]
+}</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>export function setup(api, manifest) {
+  api.events.on('mybutton:clicked', async () =&gt; {
+    const char = await api.character.getCurrentCharacter();
+    api.postToUI({
+      type: 'showCharacter',
+      name: char?.name || '未选择'
+    });
+  });
+
+  return () =&gt; {};
+}</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">ui.js</span></div>
+        <pre><code>export function setup(uiApi, manifest) {
+  // 在侧栏底部注入按钮
+  const offSlot = uiApi.registerSlot('sidebar-footer-extra', () =&gt; {
+    return uiApi.dom.h('button.sidebar-btn', {
+      onclick: async () =&gt; {
+        uiApi.sendToWorker({ action: 'click' });
+      },
+    }, [
+      uiApi.dom.createIcon('fa-star'),
+      uiApi.dom.h('span', {}, '我的工具'),
+    ]);
+  });
+
+  // 监听 Worker 消息
+  const offMsg = uiApi.onWorkerMessage(async (payload) =&gt; {
+    if (payload.type === 'showCharacter') {
+      await uiApi.dialog.alert(`当前角色：${payload.name}`, {
+        type: 'info',
+      });
+    }
+  });
+
+  return () =&gt; {
+    offSlot();
+    offMsg();
+  };
+}</code></pre>
+      </div>
+
+      <h3>示例 3：注册自定义命令</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">manifest.json</span></div>
+        <pre><code>{
+  "id": "com.example.custom-cmd",
+  "name": "自定义命令",
+  "version": "1.0.0",
+  "main": "main.js",
+  "permissions": [
+    "command:register",
+    "character:read"
+  ]
+}</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>export function setup(api, manifest) {
+  api.commandEngine.registerCommand(
+    'hello',
+    async (args, context) =&gt; {
+      const char = context.character;
+      const name = args.trim() || (char ? char.name : '世界');
+      return {
+        console: `👋 Hello, ${name}!`,
+        consoleType: 'success',
+        banner: `👋 已向 ${name} 打招呼`,
+      };
+    },
+    {
+      description: '打招呼（/hello [名字]）',
+      aliases: ['hi'],
+    }
+  );
+
+  return () =&gt; {};
+}</code></pre>
+      </div>
+
+      <!-- ============================================================
+           27. FAQ
+           ============================================================ -->
+      <h2 id="faq">常见问题</h2>
+
+      <h3>Q: 为什么 Worker 里不能使用 document？</h3>
+      <p>
+        Worker 是独立线程，没有 DOM。这是<strong>设计意图</strong>——确保插件不能直接
+        操作界面，必须通过 <code>uiApi</code>（运行在主线程）进行受控的界面操作。
+        如需操作界面，请把对应逻辑放在 <code>ui.js</code> 中。
+      </p>
+
+      <h3>Q: 我的插件需要长时间运行任务怎么办？</h3>
+      <p>
+        Worker 本身就适合 CPU 密集任务。<code>setup</code> 可以是异步函数，
+        但注意<strong>不要在钩子中执行超过 5 秒的同步操作</strong>。长时间任务建议：
+      </p>
+      <ul>
+        <li>通过 <code>api.events.on()</code> 触发后台异步任务</li>
+        <li>使用 <code>api.postToUI()</code> 通知 UI 更新进度</li>
+        <li>使用 <code>uiApi.loading</code> 显示加载状态</li>
+      </ul>
+
+      <h3>Q: 如何在插件中读写应用设置？</h3>
+      <p>
+        使用 <code>api.settings</code>（需 <code>settings:read</code> / <code>settings:write</code>）：
+      </p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">main.js</span></div>
+        <pre><code>const settings = await api.settings.loadSettings();
+console.log(settings.apiProvider);
+
+await api.settings.updateSettings({
+  temperature: 0.9,
+});</code></pre>
+      </div>
+
+      <h3>Q: 插件间如何通信？</h3>
+      <p>
+        通过 <code>api.events</code>。插件 A 发布自定义事件，插件 B 订阅：
+      </p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">plugin-a/main.js</span></div>
+        <pre><code>api.events.emit('myplugin:data-ready', { data: [...] });</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">plugin-b/main.js</span></div>
+        <pre><code>api.events.on('myplugin:data-ready', (payload) =&gt; {
+  console.log('收到数据:', payload);
+});</code></pre>
+      </div>
+      <p>
+        建议事件名加上插件名前缀（如 <code>myplugin:xxx</code>），避免与核心事件冲突。
+      </p>
+
+      <h3>Q: 插件可以访问其他插件的数据吗？</h3>
+      <p>
+        不能。每个插件的 <code>storage</code> 与 <code>config</code> 是隔离的命名空间。
+        如果需要共享数据，通过事件通信或让用户显式配置。
+      </p>
+
+      <h3>Q: 如何让插件兼容未来版本的 Utopia？</h3>
+      <p>
+        在 manifest 中声明 <code>utopia.minVersion</code> / <code>maxVersion</code>。
+        当用户升级 Utopia 后，如果 API 不兼容，插件会被提示需要更新。
+      </p>
+
+      <h3>Q: 钩子可以取消核心方法调用吗？</h3>
+      <p>
+        可以。<code>before</code> 钩子返回 <code>false</code> 或设置
+        <code>context.cancelled = true</code>，主线程会抛出带 <code>_cancelled</code>
+        标记的异常，原方法不会被执行。调用方（用户操作）会看到相应提示。
+      </p>
+
+      <h3>Q: 我的插件崩溃了，会影响主应用吗？</h3>
+      <p>
+        不会。Worker 与主线程隔离，Worker 崩溃不会影响主应用。但插件会停止工作，
+        用户需要重新启用。请确保关键路径有 try-catch。
+      </p>
+
+      <h3>Q: 如何测试插件？</h3>
+      <p>
+        Utopia 未提供内置测试框架。推荐方式：
+      </p>
+      <ul>
+        <li>使用 <code>uiApi.logger</code> 输出关键日志</li>
+        <li>利用 <code>window.__utopiaPlugins</code> 检查注册状态</li>
+        <li>在浏览器控制台手动触发事件测试</li>
+        <li>通过 <code>uiApi.dialog.form</code> 构造测试输入</li>
+      </ul>
+
+      <!-- ============================================================
+           结尾
+           ============================================================ -->
+      <hr style="margin: 3rem 0 1.5rem; border: none; border-top: 1px solid var(--color-border);">
+
+      <p style="text-align: center; color: var(--color-text-muted); font-size: 0.85rem;">
+        Utopia 插件系统开发说明 · v1.0 · 文档基于插件系统 v1.0.0
+      </p>
+      <p style="text-align: center; color: var(--color-text-muted); font-size: 0.8rem;">
+        如有疑问，请在项目仓库提交 Issue 或联系维护者。
+      </p>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // ============================================================
+  // 滚动进度条
+  // ============================================================
+  const progressBar = document.getElementById('progressBar');
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement;
+    const scrolled = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+    progressBar.style.width = scrolled + '%';
+  });
+
+  // ============================================================
+  // 侧栏导航高亮（基于 IntersectionObserver）
+  // ============================================================
+  const navLinks = document.querySelectorAll('.nav-link');
+  const sections = [];
+  navLinks.forEach(link => {
+    const href = link.getAttribute('href');
+    if (href && href.startsWith('#')) {
+      const el = document.querySelector(href);
+      if (el) sections.push({ el, link });
+    }
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + id));
+      }
+    });
+  }, {
+    rootMargin: '-80px 0px -60% 0px',
+    threshold: 0,
+  });
+
+  sections.forEach(({ el }) => observer.observe(el));
+
+  // ============================================================
+  // 代码复制
+  // ============================================================
+  document.querySelectorAll('.code-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const codeBlock = btn.closest('.code-block');
+      const codeEl = codeBlock?.querySelector('pre code');
+      if (!codeEl) return;
+
+      try {
+        await navigator.clipboard.writeText(codeEl.textContent);
+        btn.classList.add('copied');
+        const original = btn.textContent;
+        btn.textContent = '已复制 ✓';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.textContent = original;
+        }, 1500);
+      } catch (err) {
+        console.warn('复制失败:', err);
+        // 降级
+        const textarea = document.createElement('textarea');
+        textarea.value = codeEl.textContent;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
+    });
+  });
+
+  // ============================================================
+  // 移动端侧栏切换
+  // ============================================================
+  const mobileToggle = document.getElementById('mobileToggle');
+  const sidebar = document.getElementById('sidebar');
+  if (mobileToggle && sidebar) {
+    mobileToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+    });
+
+    // 点击侧栏链接后自动关闭（移动端）
+    sidebar.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth <= 900) {
+          sidebar.classList.remove('open');
+        }
+      });
+    });
+  }
+
+  console.log('%c🧩 Utopia 插件系统开发说明已加载', 'color: #6c5ce7; font-weight: bold;');
+</script>
+
+</body>
+</html>

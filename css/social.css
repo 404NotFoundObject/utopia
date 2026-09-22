@@ -1,0 +1,209 @@
+/* ============================================================
+   朋友圈样式 (social.css)
+   ============================================================ */
+
+.social-feed {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--spacing-sm) 0;
+}
+
+/* 头部 */
+.social-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-lg);
+}
+.social-header h2 {
+  margin: 0;
+  flex: 1;
+  font-size: var(--font-size-lg);
+}
+.social-header-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+/* 发布框 */
+.social-publish-box {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-base);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  animation: fadeIn 0.2s ease;
+}
+.social-publish-box textarea {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 1rem;
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+.social-publish-box textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+.social-publish-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+/* 帖子列表 */
+.social-posts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-base);
+}
+
+/* 单条帖子 */
+.social-post {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-base) var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border-light);
+  transition: box-shadow var(--transition-fast);
+}
+.social-post:hover {
+  box-shadow: var(--shadow-md);
+}
+.social-post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+.social-post-author {
+  font-weight: var(--font-weight-medium);
+}
+.social-post-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.social-post-content {
+  margin: var(--spacing-sm) 0 var(--spacing-base);
+  font-size: var(--font-size-base);
+  white-space: pre-wrap;
+}
+
+/* 评论区域 */
+.social-post-comments {
+  margin: var(--spacing-sm) 0;
+  font-size: var(--font-size-sm);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-sm);
+}
+.social-comment {
+  margin-bottom: var(--spacing-xs);
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.social-comment:last-child {
+  border-bottom: none;
+}
+.social-comment .social-comment-btn {
+  margin-left: 0.5rem;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+.social-comment .social-comment-btn:hover {
+  color: var(--color-primary);
+}
+
+/* 回复 */
+.social-reply {
+  margin-left: var(--spacing-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  padding: 0.25rem 0;
+}
+
+/* 内联评论输入框 */
+.social-inline-comment {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.3rem 0.5rem;
+  animation: fadeIn 0.2s ease;
+}
+.social-inline-comment .social-comment-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.4rem 0.2rem;
+  outline: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+.social-inline-comment .social-inline-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+.social-inline-comment .social-inline-actions .btn {
+  font-size: var(--font-size-xs);
+  padding: 0.2rem 0.6rem;
+}
+
+/* 删除按钮 */
+.social-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+.social-delete-btn:hover {
+  background: rgba(225, 112, 85, 0.1);
+}
+
+/* 空状态 */
+.empty-msg {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--spacing-2xl);
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 响应式调整（可选） */
+@media (max-width: 768px) {
+  .social-post {
+    padding: var(--spacing-base);
+  }
+  .social-inline-comment {
+    flex-wrap: wrap;
+  }
+  .social-inline-comment .social-comment-input {
+    flex-basis: 100%;
+  }
+  .social-inline-comment .social-inline-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

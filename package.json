@@ -1,0 +1,15 @@
+{
+  "name": "utopia",
+  "version": "3.7.1",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "AI 角色扮演 Agent —— 让角色真正活起来的工具集",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/404NotFoundObject/utopia.git"
+  },
+  "scripts": {
+    "dev": "python -m http.server 8080",
+    "dev:node": "npx serve -l 8080"
+  }
+}

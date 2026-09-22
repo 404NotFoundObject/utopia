@@ -1,0 +1,69 @@
+/* ============================================================
+   布局
+   ============================================================ */
+
+#app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+}
+
+#sidebar {
+  width: var(--sidebar-width);
+  background: var(--color-bg-sidebar);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width var(--transition-base), transform var(--transition-base);
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+  box-shadow: var(--shadow-sm);
+}
+
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-bg-primary);
+}
+
+#welcomePage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  text-align: center;
+  padding: var(--spacing-2xl);
+  background: var(--color-bg-secondary);
+}
+#welcomePage h1 {
+  font-size: var(--font-size-2xl);
+  background: var(--color-primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+#welcomePage p {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+}
+#welcomePage .sub {
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-base);
+}
+
+#chatContainer {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+#chatContainer.active {
+  display: flex;
+}

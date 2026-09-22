@@ -1,0 +1,244 @@
+/* ===== 群聊消息专用样式（优化气泡宽度与缩进，时间戳右下角） ===== */
+
+/* 容器 */
+#chatMessages.group-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 1.5rem;
+}
+
+/* 单条消息 */
+#chatMessages .group-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 80%;
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+
+#chatMessages .group-message.own {
+  align-self: flex-end;
+  align-items: flex-end;
+  padding: 0;
+}
+
+/* 顶部：头像 + 名称 */
+#chatMessages .group-message-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+  width: 100%;
+}
+
+#chatMessages .group-message-top .avatar {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  object-fit: cover;
+  background: var(--color-border);
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-light);
+}
+
+#chatMessages .group-message-top .sender-name {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* 消息气泡 */
+#chatMessages .group-message-bubble {
+  background: var(--color-bg-primary);
+  padding: 0.4rem 0.7rem 0.2rem 0.7rem;
+  border-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-xs);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border-light);
+  word-wrap: break-word;
+  max-width: 100%;
+  margin-left: 44px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ★★★ 正文：继承父级字号 ★★★ */
+#chatMessages .group-message-bubble .content {
+  font-size: inherit;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* ★★★ mentions 标签：与内容同行，高亮显示 ★★★ */
+#chatMessages .mentions {
+  display: inline;
+  font-size: inherit;
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-right: 0.2rem;
+}
+
+/* 时间戳 */
+#chatMessages .group-message-bubble .timestamp {
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+  text-align: right;
+}
+
+/* 自己的消息 */
+#chatMessages .group-message.own .group-message-bubble {
+  background: var(--color-primary-gradient);
+  color: #fff;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-xs);
+  border-color: var(--color-primary);
+  margin-left: 0;
+  margin-right: 44px;
+}
+
+#chatMessages .group-message.own .group-message-bubble .timestamp {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+#chatMessages .group-message.own .group-message-top {
+  flex-direction: row-reverse;
+}
+
+/* 空状态 */
+#chatMessages .empty-msg {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 2rem;
+}
+
+/* ===== 移动端适配 ===== */
+@media (max-width: 768px) {
+  #chatMessages.group-chat-messages {
+    padding: 0.5rem 0.75rem;
+  }
+
+  #chatMessages .group-message {
+    max-width: 88%;
+    padding: 0;
+  }
+  #chatMessages .group-message.own {
+    padding: 0;
+  }
+
+  #chatMessages .group-message-top .avatar {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  #chatMessages .group-message-top .sender-name {
+    font-size: 0.65rem;
+    max-width: 80px;
+  }
+
+  #chatMessages .group-message-bubble {
+    margin-left: 36px;
+    padding: 0.3rem 0.5rem 0.15rem 0.5rem;
+  }
+
+  #chatMessages .group-message.own .group-message-bubble {
+    margin-right: 36px;
+  }
+
+  #chatMessages .group-message-bubble .content {
+    font-size: inherit;
+  }
+
+  #chatMessages .group-message-bubble .timestamp {
+    font-size: 0.5rem;
+    margin-top: 0.05rem;
+  }
+}
+
+@media (max-width: 480px) {
+  #chatMessages.group-chat-messages {
+    padding: 0.25rem 0.5rem;
+  }
+
+  #chatMessages .group-message {
+    max-width: 94%;
+    padding: 0;
+  }
+  #chatMessages .group-message.own {
+    padding: 0;
+  }
+
+  #chatMessages .group-message-top .avatar {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  #chatMessages .group-message-top .sender-name {
+    font-size: 0.55rem;
+    max-width: 60px;
+  }
+
+  #chatMessages .group-message-bubble {
+    margin-left: 30px;
+    padding: 0.2rem 0.4rem 0.1rem 0.4rem;
+  }
+
+  #chatMessages .group-message.own .group-message-bubble {
+    margin-right: 30px;
+  }
+
+  #chatMessages .group-message-bubble .content {
+    font-size: inherit;
+  }
+
+  #chatMessages .group-message-bubble .timestamp {
+    font-size: 0.45rem;
+    margin-top: 0.05rem;
+  }
+}
+
+/* ===== 提及选择器 ===== */
+.mention-picker {
+  position: fixed;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 200;
+  padding: 4px 0;
+  min-width: 150px;
+}
+.mention-picker ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mention-picker li {
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+.mention-picker li:hover {
+  background: var(--color-bg-secondary);
+}
+
+@media (max-width: 768px) {
+  .mention-picker {
+    max-height: 120px;
+    min-width: 120px;
+  }
+  .mention-picker li {
+    padding: 8px 12px;
+    font-size: var(--font-size-xs);
+  }
+}

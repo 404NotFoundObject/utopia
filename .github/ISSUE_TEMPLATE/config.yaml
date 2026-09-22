@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 阅读 FAQ
+    url: https://github.com/404NotFoundObject/utopia/blob/main/FAQ.md
+    about: 常见问题解答，可能已经包含你的答案
+  - name: 📚 插件开发说明
+    url: https://github.com/404NotFoundObject/utopia/blob/main/docs/plugin-development.md
+    about: 插件开发文档
+  - name: 💬 讨论区
+    url: https://github.com/404NotFoundObject/utopia/discussions
+    about: 提问、分享经验、讨论功能方向

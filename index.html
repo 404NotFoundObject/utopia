@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Utopia - 永远的理想国</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- 各CSS文件 -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/character.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/social.css">
+  <link rel="stylesheet" href="css/worldbook.css">
+  <link rel="stylesheet" href="css/group-chat.css">
+  <!-- 第三方库 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/minisearch@6.3.0/dist/umd/index.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- 侧栏 -->
+    <aside id="sidebar" data-plugin-slot="sidebar">
+      <div class="sidebar-header" data-plugin-slot="sidebar-header">
+        <span class="logo">✨ Utopia</span>
+        <button id="sidebarToggle" class="icon-btn"><i class="fas fa-bars"></i></button>
+      </div>
+      <div class="sidebar-content">
+        <!-- ★ 槽位：角色列表上方（插件可注入自定义区块） ★ -->
+        <div data-plugin-slot="sidebar-top" style="display:contents;"></div>
+
+        <!-- 角色与群组列表（共用） -->
+        <div class="character-list-wrapper">
+          <h3><i class="fas fa-users"></i> 角色与群组</h3>
+          <ul id="characterList" class="character-list"></ul>
+        </div>
+
+        <!-- ★ 槽位：角色列表下方、footer 上方 ★ -->
+        <div data-plugin-slot="sidebar-bottom" style="display:contents;"></div>
+
+        <div class="sidebar-footer" data-plugin-slot="sidebar-footer">
+          <button id="themeToggleBtn" class="sidebar-btn">
+            <i class="fas fa-moon"></i>
+            <span>主题</span>
+          </button>
+          <button id="socialBtn" class="sidebar-btn">
+            <i class="fas fa-users"></i>
+            <span>朋友圈</span>
+          </button>
+          <button id="worldbookBtn" class="sidebar-btn">
+            <i class="fas fa-book-open"></i>
+            <span>世界书</span>
+          </button>
+          <button id="pluginBtn" class="sidebar-btn">
+            <i class="fas fa-puzzle-piece"></i>
+            <span>插件</span>
+          </button>
+          <button id="settingsBtn" class="sidebar-btn">
+            <i class="fas fa-cog"></i>
+            <span>设置</span>
+          </button>
+          <button id="importBtn" class="sidebar-btn">
+            <i class="fas fa-file-import"></i>
+            <span>导入</span>
+          </button>
+          <button id="createBtn" class="sidebar-btn">
+            <i class="fas fa-plus-circle"></i>
+            <span>创建</span>
+          </button>
+          <button id="createGroupBtn" class="sidebar-btn">
+            <i class="fas fa-users-plus"></i>
+            <span>创建群组</span>
+          </button>
+          <!-- ★ 槽位：footer 内追加按钮（插件可注入） ★ -->
+          <div data-plugin-slot="sidebar-footer-extra" style="display:contents;"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 侧栏遮罩 -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <!-- 主内容区 -->
+    <main id="main">
+      <!-- 聊天头部 -->
+      <header id="chatHeader">
+        <button id="mobileMenuToggle" class="icon-btn"><i class="fas fa-bars"></i></button>
+        <div id="characterInfo" data-plugin-slot="chat-header-info">
+          <img id="charAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23e0e0e6'/%3E%3Ctext x='20' y='26' text-anchor='middle' fill='%238a8aaa' font-size='16' font-family='sans-serif'%3E?%3C/text%3E%3C/svg%3E" alt="头像">
+          <div>
+            <h2 id="charName">未选择</h2>
+            <p id="charRelation">--</p>
+          </div>
+        </div>
+        <!-- ★ 槽位：头部右侧按钮区（插件可注入） ★ -->
+        <div class="header-actions" data-plugin-slot="chat-header-actions"></div>
+      </header>
+
+      <!-- 欢迎页 -->
+      <div id="welcomePage" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding:2rem;background:var(--color-bg-secondary);">
+        <h1 style="font-size:3rem;color:var(--color-accent);margin-bottom:0.5rem;">✨ Utopia</h1>
+        <p style="font-size:1.5rem;color:var(--color-text-secondary);">永远的理想国</p>
+        <p style="color:var(--color-text-muted);margin-top:1rem;">请从左侧选择一个角色或群组开始对话</p>
+        <!-- ★ 槽位：欢迎页内容（插件可注入） ★ -->
+        <div data-plugin-slot="welcome-content" style="display:contents;"></div>
+      </div>
+
+      <!-- 聊天容器 -->
+      <div id="chatContainer" style="display:none;flex:1;flex-direction:column;min-height:0;">
+        <div id="chatMessages"></div>
+        <div id="chatInput">
+          <!-- ★ 槽位：输入框左侧（插件可注入按钮，如"清空"、"格式化"） ★ -->
+          <div data-plugin-slot="input-actions-left" style="display:contents;"></div>
+          <textarea id="messageInput" rows="2" placeholder="输入消息..."></textarea>
+          <!-- ★ 槽位：输入框右侧（麦克风、发送按钮由插件位置调整） ★ -->
+          <div data-plugin-slot="input-actions-right" style="display:contents;"></div>
+          <button id="sendBtn" class="send-btn"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 模态框 -->
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div id="modalContent" class="modal-content"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Import Map（含 fflate 用于插件 ZIP 解压） -->
+  <script type="importmap">
+    {
+      "imports": {
+        "/js/": "./js/",
+        "/lib/": "./lib/",
+        "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+      }
+    }
+  </script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

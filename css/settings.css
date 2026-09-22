@@ -1,0 +1,151 @@
+/* ===== 设置面板 ===== */
+.settings-section {
+  margin-bottom: var(--spacing-xl);
+}
+.settings-section h3 {
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--spacing-xs);
+}
+.setting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+.setting-row label {
+  min-width: 120px;
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+}
+.setting-row input,
+.setting-row select {
+  flex: 1;
+  min-width: 200px;
+}
+.setting-row .help-text {
+  flex-basis: 100%;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.setting-row .btn-sm {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.setting-row .btn-sm:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+.setting-row .btn-sm i {
+  margin-right: var(--spacing-xs);
+}
+.setting-row .btn-sm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   ★★★ 开关（Toggle Switch） ★★★
+   ============================================================ */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  /* 覆盖 .setting-row label 的默认样式 */
+  min-width: unset !important;
+  margin-bottom: 0 !important;
+  font-weight: normal !important;
+  font-size: unset !important;
+  cursor: pointer;
+  vertical-align: middle;
+  flex: 0 0 auto !important;
+}
+
+/* 隐藏原生 checkbox，但仍可被 JS 读取 */
+.toggle-switch input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+/* 滑块（轨道） */
+.toggle-switch .toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-border);
+  border-radius: 999px;
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* 滑块（圆形按钮） */
+.toggle-switch .toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  top: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--transition-fast);
+}
+
+/* 选中态 */
+.toggle-switch input[type="checkbox"]:checked + .toggle-slider {
+  background: var(--color-primary-gradient);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--color-primary);
+}
+.toggle-switch input[type="checkbox"]:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+/* 悬停态 */
+.toggle-switch:hover .toggle-slider {
+  filter: brightness(0.97);
+}
+[data-theme="dark"] .toggle-switch:hover .toggle-slider,
+[data-theme="cyberpunk"] .toggle-switch:hover .toggle-slider {
+  filter: brightness(1.15);
+}
+
+/* 禁用态 */
+.toggle-switch input[type="checkbox"]:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.toggle-switch input[type="checkbox"]:disabled ~ * {
+  cursor: not-allowed;
+}
+
+/* 聚焦态（键盘 Tab） */
+.toggle-switch input[type="checkbox"]:focus-visible + .toggle-slider {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 窄屏下让开关独占一行偏右 */
+@media (max-width: 480px) {
+  .setting-row .toggle-switch {
+    margin-left: auto;
+  }
+}

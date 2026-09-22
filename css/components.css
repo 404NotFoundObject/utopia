@@ -1,0 +1,572 @@
+/* ============================================================
+   组件样式
+   ============================================================ */
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
+  transition: all var(--transition-fast);
+}
+.icon-btn:hover {
+  background: rgba(108, 92, 231, 0.08);
+  color: var(--color-primary);
+  transform: scale(1.05);
+}
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1.5px solid var(--color-border);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--color-border);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.btn:active {
+  transform: translateY(0);
+}
+.btn-primary {
+  background: var(--color-primary-gradient);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.btn-primary:hover {
+  background: var(--color-primary-gradient-hover);
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+  transform: translateY(-1px);
+}
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: var(--color-danger);
+}
+.btn-danger:hover {
+  background: var(--color-danger-dark);
+  border-color: var(--color-danger-dark);
+  box-shadow: 0 4px 12px rgba(225, 112, 85, 0.3);
+}
+.btn-sm {
+  padding: 0.25rem 0.75rem;
+  font-size: var(--font-size-xs);
+}
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 文件上传自定义 */
+.file-upload-wrapper {
+  position: relative;
+  display: inline-block;
+}
+.file-upload-wrapper input[type="file"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.file-upload-wrapper .file-upload-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  border: 1.5px dashed var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.file-upload-wrapper .file-upload-label:hover {
+  background: var(--color-border);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.file-upload-wrapper .file-upload-label i {
+  font-size: 1.1rem;
+}
+.file-upload-wrapper .file-upload-label .file-name {
+  margin-left: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-group {
+  margin-bottom: var(--spacing-base);
+}
+.form-group label {
+  display: block;
+  font-weight: var(--font-weight-medium);
+  margin-bottom: 0.25rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.form-group .help-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-base);
+  border: 1px solid var(--color-border-light);
+  transition: box-shadow var(--transition-fast);
+}
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: var(--spacing-base);
+  animation: modalFadeIn 0.25s ease both;
+}
+.modal-overlay.hidden {
+  display: none;
+}
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.modal-content {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-2xl);
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border-light);
+  position: relative;
+  animation: modalContentIn 0.3s ease both;
+}
+@keyframes modalContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.modal-close {
+  position: absolute;
+  top: var(--spacing-base);
+  right: var(--spacing-base);
+  font-size: 1.5rem;
+  color: var(--color-text-muted);
+  padding: 0.25rem;
+  line-height: 1;
+  border-radius: var(--radius-full);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.modal-close:hover {
+  background: var(--color-border);
+  transform: rotate(90deg);
+}
+.modal-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-primary);
+}
+
+.toast-container {
+  position: fixed;
+  bottom: var(--spacing-lg);
+  right: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  z-index: var(--z-toast);
+  max-width: 360px;
+  width: 100%;
+}
+.toast {
+  padding: 0.75rem 1.25rem;
+  background: var(--color-bg-primary);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: toastSlideIn 0.3s ease both;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+.toast-success { border-left-color: var(--color-secondary); }
+.toast-error { border-left-color: var(--color-danger); }
+.toast-warning { border-left-color: var(--color-warning); }
+.toast-icon { font-size: 1.2rem; }
+.toast-msg { flex: 1; }
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 隐藏模态框滚动条 */
+.modal-content::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+.modal-content {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* ============================================================
+   旁白提示框（Banner）- 居中浮层
+   ============================================================ */
+
+.banner-container {
+  position: fixed;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: var(--z-toast);
+  max-width: 80%;
+  min-width: 200px;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+.banner-container.banner-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+/* 不同类型 */
+.banner-container.banner-info {
+  border-left: 4px solid var(--color-primary);
+}
+.banner-container.banner-success {
+  border-left: 4px solid var(--color-secondary);
+}
+.banner-container.banner-error {
+  border-left: 4px solid var(--color-danger);
+}
+.banner-container.banner-warning {
+  border-left: 4px solid var(--color-warning);
+}
+
+.banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.banner-line {
+  display: block;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .banner-container {
+    top: 8%;
+    max-width: 92%;
+    padding: 0.5rem 1rem;
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .banner-container {
+    top: 6%;
+    max-width: 96%;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+/* ============================================================
+   通用预览组件
+   用途：用户信息、角色表单、群组设置等多处
+   ============================================================ */
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  max-width: 80px;
+  max-height: 80px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  background: var(--color-border);
+  border: 2px dashed var(--color-border);
+  flex-shrink: 0;
+}
+
+.bg-preview {
+  max-width: 100%;
+  max-height: 150px;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+/* ============================================================
+   进阶设定滑块（响应式布局）
+   ------------------------------------------------------------
+   ★ 修复：移动端 range input 因 flexbox min-width:auto 溢出模态框
+   1. .adv-slider-input 加 min-width:0，允许收缩到 0
+   2. 768px 以下改为两行布局，滑块占满整行
+   ============================================================ */
+
+.adv-slider-item {
+  width: 100%;
+}
+
+.adv-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.adv-slider-label {
+  min-width: 90px;
+  flex-shrink: 0;
+  color: var(--color-text-primary);
+}
+
+.adv-slider-input {
+  flex: 1;
+  min-width: 0;              /* ★ 关键：打破 flexbox 的 auto 最小宽度 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.adv-slider-input.inverted {
+  direction: rtl;
+}
+
+.adv-slider-value {
+  min-width: 40px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.adv-slider-hint {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-left: 98px;
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+
+/* -------- 移动端：768px 以下改为两行布局 -------- */
+@media (max-width: 768px) {
+  .adv-slider-row {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .adv-slider-label {
+    min-width: 0;
+    flex: 1 1 auto;
+    order: 1;
+  }
+
+  .adv-slider-value {
+    min-width: 40px;
+    order: 2;
+    text-align: right;
+  }
+
+  .adv-slider-input {
+    flex: 1 1 100%;
+    order: 3;
+    width: 100%;
+    margin-top: 0.1rem;
+  }
+
+  .adv-slider-hint {
+    margin-left: 0;
+  }
+}
+
+/* -------- 小屏增强：480px 以下进一步压缩 -------- */
+@media (max-width: 480px) {
+  .adv-slider-row {
+    gap: 0.2rem;
+  }
+
+  .adv-slider-label {
+    font-size: 0.78rem;
+  }
+
+  .adv-slider-value {
+    font-size: 0.72rem;
+  }
+
+  .adv-slider-hint {
+    font-size: 0.68rem;
+  }
+}
+/* ============================================================
+   进阶设定 - 内联字段（label + select/input）
+   ------------------------------------------------------------
+   ★ 修复：移动端 select 因 flexbox min-width:auto 溢出 details 边框
+   1. .adv-inline-select 加 min-width:0，允许收缩到 0
+   2. 768px 以下改为两行布局，select 独占一行
+   ============================================================ */
+
+.adv-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.adv-inline-label {
+  flex-shrink: 0;
+  min-width: 90px;
+  color: var(--color-text-primary);
+}
+
+.adv-inline-select,
+.adv-inline-input {
+  flex: 1;
+  min-width: 0;              /* ★ 关键：打破 flexbox 的 auto 最小宽度 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.adv-inline-input-small {
+  flex: 0 1 80px;
+  min-width: 0;
+  width: 80px;
+  box-sizing: border-box;
+}
+
+.adv-inline-unit {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* -------- 移动端：768px 以下改为两行布局 -------- */
+@media (max-width: 768px) {
+  .adv-inline-field {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .adv-inline-label {
+    flex: 1 1 100%;
+    min-width: 0;
+    order: 1;
+  }
+
+  .adv-inline-select,
+  .adv-inline-input {
+    flex: 1 1 100%;
+    order: 2;
+    /* 防止 iOS Safari 因 font-size < 16px 触发输入框自动缩放 */
+    font-size: 16px;
+  }
+
+  .adv-inline-input-small {
+    flex: 1 1 auto;
+    order: 2;
+	font-size: 16px;
+  }
+
+  .adv-inline-unit {
+    order: 3;
+  }
+}
+
+/* -------- 小屏增强：480px 以下进一步压缩 -------- */
+@media (max-width: 480px) {
+  .adv-inline-field {
+    gap: 0.2rem;
+  }
+
+  .adv-inline-label {
+    font-size: 0.78rem;
+  }
+}

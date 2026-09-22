@@ -1,0 +1,711 @@
+/* ============================================================
+   世界书样式（升级版：组树 + 条件编辑器 + 选择器）
+   ============================================================ */
+
+.worldbook-container {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+/* ============================================================
+   头部
+   ============================================================ */
+
+.worldbook-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.worldbook-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.worldbook-actions input[type="text"] {
+  min-width: 150px;
+}
+
+/* ============================================================
+   组树
+   ============================================================ */
+
+.wb-group-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wb-group-node {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.wb-group-node:hover {
+  border-color: var(--color-border-focus);
+}
+
+.wb-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  user-select: none;
+  background: var(--color-bg-primary);
+  transition: background var(--transition-fast);
+}
+
+.wb-group-header:hover {
+  background: var(--color-bg-secondary);
+}
+
+.wb-group-header .wb-group-toggle {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.wb-group-header .wb-group-toggle.expanded {
+  transform: rotate(90deg);
+}
+
+.wb-group-header .wb-group-icon {
+  font-size: 1.1rem;
+}
+
+.wb-group-header .wb-group-name {
+  font-weight: var(--font-weight-medium);
+  flex: 1;
+}
+
+.wb-group-header .wb-group-status {
+  font-size: 0.7rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.wb-group-header .wb-group-status.enabled {
+  background: var(--color-secondary);
+  color: #fff;
+}
+
+.wb-group-header .wb-group-status.disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.wb-group-header .wb-group-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: 0.5rem;
+}
+
+.wb-group-header .wb-group-actions {
+  display: flex;
+  gap: 0.2rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.wb-group-header:hover .wb-group-actions {
+  opacity: 1;
+}
+
+.wb-group-header .wb-group-actions .icon-btn {
+  width: 28px;
+  height: 28px;
+  font-size: 0.8rem;
+}
+
+.wb-group-body {
+  padding: 0.3rem 0.8rem 0.8rem 0.8rem;
+  display: none;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.wb-group-body.expanded {
+  display: block;
+}
+
+/* ============================================================
+   组内规则列表
+   ============================================================ */
+
+.wb-group-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.wb-rule-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  transition: border-color var(--transition-fast);
+}
+
+.wb-rule-item:hover {
+  border-color: var(--color-border);
+}
+
+.wb-rule-item .wb-rule-status {
+  font-size: 0.7rem;
+  width: 16px;
+  text-align: center;
+}
+
+.wb-rule-item .wb-rule-name {
+  font-weight: var(--font-weight-medium);
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.wb-rule-item .wb-rule-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  flex: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-rule-item .wb-rule-actions {
+  display: flex;
+  gap: 0.2rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.wb-rule-item:hover .wb-rule-actions {
+  opacity: 1;
+}
+
+.wb-rule-item .wb-rule-actions .icon-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 0.7rem;
+}
+
+/* ============================================================
+   规则卡片（无组时显示）
+   ============================================================ */
+
+.wb-rule-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.8rem;
+  background: var(--color-bg-primary);
+  transition: background 0.2s;
+}
+
+.wb-rule-card.disabled {
+  opacity: 0.6;
+  background: var(--color-bg-secondary);
+}
+
+.wb-rule-card .wb-rule-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.wb-rule-card .wb-rule-name {
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.wb-rule-card .wb-rule-scope {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.wb-rule-card .wb-rule-status {
+  font-size: 0.7rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.wb-rule-card .wb-rule-status.enabled {
+  background: var(--color-secondary);
+  color: #fff;
+}
+
+.wb-rule-card .wb-rule-status.disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.wb-rule-card .wb-rule-desc {
+  margin: 0.2rem 0;
+  font-size: 0.85rem;
+}
+
+.wb-rule-card .wb-rule-condition {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  padding: 0.2rem 0.4rem;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-xs);
+  margin: 0.2rem 0;
+}
+
+.wb-rule-card .wb-rule-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.wb-rule-card .wb-rule-actions {
+  margin-top: 0.3rem;
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   条件编辑器
+   ============================================================ */
+
+.wb-condition-editor {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  min-height: 60px;
+}
+
+.wb-cond-node {
+  position: relative;
+  margin-bottom: 0.3rem;
+}
+
+.wb-cond-node:last-child {
+  margin-bottom: 0;
+}
+
+.wb-cond-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.wb-cond-badge {
+  font-size: 0.6rem;
+  font-weight: var(--font-weight-semibold);
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.wb-cond-badge.simple {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+.wb-cond-badge.and {
+  background: var(--color-secondary-light);
+  color: var(--color-secondary-dark);
+}
+
+.wb-cond-badge.or {
+  background: var(--color-warning-light);
+  color: var(--color-warning-dark);
+}
+
+.wb-cond-badge.not {
+  background: var(--color-danger-light);
+  color: var(--color-danger-dark);
+}
+
+.wb-cond-simple .wb-cond-row {
+  background: var(--color-bg-primary);
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+}
+
+.wb-cond-simple .wb-cond-row:hover {
+  border-color: var(--color-border);
+}
+
+.wb-cond-composite {
+  border-left: 2px solid var(--color-border);
+  padding-left: 0.5rem;
+}
+
+.wb-cond-composite .wb-cond-header {
+  background: var(--color-bg-primary);
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  margin-bottom: 0.3rem;
+}
+
+.wb-cond-composite .wb-cond-header:hover {
+  border-color: var(--color-border);
+}
+
+.wb-cond-composite .wb-cond-count {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.wb-cond-composite .wb-cond-actions {
+  display: flex;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+.wb-cond-children {
+  padding-left: 0.5rem;
+}
+
+.wb-cond-children .wb-cond-node:last-child {
+  margin-bottom: 0;
+}
+
+.wb-cond-path,
+.wb-cond-op {
+  min-width: 100px;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-primary);
+}
+
+.wb-cond-value {
+  flex: 1;
+  min-width: 80px;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-primary);
+}
+
+.btn-add-child,
+.btn-toggle-type,
+.btn-remove-cond {
+  font-size: 0.65rem;
+  padding: 0.05rem 0.4rem;
+}
+
+.btn-remove-cond {
+  color: var(--color-danger);
+}
+
+.btn-remove-cond:hover {
+  background: rgba(225, 112, 85, 0.1);
+}
+
+/* ============================================================
+   规则选择器
+   ============================================================ */
+
+.wb-selector {
+  position: relative;
+}
+
+.wb-selector-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.3rem 0.5rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  min-height: 36px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.wb-selector-tags:hover {
+  border-color: var(--color-border-focus);
+}
+
+.wb-selector-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+}
+
+.wb-selector-tag .wb-selector-tag-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0.1rem;
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+.wb-selector-tag .wb-selector-tag-remove:hover {
+  opacity: 1;
+}
+
+.wb-selector-placeholder {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.wb-selector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.2rem;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  max-height: 200px;
+  display: none;
+  flex-direction: column;
+}
+
+.wb-selector-dropdown.visible {
+  display: flex;
+}
+
+.wb-selector-search {
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-bottom: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-bg-secondary);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.wb-selector-search:focus {
+  outline: none;
+}
+
+.wb-selector-options {
+  overflow-y: auto;
+  max-height: 150px;
+  padding: 0.2rem 0;
+}
+
+.wb-selector-option {
+  display: flex;
+  flex-direction: column;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.wb-selector-option:hover {
+  background: var(--color-bg-secondary);
+}
+
+.wb-selector-option-name {
+  font-size: 0.85rem;
+}
+
+.wb-selector-option-desc {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.wb-selector-empty {
+  padding: 0.5rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* 组选择器 */
+.wb-group-selector .wb-selector-select {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.wb-group-selector .wb-selector-select:focus {
+  border-color: var(--color-border-focus);
+  outline: none;
+}
+
+/* ============================================================
+   世界书编辑器
+   ============================================================ */
+
+.worldbook-editor .form-group {
+  margin-bottom: 0.8rem;
+}
+
+.worldbook-editor textarea {
+  width: 100%;
+  min-height: 60px;
+  font-family: monospace;
+}
+
+.worldbook-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+/* ============================================================
+   组设置对话框
+   ============================================================ */
+
+.wb-group-settings .form-group {
+  margin-bottom: 0.8rem;
+}
+
+.wb-group-settings .wb-group-rule-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  min-height: 30px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.wb-group-settings .wb-group-rule-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+}
+
+.wb-group-settings .wb-group-rule-tag .remove {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.wb-group-settings .wb-group-rule-tag .remove:hover {
+  opacity: 1;
+}
+
+/* ============================================================
+   空状态
+   ============================================================ */
+
+.wb-empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 2rem;
+}
+
+.wb-empty .wb-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.wb-empty .wb-empty-text {
+  font-size: 1rem;
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .worldbook-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .worldbook-actions {
+    flex-wrap: wrap;
+  }
+  .worldbook-actions input[type="text"] {
+    min-width: 100px;
+    flex: 1;
+  }
+  
+  .wb-group-header {
+    flex-wrap: wrap;
+  }
+  .wb-group-header .wb-group-actions {
+    opacity: 1;
+  }
+  
+  .wb-rule-item {
+    flex-wrap: wrap;
+  }
+  .wb-rule-item .wb-rule-desc {
+    flex-basis: 100%;
+    margin-left: 1.5rem;
+  }
+  .wb-rule-item .wb-rule-actions {
+    opacity: 1;
+  }
+  
+  .wb-cond-row {
+    flex-wrap: wrap;
+  }
+  .wb-cond-path,
+  .wb-cond-op {
+    min-width: 80px;
+    flex: 1;
+  }
+  .wb-cond-value {
+    flex-basis: 100%;
+  }
+  
+  .wb-selector-dropdown {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wb-group-header .wb-group-count {
+    display: none;
+  }
+  .wb-rule-item .wb-rule-desc {
+    display: none;
+  }
+  .wb-cond-badge {
+    font-size: 0.5rem;
+  }
+  .wb-cond-path,
+  .wb-cond-op {
+    font-size: 0.75rem;
+    min-width: 60px;
+  }
+  .wb-cond-value {
+    font-size: 0.75rem;
+  }
+}

@@ -1,0 +1,504 @@
+/* ============================================================
+   Utopia 工业级 UI 设计系统
+   字体、颜色、阴影、圆角、间距、过渡、动画
+   ============================================================ */
+
+:root {
+  /* ---- 字体 ---- */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1.125rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---- 颜色 ---- */
+  --color-primary: #6c5ce7;
+  --color-primary-light: #a29bfe;
+  --color-primary-dark: #4a3db8;
+  --color-primary-gradient: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+  --color-primary-gradient-hover: linear-gradient(135deg, #5a4bd1 0%, #8c7ef0 100%);
+
+  --color-secondary: #00b894;
+  --color-secondary-light: #55efc4;
+  --color-secondary-dark: #00a381;
+
+  --color-danger: #e17055;
+  --color-danger-light: #fab1a0;
+  --color-danger-dark: #d63031;
+
+  --color-warning: #fdcb6e;
+  --color-warning-light: #ffeaa7;
+
+  --color-gray-50: #f8f9fd;
+  --color-gray-100: #f0f2f8;
+  --color-gray-200: #e8ecf4;
+  --color-gray-300: #d5dae8;
+  --color-gray-400: #b3b9cc;
+  --color-gray-500: #8a8aaa;
+  --color-gray-600: #6a6a8a;
+  --color-gray-700: #4a4a6a;
+  --color-gray-800: #2a2a4a;
+  --color-gray-900: #1a1a2e;
+
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: var(--color-gray-50);
+  --color-bg-sidebar: var(--color-gray-100);
+  --color-bg-input: #ffffff;
+  --color-bg-card: #ffffff;
+
+  --color-text-primary: var(--color-gray-900);
+  --color-text-secondary: var(--color-gray-700);
+  --color-text-muted: var(--color-gray-500);
+  --color-text-inverse: #ffffff;
+
+  --color-border: var(--color-gray-200);
+  --color-border-light: var(--color-gray-100);
+  --color-border-focus: var(--color-primary);
+
+  /* ---- 阴影 ---- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(108, 92, 231, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.18);
+  --shadow-inner: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  /* ---- 圆角 ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ---- 间距 ---- */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 0.75rem;
+  --spacing-base: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* ---- 过渡 ---- */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- 布局 ---- */
+  --sidebar-width: 280px;
+  --sidebar-collapsed: 60px;
+  --header-height: 64px;
+  --input-height: 80px;
+
+  /* ---- z-index ---- */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}
+
+/* ============================================================
+   暗色主题
+   ============================================================ */
+[data-theme="dark"] {
+  --color-primary: #a29bfe;
+  --color-primary-light: #b8b3ff;
+  --color-primary-dark: #6c5ce7;
+  --color-primary-gradient: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+  --color-primary-gradient-hover: linear-gradient(135deg, #5a4bd1 0%, #8c7ef0 100%);
+
+  --color-bg-primary: #1a1a2e;
+  --color-bg-secondary: #16213e;
+  --color-bg-sidebar: #0f0f1a;
+  --color-bg-input: #25254a;
+  --color-bg-card: #1f1f3a;
+
+  --color-text-primary: #e8e8f0;
+  --color-text-secondary: #a0a0c0;
+  --color-text-muted: #6a6a8a;
+  --color-text-inverse: #ffffff;
+
+  --color-border: #2a2a4a;
+  --color-border-light: #1f1f3a;
+  --color-border-focus: #a29bfe;
+
+  --color-gray-50: #0f0f1a;
+  --color-gray-100: #1a1a2e;
+  --color-gray-200: #25254a;
+  --color-gray-300: #3a3a5a;
+  --color-gray-400: #5a5a7a;
+  --color-gray-500: #8a8aaa;
+  --color-gray-600: #a0a0c0;
+  --color-gray-700: #c0c0d8;
+  --color-gray-800: #e0e0ec;
+  --color-gray-900: #f0f0f8;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 16px rgba(108, 92, 231, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.8);
+  --shadow-inner: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   赛博朋克主题
+   ============================================================ */
+[data-theme="cyberpunk"] {
+  --color-bg-primary: #0a0a1a;
+  --color-bg-secondary: #1a0a2e;
+  --color-bg-sidebar: #0a0a1a;
+  --color-bg-input: #1a0a2e;
+  --color-bg-card: #0d0d24;
+
+  --color-text-primary: #00ffcc;
+  --color-text-secondary: #ff00ff;
+  --color-text-muted: #8844aa;
+  --color-text-inverse: #000000;
+
+  --color-border: #ff00ff44;
+  --color-border-light: #00ffcc22;
+  --color-border-focus: #ff00ff;
+
+  --color-primary: #ff00ff;
+  --color-primary-light: #ff88ff;
+  --color-primary-dark: #cc00cc;
+  --color-primary-gradient: linear-gradient(135deg, #ff00ff 0%, #00ffcc 100%);
+  --color-primary-gradient-hover: linear-gradient(135deg, #cc00cc 0%, #00ccaa 100%);
+
+  --color-secondary: #00ffcc;
+  --color-secondary-light: #88ffdd;
+  --color-secondary-dark: #00ccaa;
+
+  --color-danger: #ff4444;
+  --color-danger-light: #ff8888;
+  --color-danger-dark: #cc0000;
+
+  --color-warning: #ffaa00;
+  --color-warning-light: #ffcc44;
+
+  --color-gray-50: #0a0a1a;
+  --color-gray-100: #1a0a2e;
+  --color-gray-200: #2a1a4a;
+  --color-gray-300: #4a2a6a;
+  --color-gray-400: #6a4a8a;
+  --color-gray-500: #8a6aaa;
+  --color-gray-600: #aa8acc;
+  --color-gray-700: #ccaadd;
+  --color-gray-800: #eaccf0;
+  --color-gray-900: #f5e8f8;
+
+  --shadow-xs: 0 1px 2px rgba(0, 255, 204, 0.1);
+  --shadow-sm: 0 2px 8px rgba(255, 0, 255, 0.2);
+  --shadow-md: 0 4px 16px rgba(255, 0, 255, 0.3);
+  --shadow-lg: 0 8px 32px rgba(255, 0, 255, 0.4);
+  --shadow-xl: 0 12px 48px rgba(255, 0, 255, 0.5);
+
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 0px;
+}
+
+/* ============================================================
+   全局重置
+   ============================================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+/* ============================================================
+   滚动条
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ============================================================
+   链接
+   ============================================================ */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+a:hover {
+  color: var(--color-primary-dark);
+}
+
+/* ============================================================
+   按钮重置
+   ============================================================ */
+button {
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  transition: all var(--transition-fast);
+}
+
+/* ============================================================
+   输入框
+   ============================================================ */
+input, textarea, select {
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 1rem;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+/* ============================================================
+   图片
+   ============================================================ */
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* ============================================================
+   列表
+   ============================================================ */
+ul, ol {
+  list-style: none;
+}
+
+/* ============================================================
+   全局过渡增强（所有可变化属性平滑过渡）
+   ============================================================ */
+* {
+  transition: background-color var(--transition-base),
+              color var(--transition-base),
+              border-color var(--transition-base),
+              box-shadow var(--transition-base),
+              opacity var(--transition-base),
+              transform var(--transition-base),
+              background-image var(--transition-base);
+}
+
+/* ============================================================
+   核心组件过渡（确保主题切换平滑）
+   ============================================================ */
+#app,
+#sidebar,
+#main,
+.modal-content,
+.social-post,
+.message .bubble,
+.character-item {
+  transition: background-color var(--transition-base),
+              color var(--transition-base),
+              border-color var(--transition-base),
+              box-shadow var(--transition-base);
+}
+
+/* ============================================================
+   消息入场动画
+   ============================================================ */
+.message {
+  animation: messageSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ============================================================
+   模态框入场动画
+   ============================================================ */
+.modal-content {
+  animation: modalScaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ============================================================
+   遮罩淡入
+   ============================================================ */
+.modal-overlay {
+  animation: overlayFadeIn 0.25s ease both;
+}
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+/* ============================================================
+   Toast 滑入
+   ============================================================ */
+.toast {
+  animation: toastSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ============================================================
+   按钮点击反馈
+   ============================================================ */
+.btn:active,
+.icon-btn:active,
+.sidebar-btn:active {
+  transform: scale(0.92);
+  transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   角色列表项悬停动画
+   ============================================================ */
+.character-item {
+  transition: background 0.15s ease,
+              transform 0.15s ease,
+              border-color 0.15s ease;
+}
+.character-item:hover {
+  transform: translateX(4px);
+}
+.character-item.active {
+  transform: translateX(0);
+}
+
+/* ============================================================
+   侧栏折叠动画
+   ============================================================ */
+#sidebar {
+  transition: width var(--transition-base),
+              transform var(--transition-base),
+              background-color var(--transition-base),
+              border-color var(--transition-base),
+              box-shadow var(--transition-base);
+}
+
+/* ============================================================
+   聊天容器切换动画
+   ============================================================ */
+#chatContainer {
+  transition: opacity var(--transition-base), display var(--transition-base);
+}
+#welcomePage {
+  transition: opacity var(--transition-base), display var(--transition-base);
+}
+
+/* ============================================================
+   朋友圈帖子悬停动画
+   ============================================================ */
+.social-post {
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.social-post:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* ============================================================
+   主题切换平滑过渡
+   ============================================================ */
+[data-theme] {
+  transition: background-color 0.3s ease,
+              color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
+}
+
+/* ============================================================
+   隐藏模态框滚动条
+   ============================================================ */
+.modal-content::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+.modal-content {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+/* ============================================================
+   头像强制圆角（覆盖主题变量）
+   ============================================================ */
+#characterInfo img,
+.message .avatar,
+.character-item .avatar,
+.avatar-preview {
+  border-radius: 50% !important;
+}

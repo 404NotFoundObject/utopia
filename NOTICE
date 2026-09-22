@@ -1,0 +1,120 @@
+Utopia
+Copyright 2026 404 and Utopia contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+================================================================================
+归因声明
+================================================================================
+
+本产品包含来自第三方项目的软件组件。以下为本产品使用或参考的主要
+第三方组件及其原始版权声明。完整的第三方许可清单见
+THIRD_PARTY_NOTICES.md。
+
+--------------------------------------------------------------------------------
+1. Transformers.js
+--------------------------------------------------------------------------------
+Copyright 2023-2025 Hugging Face Inc.
+
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/huggingface/transformers.js
+
+Utopia 使用 Transformers.js 在浏览器本地运行语义嵌入模型，
+用于长期记忆的语义检索与世界书的语义触发。
+
+--------------------------------------------------------------------------------
+2. ONNX Runtime Web
+--------------------------------------------------------------------------------
+Copyright (c) Microsoft Corporation.
+
+Licensed under the MIT License.
+Source: https://github.com/microsoft/onnxruntime
+
+Utopia 通过 ONNX Runtime Web 在浏览器中运行 ONNX 格式的嵌入模型。
+
+--------------------------------------------------------------------------------
+3. Marked
+--------------------------------------------------------------------------------
+Copyright (c) 2011-2024, Christopher Jeffrey.
+
+Licensed under the MIT License.
+Source: https://github.com/markedjs/marked
+
+Utopia 使用 Marked 渲染聊天消息中的 Markdown 内容。
+
+--------------------------------------------------------------------------------
+4. DOMPurify
+--------------------------------------------------------------------------------
+Copyright 2015-2024 Mario Heiderich, Cure53, and contributors.
+
+Licensed under the Apache License, Version 2.0 (or MPL 2.0, at your choice).
+Source: https://github.com/cure53/DOMPurify
+
+Utopia 使用 DOMPurify 对渲染后的 Markdown HTML 进行 XSS 过滤，
+确保用户消息与 AI 回复中的 HTML 不会注入恶意脚本。
+
+--------------------------------------------------------------------------------
+5. MiniSearch
+--------------------------------------------------------------------------------
+Copyright (c) 2018 Luca Ongaro.
+
+Licensed under the MIT License.
+Source: https://github.com/lucaong/minisearch
+
+Utopia 使用 MiniSearch 实现长期记忆的关键词全文检索。
+
+--------------------------------------------------------------------------------
+6. fflate
+--------------------------------------------------------------------------------
+Copyright (c) 2020 Arjun Barrett.
+
+Licensed under the MIT License.
+Source: https://github.com/101arrowz/fflate
+
+Utopia 使用 fflate 解压插件 ZIP 包。
+
+--------------------------------------------------------------------------------
+7. Font Awesome Free
+--------------------------------------------------------------------------------
+Copyright (c) Fonticons, Inc.
+
+Icons licensed under CC BY 4.0.
+Fonts licensed under SIL Open Font License 1.1.
+Code licensed under MIT License.
+Source: https://github.com/FortAwesome/Font-Awesome
+
+Utopia 使用 Font Awesome Free 作为界面图标集。
+
+--------------------------------------------------------------------------------
+8. 网络时间 API
+--------------------------------------------------------------------------------
+Utopia 的时间引擎在首次启动时会尝试通过以下公开 API 校准网络时间：
+
+  - 淘宝时间 API
+    https://api.m.taobao.com/rest/api3.do?api=mtop.common.getTimestamp
+  - WorldTimeAPI
+    https://worldtimeapi.org/api/timezone/Asia/Shanghai
+
+这些 API 仅用于一次性时间校准。若请求失败，Utopia 会降级使用本地
+系统时间，不影响功能。
+
+================================================================================
+商标声明
+================================================================================
+
+"Utopia" 是本项目的名称。"Utopia" 名称不主张商标权，但其他项目在
+再分发或修改本软件时，请勿使用 "Utopia" 名称暗示官方关联或背书。
+
+本产品中提及的其他商标（如 OpenAI、Anthropic、Google、Cohere、
+DeepSeek、Mistral、Groq、Perplexity、xAI、SillyTavern、
+Character.AI 等）均为其各自所有者的商标或注册商标。Utopia 与
+这些公司无任何官方关联或背书关系。
+
+================================================================================
+联系方式
+================================================================================
+
+如对本 NOTICE 有任何疑问，请在项目仓库提交 Issue：
+
+  https://github.com/404NotFoundObject/utopia/issues

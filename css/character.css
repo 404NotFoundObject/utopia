@@ -1,0 +1,18 @@
+/* ===== 角色表单 ===== */
+.character-form .form-group textarea {
+  min-height: 80px;
+}
+.character-form .form-group textarea.system-prompt {
+  min-height: 150px;
+  font-family: monospace;
+}
+.avatar-upload {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+.avatar-upload input[type="file"] {
+  flex: 1;
+  min-width: 150px;
+}
