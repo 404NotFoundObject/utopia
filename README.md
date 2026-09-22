@@ -5,6 +5,14 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-3.7.1-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
+
+> [!IMPORTANT]
+> **在线体验说明**
+> 受限于模型文件体积与网络加载速度，在线 Demo 仅展示 UI 与核心交互逻辑，**不提供语义向量（长期记忆检索/联想）支持**。
+> 如需体验完整功能，请参考下方「快速开始」在本地运行。
+
+🔗 **在线体验（精简版）：** [https://404NotFoundObject.github.io/utopia/](https://404NotFoundObject.github.io/utopia/)
 
 <p align="center">
   <img src="assets/screenshots/chat-sleep.png" width="800" alt="凌晨 00:31，她睡梦中被叫醒">
