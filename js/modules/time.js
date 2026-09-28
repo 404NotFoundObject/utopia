@@ -31,9 +31,37 @@ function isDocumentHidden() {
 // ============================================================
 // 网络时间获取（失败返回 null，由调用方决定如何处理）
 // ============================================================
+
+/**
+ * 单次网络时间请求的超时上限。
+ *
+ * 网络时间只用于校准，失败会降级为本地时间推进，因此它绝不该拖慢启动。
+ * 但 syncTime() 是在 init() 中被 await 的，一旦这里的 fetch 卡住（DNS 无响应、
+ * 网络被墙、代理挂起），浏览器自身的连接超时可达数十秒，会连带阻塞后续的
+ * UI 事件绑定——表现为「页面渲染出来了但点什么都没反应」。
+ * 因此这里强制封顶，把最坏情况压到「超时上限 × 接口数量」。
+ */
+const NETWORK_TIME_TIMEOUT_MS = 3000;
+
+/**
+ * 带超时的 fetch。
+ * @param {string} url
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response>}
+ */
+async function fetchWithTimeout(url, init = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NETWORK_TIME_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchNetworkTime() {
   try {
-    const response = await fetch('https://api.m.taobao.com/rest/api3.do?api=mtop.common.getTimestamp', {
+    const response = await fetchWithTimeout('https://api.m.taobao.com/rest/api3.do?api=mtop.common.getTimestamp', {
       headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
     });
     const json = await response.json();
@@ -43,7 +71,7 @@ async function fetchNetworkTime() {
     console.warn('[Time] 淘宝时间 API 失败:', error.message);
   }
   try {
-    const response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Shanghai', {
+    const response = await fetchWithTimeout('https://worldtimeapi.org/api/timezone/Asia/Shanghai', {
       headers: { 'Cache-Control': 'no-cache' },
     });
     const json = await response.json();
@@ -446,7 +474,6 @@ export async function resetGameTime() {
     cachedGameTime = now;
     cachedRealTime = now;
     cachedSpeed = timeState.speed;
-    const { getStores } = await import('./db.js');
     const storesAll = await getStores();
     const allChars = await storesAll.characters.getAll();
     for (const char of allChars) {

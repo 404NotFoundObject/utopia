@@ -122,7 +122,7 @@ export function bindMemorySection(modalContent, ctx) {
         modelSelect.appendChild(opt);
       }
 
-      // ★ 回归修复：优先用用户未保存的修改值
+      // ★ 优先用用户未保存的修改值
       const restoredModel = consumeRestoredValue('settingsSemanticModel');
       const targetModel = restoredModel || ctx.getSettings()?.semanticModelId || '';
       if (targetModel) {

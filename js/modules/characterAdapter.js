@@ -220,7 +220,7 @@ function fromSTV2(data) {
  * 与 V2 唯一区别：数据位于 data.data 下（多一层嵌套）
  * 映射规则与字段处理策略完全同 fromSTV2。
  *
- * ★ 个性化改造修复：profile 兜底路径为 data.data.extensions.utopia
+ * ★ profile 兜底路径：data.data.extensions.utopia
  */
 function fromSTV3(data) {
   const d = data.data;

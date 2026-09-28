@@ -66,7 +66,7 @@ export async function renderGroupList() {
 
   if (groups.length === 0) return;
 
-  // ★ XSS 修复：group.id / avatar / name / description 全部转义
+  // ★ 防 XSS：group.id / avatar / name / description 全部转义
   const html = groups.map(group => {
     const safeId = escapeHtml(group.id);
     const safeName = escapeHtml(group.name);

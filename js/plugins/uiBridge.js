@@ -9,9 +9,9 @@
  *   - 转发 Worker ↔ UI 的消息
  *
  * 集成的便捷 API：
- *   - 第 1 轮：storage / config
- *   - 第 2 轮：dialog / logger / dom / hotkey
- *   - 第 3 轮：contextMenu / tooltip / loading / dragDrop
+ *   - storage / config
+ *   - dialog / logger / dom / hotkey
+ *   - contextMenu / tooltip / loading / dragDrop
  *
  */
 
@@ -188,7 +188,7 @@ export function createUiApi(pluginId, manifest) {
     api: createScopedApi(pluginId, manifest),
 
     // ============================================================
-    // ★ 持久化存储与配置（第 1 轮）
+    // ★ 持久化存储与配置
     // ============================================================
     storage: createPluginStorage(pluginId),
     config: createPluginConfig(pluginId, {}, {
@@ -211,7 +211,7 @@ export function createUiApi(pluginId, manifest) {
     }),
 
     // ============================================================
-    // ★ 便捷工具（第 2 轮）
+    // ★ 便捷工具
     // ============================================================
     dialog: createPluginDialog(pluginId, manifest),
     logger: createPluginLogger(pluginId, manifest.name),
@@ -219,7 +219,7 @@ export function createUiApi(pluginId, manifest) {
     hotkey: hotkeyInstance,
 
     // ============================================================
-    // ★ UI 增强（第 3 轮）
+    // ★ UI 增强
     // ============================================================
     contextMenu: createPluginContextMenu(pluginId),
     tooltip: createPluginTooltip(pluginId),

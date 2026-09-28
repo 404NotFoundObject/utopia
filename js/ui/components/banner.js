@@ -31,7 +31,7 @@ export function showBanner(text, duration = 3000, type = 'info') {
   const safeType = ['info', 'success', 'error', 'warning'].includes(type) ? type : 'info';
   container.className = `banner-container banner-${safeType}`;
 
-  // ★ XSS 修复：每一行转义
+  // ★ 防 XSS：每一行转义
   const safeText = text === null || text === undefined ? '' : String(text);
   const lines = safeText.split('\n');
   const contentHtml = lines.map(line => {

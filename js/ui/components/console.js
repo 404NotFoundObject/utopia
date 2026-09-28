@@ -29,7 +29,7 @@ export function appendConsoleMessage(text, type = 'info') {
     warning: '⚠️',
   };
 
-  // ★ XSS 修复：每一行做转义，iconMap 是硬编码 emoji 无需处理
+  // ★ 防 XSS：每一行做转义，iconMap 是硬编码 emoji 无需处理
   const safeText = text === null || text === undefined ? '' : String(text);
   const lines = safeText.split('\n');
   const contentHtml = lines

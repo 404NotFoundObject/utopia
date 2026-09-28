@@ -148,7 +148,7 @@ function showInlineInput(container, postId, replyToId = null) {
     return;
   }
 
-  // ★ XSS 修复：data-* 属性值转义
+  // ★ 防 XSS：data-* 属性值转义
   const safePostId = escapeHtml(postId);
   const safeReplyToId = escapeHtml(replyToId || '');
 
@@ -186,16 +186,16 @@ function renderPostHtml(post) {
     if (c.replies && c.replies.length > 0) {
       repliesHtml = c.replies.map(r => {
         const rAuthor = getAuthorName(r.authorId, r.authorType);
-        // ★ XSS 修复：回复作者和内容转义
+        // ★ 防 XSS：回复作者和内容转义
         return `<div class="social-reply"><strong>${escapeHtml(rAuthor)}</strong> 回复：${escapeHtml(r.content)}</div>`;
       }).join('');
     }
     const replyBtn = `<button class="social-comment-btn btn btn-sm" data-post-id="${escapeHtml(post.id)}" data-reply-to-id="${escapeHtml(c.id)}">回复</button>`;
-    // ★ XSS 修复：评论作者和内容转义
+    // ★ 防 XSS：评论作者和内容转义
     return `<div class="social-comment"><strong>${escapeHtml(cAuthor)}</strong>：${escapeHtml(c.content)} ${repliesHtml} ${replyBtn}</div>`;
   }).join('');
 
-  // ★ XSS 修复：作者名、时间、内容、data-* 全部转义
+  // ★ 防 XSS：作者名、时间、内容、data-* 全部转义
   const safeAuthorName = escapeHtml(authorName);
   const safeTime = escapeHtml(time);
   const safeContent = escapeHtml(post.content);

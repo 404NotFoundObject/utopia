@@ -15,6 +15,12 @@ export function renderEnginesSection(settings, ctx) {
   const engineBody = engineFlags.bodyState !== false;
   const engineTime = engineFlags.time !== false;
 
+  const perception = settings.emotionPerception || {};
+  const semanticMode = ['off', 'auto', 'always'].includes(perception.semanticMode)
+    ? perception.semanticMode
+    : 'auto';
+  const llmArbiter = perception.useLLMArbiter === true;
+
   return `
     <!-- 引擎控制 -->
     <div class="settings-section">
@@ -39,22 +45,46 @@ export function renderEnginesSection(settings, ctx) {
       </div>
     </div>
 
-    <!-- 情感引擎高级选项 -->
+    <!-- 情绪识别 -->
     <div class="settings-section">
-      <h3>情感引擎高级选项</h3>
+      <h3>情绪识别</h3>
+      <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:0.8rem;">
+        识别分三层：<b>规则层</b>（否定与施事判定，始终启用）→ <b>语义层</b> → <b>LLM 仲裁</b>。
+        规则层能区分「我不喜欢你」与「我喜欢你」、「他喜欢你」与「我喜欢你」这类写法。
+      </p>
       <div class="setting-row">
-        <label>启用 LLM 辅助情感分类</label>
-        ${ctx.toggleHtml('settingsUseLLMEmotion', settings.useLLMForEmotion)}
-        <span class="help-text">开启后，当词库匹配不明确时，将调用 AI 分析用户意图（消耗少量 token）</span>
+        <label>语义识别</label>
+        <select id="settingsEmotionSemanticMode">
+          <option value="off" ${semanticMode === 'off' ? 'selected' : ''}>关闭（只用规则层）</option>
+          <option value="auto" ${semanticMode === 'auto' ? 'selected' : ''}>自动（规则层拿不准时才启用）</option>
+          <option value="always" ${semanticMode === 'always' ? 'selected' : ''}>总是启用（最准，每条消息都做向量计算）</option>
+        </select>
+        <span class="help-text">语义层复用记忆引擎的本地向量模型，离线运行、不产生 API 请求</span>
+      </div>
+      <div class="setting-row">
+        <label>LLM 仲裁</label>
+        ${ctx.toggleHtml('settingsEmotionLLMArbiter', llmArbiter)}
+        <span class="help-text">仅当前两层证据冲突时调用一次 AI 裁决，而不是每条消息都调用</span>
+      </div>
+      <div class="setting-row">
+        <label>识别调试</label>
+        <button class="btn btn-sm" id="emotionDebugBtn">打开调试面板</button>
+        <span class="help-text">查看子句切分、否定与施事判定、各层得分与最终结论</span>
       </div>
     </div>
   `;
 }
 
 /**
- * 引擎控制 section 无需额外事件绑定
- * （引擎开关的警告确认逻辑在 save.js 中）
+ * 绑定情绪识别调试面板入口。
+ * 动态导入：面板只在用户主动打开时才加载，不影响设置页常规路径。
+ * @param {HTMLElement} modalContent
+ * @param {Object} ctx
  */
 export function bindEnginesSection(modalContent, ctx) {
-  // no-op
+  modalContent.querySelector('#emotionDebugBtn')?.addEventListener('click', () => {
+    import('../../emotionDebugUI.js')
+      .then(mod => mod.openEmotionDebug())
+      .catch(err => console.error('[Settings] 打开情绪识别调试面板失败:', err));
+  });
 }

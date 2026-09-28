@@ -34,6 +34,14 @@ export async function loadSettings() {
       settings.conversationState = defaults.conversationState;
       needUpdate = true;
     }
+    if (!settings.emotionPerception || typeof settings.emotionPerception !== 'object') {
+      settings.emotionPerception = {
+        ...defaults.emotionPerception,
+        // 迁移：旧的独立 LLM 开关并入新配置，避免用户此前的选择被重置
+        useLLMArbiter: settings.useLLMForEmotion === true,
+      };
+      needUpdate = true;
+    }
 
     if (settings.memoryScoreThreshold === undefined) {
       const legacyThreshold = settings.worldBookSemantic?.threshold;
@@ -105,6 +113,14 @@ export function getDefaultSettings() {
       bodyState: true,
       time: true,
     },
+    // 情绪感知（识别层）配置。识别分三层：规则层 → 语义层 → LLM 仲裁。
+    // 规则层永远启用；语义层复用记忆引擎已加载的本地向量模型，不需要额外下载。
+    emotionPerception: {
+      // 'off' 只用规则层 | 'auto' 规则层不确定时才走语义层 | 'always' 每次都走
+      semanticMode: 'auto',
+      // LLM 仲裁：仅在前两层证据冲突时触发，不是每条消息都调用
+      useLLMArbiter: false,
+    },
     retrievalMode: 'keyword',
     semanticModelId: '',
     semanticDtype: '',
@@ -139,12 +155,12 @@ export function getDefaultSettings() {
       worldBookBudgetRatio: 0.3,
     },
 
-    // ★★★ 新增：LLM 裁决开关 ★★★
+    // ★★★ LLM 裁决开关 ★★★
     llmArbiter: {
       enabled: true,                    // 是否允许调用 LLM 做场景裁决
     },
 
-    // ★★★ 新增：会话状态与转场 ★★★
+    // ★★★ 会话状态与转场 ★★★
     conversationState: {
       enabled: true,                    // 总开关
       crossDayEnabled: true,            // 跨天感知

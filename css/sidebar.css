@@ -21,7 +21,7 @@
   letter-spacing: -0.5px;
 }
 
-/* ---------- 新增：PC 端隐藏侧栏汉堡菜单 ---------- */
+/* ---------- PC 端隐藏侧栏汉堡菜单 ---------- */
 #sidebarToggle {
   display: none;
 }

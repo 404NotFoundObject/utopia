@@ -135,7 +135,7 @@ export async function generateComment(character, post) {
   }
 }
 
-// ---------- 生成回复（含重试，AUD-13 加锁） ----------
+// ---------- 生成回复（含重试与加锁） ----------
 export async function generateReplyForComment(postId, commentId, userReplyContent = null, retries = 2) {
   return withKeyLock('post', postId, async () => {
     const stores = await getS();
@@ -242,7 +242,7 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
   });
 }
 
-// ---------- 为帖子生成评论（AUD-13 加锁） ----------
+// ---------- 为帖子生成评论（加锁） ----------
 export async function generateCommentsForPost(postId) {
   return withKeyLock('post', postId, async () => {
     const stores = await getS();
@@ -288,7 +288,7 @@ export async function generateCommentsForPost(postId) {
   });
 }
 
-// ---------- 用户评论帖子（AUD-13 加锁） ----------
+// ---------- 用户评论帖子（加锁） ----------
 export async function userCommentPost(postId, content, replyToCommentId = null) {
   // 分支 1：回复评论 —— 直接调用 generateReplyForComment（它自己会加锁），
   //        避免外层再套一层锁导致同一 postId 死锁
@@ -335,7 +335,7 @@ export async function getAllPosts() {
   return posts.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-// ---------- 删除帖子（AUD-13 加锁） ----------
+// ---------- 删除帖子（加锁） ----------
 export async function deletePost(postId) {
   return withKeyLock('post', postId, async () => {
     const stores = await getS();

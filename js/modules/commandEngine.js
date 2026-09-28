@@ -728,6 +728,56 @@ registerCommand('reset_params', async (args, context) => {
 // 检查类命令
 // ============================================================
 
+// /emotion
+registerCommand('emotion', async (args) => {
+  const text = String(args || '').trim();
+  if (!text) {
+    return {
+      console: [
+        '🧪 情绪识别调试',
+        '',
+        '用法：/emotion <要测试的句子>',
+        '示例：/emotion 我不喜欢你',
+        '',
+        '完整可视化面板：设置 → 情绪识别 → 打开调试面板',
+      ].join('\n'),
+      consoleType: 'info',
+    };
+  }
+
+  const { classifyUserMessage } = await import('./emotionEngine.js');
+  const result = await classifyUserMessage(text, false, { debug: true });
+
+  const lines = [];
+  lines.push(`🧪 情绪识别：${text}`);
+  lines.push('');
+  lines.push(`结论：${result.type}   强度 ${result.intensity}   置信度 ${result.confidence}`);
+  lines.push(`方式：${result.layer} / ${result.arbitration}   矛盾：${result.ambivalent ? '是' : '否'}`);
+  lines.push(`判定：${result.trace?.decision || '—'}`);
+  lines.push('');
+
+  const clauses = result.clauses || [];
+  if (clauses.length === 0) {
+    lines.push('（无子句）');
+  }
+  for (const [i, clause] of clauses.entries()) {
+    lines.push(`子句 ${i + 1}：${clause.text}（权重 ${clause.weight}）`);
+    if (!clause.hits || clause.hits.length === 0) {
+      lines.push('  · 无命中');
+      continue;
+    }
+    for (const h of clause.hits) {
+      const marks = [];
+      if (h.negated) marks.push('否定');
+      if (h.agent === 'third' || h.target === 'third') marks.push('第三方');
+      const mapped = h.type !== h.resolvedType ? ` → ${h.resolvedType}` : '';
+      lines.push(`  · ${h.word}  ${h.type}${mapped}  ${marks.join('/')}  (${h.reason})`);
+    }
+  }
+
+  return { console: lines.join('\n'), consoleType: 'success' };
+}, { description: '测试情绪识别结果（调试用）', aliases: ['emo'] });
+
 // /inspect
 registerCommand('inspect', async (args, context) => {
   const state = getAppState();
@@ -1172,7 +1222,7 @@ registerCommand('status', async (args, context) => {
     if (userMember) {
       lines.push(`👑 群主: ${userMember.role === 'owner' ? '你' : '用户'}`);
     }
-    // ★ 修复：与 Bug-10 同源，改用 getGameTime() 与写入端保持一致
+    // ★ 使用 getGameTime()，与写入端保持一致
     const now = getGameTime();
     const activeThreshold = 5 * 60 * 1000;
     const activeCount = charMembers.filter(m => (m.lastActiveAt || 0) > now - activeThreshold).length;

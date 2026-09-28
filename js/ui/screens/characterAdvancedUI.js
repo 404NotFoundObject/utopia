@@ -144,7 +144,7 @@ export function renderAdvancedSection(characterData) {
         <div class="form-group" style="margin-top:0.8rem;">
           <label style="font-size:0.85rem;">🕐 生理节律</label>
           <div style="display:flex;flex-direction:column;gap:0.3rem;margin-top:0.3rem;">
-            <!-- ★ 修复：改用 class 布局，选项文本缩短，移动端两行显示 -->
+            <!-- ★ class 布局：选项文本缩短，移动端两行显示 -->
             <label class="adv-inline-field">
               <span class="adv-inline-label">作息类型</span>
               <select id="advChronotype" class="adv-inline-select">
@@ -154,7 +154,7 @@ export function renderAdvancedSection(characterData) {
                 <option value="none" title="不受昼夜影响" ${bodyProfile.chronotype === 'none' ? 'selected' : ''}>无节律</option>
               </select>
             </label>
-            <!-- ★ F4 修复：新增昼夜节律总开关 -->
+            <!-- ★ 昼夜节律总开关 -->
             <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;">
               <input type="checkbox" id="advCircadianEnabled" ${bodyProfile.circadianEnabled !== false ? 'checked' : ''}>
               启用昼夜节律
@@ -172,7 +172,7 @@ export function renderAdvancedSection(characterData) {
               <input type="checkbox" id="advAllowNapping" ${bodyProfile.allowNapping ? 'checked' : ''}>
               习惯午休
             </label>
-            <!-- ★ 方案 A 修复：新增午休倾向滑块，随 allowNapping 显示/隐藏 -->
+            <!-- ★ 午休倾向滑块，随 allowNapping 显示/隐藏 -->
             <div id="advNapTendencyWrapper" style="${bodyProfile.allowNapping ? '' : 'display:none;'}">
               ${renderSlider('advNapTendency', '午休倾向', bodyProfile.napTendency, 0, 1, 0.05, '越高越易触发午休（0=从不，1=每次）')}
             </div>

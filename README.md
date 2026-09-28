@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.7.1-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.8.0-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -73,6 +73,22 @@ Utopia 选择另一条路：**把底层引擎内置**。
 
 三引擎相互影响，形成闭环。任一引擎可独立关闭。
 
+#### 情感感知：三层级联识别
+
+角色理解用户说了什么，靠的不是关键词表，而是三层证据的级联裁定：
+
+| 层 | 负责 | 说明 |
+|---|---|---|
+| 规则层 | 结构 | 子句切分、否定（支持双重否定）、施事与受体识别、极性冲突检测 |
+| 语义层 | 覆盖 | 原型句向量 kNN，命中词表之外的表达，复用本地向量模型 |
+| LLM 仲裁 | 仲裁 | 仅在前两层证据冲突时介入，不是每条消息都调用 |
+
+**规则层对语义层有一票否决权。** 向量模型对 `我爱你` 与 `我不爱你` 的余弦相似度极高，语义相似度天然对否定不可靠。因此否定和第三方施事这类由语法结构决定的信息，只由规则层定音——`我不喜欢你` 判为拒绝而非亲密，`他喜欢你` 判为第三方示好而非亲密。
+
+共 18 类事件（夸奖 / 批评 / 关心 / 冷落 / 有趣 / 亲密 / 道歉 / 请求 / 命令 / 坦露 / 侮辱 / 八卦 / 拒绝疏离 / 第三方示好 / 安抚澄清 / 感谢 / 抱怨 / 调侃），每类都配有独立的情绪影响向量，包含六维情绪、五类需求与三类关系的变化量，并按角色的性格参数（神经质、宜人性、外向性等）加权——同样一句拒绝，神经质高的角色受伤更重。
+
+配套**可视化调试面板**（设置 → 引擎，或命令行 `/emotion`），可查看任一输入的切分、命中、否定与施事标注、两层得分与融合权重，并支持快捷样例一键试跑。
+
 ### 🧠 三层记忆
 
 - **全文检索**：MiniSearch 关键词匹配
@@ -125,6 +141,18 @@ Utopia 选择另一条路：**把底层引擎内置**。
 ### 🧩 插件系统 v1.0
 
 Worker 隔离、钩子系统（before / after / error）、UI 槽位系统、方法级权限声明。插件崩溃不影响主应用。
+
+### 🧪 自动化测试
+
+- **Vitest**：15 个文件 / 417 个用例，覆盖纯逻辑单元、DOM 组件（含 XSS 转义）、存储与引擎集成
+- **Playwright E2E**：34 个用例，在真实浏览器中验证冷启动、数据库 schema 恢复、情绪识别接线，覆盖桌面与移动两个视口
+- 见 [TESTING.md](TESTING.md)
+
+```bash
+npm install      # 首次运行需安装测试依赖
+npm test         # Vitest，约 10s
+npm run test:e2e # Playwright，约 4min（首次需 npx playwright install chromium）
+```
 
 ### 🎨 其他
 
@@ -189,7 +217,29 @@ Utopia 内置完整的交互式文档：
 - **世界书教程**：侧栏 → 世界书 → 📖 教程
 - **命令行**：在输入框输入 `/help` 查看所有命令
 - **调试**：在输入框输入 `/inspect` 查看当前生效的规则和 Token 预算
+- **情绪识别调试**：设置 → 引擎 → 打开调试面板，或输入 `/emotion`
 - **常见问题**：见 [FAQ.md](FAQ.md)
+
+---
+
+## 更新记录
+
+完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.8.0
+
+**情感感知引擎重写 + 自动化测试模块。**
+
+- **情感感知改为三层级联**：规则层（否定 / 施事 / 受体 / 极性冲突）+ 语义层（原型句向量）+ LLM 仲裁（仅证据冲突时触发）
+- **事件类别 12 → 18**：新增拒绝疏离、第三方示好、安抚澄清、感谢、抱怨、调侃，每类配有独立情绪影响向量
+- **新增情绪识别调试面板**：可查看任一输入的切分、命中与结构标注、两层得分与融合权重
+- **数据库 schema 自愈**：缺表 / 缺索引自动补齐且不丢数据；主键结构不兼容时给出可读提示
+- **新增测试模块**：Vitest 417 个用例 + Playwright 34 个用例
+- **稳定性**：网络时间请求增加超时上限；启动失败提示携带真实原因
+
+### v3.7.1
+
+首次开源发布。三引擎、三层记忆、世界书 v2.0、群聊、语音、插件系统等完整能力。
 
 ---
 
@@ -201,6 +251,8 @@ utopia/
 ├── LICENSE                       # Apache License 2.0
 ├── NOTICE                        # 版权与归因声明
 ├── README.md                     # 本文档
+├── CHANGELOG.md                  # 版本更新记录
+├── TESTING.md                    # 测试指南
 ├── FAQ.md                        # 常见问题
 │
 ├── css/                          # 样式
@@ -213,6 +265,14 @@ utopia/
 │   ├── ui/                       # 界面层
 │   ├── utils/                    # 工具函数
 │   └── dev/                      # 开发工具
+│
+├── tests/                        # 测试
+│   ├── unit/                     # 纯逻辑单元测试
+│   ├── dom/                      # DOM 组件测试
+│   ├── integration/              # 存储与引擎集成测试
+│   ├── e2e/                      # Playwright 端到端测试
+│   ├── setup/                    # Vitest 全局前置
+│   └── helpers/                  # DOM 骨架与测试夹具
 │
 └── lib/                          # 打包的第三方库
     ├── transformers.min.js       # Transformers.js
@@ -235,8 +295,10 @@ utopia/
 | Markdown | Marked + DOMPurify | 渲染与 XSS 防御 |
 | ZIP 解压 | fflate | 插件安装 |
 | 图标 | Font Awesome Free | UI 图标 |
+| 测试（开发依赖） | Vitest + jsdom + fake-indexeddb | 单元 / DOM / 集成测试 |
+| 测试（开发依赖） | Playwright | 端到端测试 |
 
-**无构建工具，无 Node.js 运行时依赖，无前端框架。**
+**运行时无构建工具，无 Node.js 依赖，无前端框架。** 测试依赖仅在开发时使用，不影响应用运行。
 
 ---
 

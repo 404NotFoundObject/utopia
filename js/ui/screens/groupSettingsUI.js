@@ -29,13 +29,13 @@ export async function openGroupSettings(groupId) {
   const avatarSrc = group.avatar || '';
   const bgSrc = group.chatBg || '';
 
-  // ★ XSS 修复：group.name / group.description / avatar / bgSrc 转义
+  // ★ 防 XSS：group.name / group.description / avatar / bgSrc 转义
   const safeName = escapeHtml(group.name);
   const safeDesc = escapeHtml(group.description || '');
   const safeAvatarSrc = escapeHtml(avatarSrc);
   const safeBgSrc = escapeHtml(bgSrc);
 
-  // ★ XSS 修复：成员列表里所有来自用户的字段转义
+  // ★ 防 XSS：成员列表里所有来自用户的字段转义
   const memberListHtml = members.map(m => {
     const safeMemberId = escapeHtml(m.memberId);
     const displayName = m.memberType === 'user'

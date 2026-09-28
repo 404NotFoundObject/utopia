@@ -1,4 +1,4 @@
-// js/ui/screens/characterExportUI.js - 角色导出为 PNG 卡（布局修复）
+// js/ui/screens/characterExportUI.js - 角色导出为 PNG 卡
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { embedJSONToPNG } from '../../utils/png.js';
@@ -17,7 +17,7 @@ const BACKGROUND_TEMPLATES = [
  * @param {Object} character - 角色对象
  */
 export function openPNGExport(character) {
-  // ★ XSS 修复：character.name / character.description 转义
+  // ★ 防 XSS：character.name / character.description 转义
   const safeName = escapeHtml(character.name);
   const safeDesc = escapeHtml(character.description || '');
 

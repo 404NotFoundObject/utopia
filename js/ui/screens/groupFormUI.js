@@ -12,7 +12,7 @@ export function renderGroupForm() {
   const state = getAppState();
   const characters = state.get('characters') || [];
 
-  // ★ XSS 修复：c.id / c.avatar / c.name 全部转义
+  // ★ 防 XSS：c.id / c.avatar / c.name 全部转义
   const memberOptionsHtml = characters.map(c => {
     const safeId = escapeHtml(c.id);
     const safeAvatar = escapeHtml(c.avatar || '');

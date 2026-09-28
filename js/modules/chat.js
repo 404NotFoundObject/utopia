@@ -282,8 +282,9 @@ export async function sendMessage(content) {
     }
 
     const settings = state.get('settings') || {};
-    const useLLM = settings.useLLMForEmotion || false;
-    const analysis = await classifyUserMessage(content, useLLM);
+    // 是否启用 LLM 仲裁由 settings.emotionPerception.useLLMArbiter 决定，
+    // 分类器内部自行读取，此处无需传参
+    const analysis = await classifyUserMessage(content);
 
     const now = getGameTime();
     const lastInteraction = character.lastInteraction?.gameTime || now;
@@ -308,6 +309,12 @@ export async function sendMessage(content) {
       await handleInteraction(character, analysis.type, analysis.intensity);
     }
 
+    // 情绪事件 → 体感事件。体感引擎只认 praise/criticism/care/funny/intimate/neglect 六种，
+    // 新增的情绪类别按「生理反应最接近」的原则归并：
+    //   gratitude / reassurance 都与「被照顾」的放松感同源 → care
+    //   teasing 是愉悦刺激 → funny
+    //   rejection 的生理损耗接近被否定 → criticism
+    // rival_affection 与 complaint 属关系/认知层面，不产生直接生理反应，故不映射。
     const bodyEventMap = {
       'praise': 'praise',
       'criticism': 'criticism',
@@ -315,6 +322,10 @@ export async function sendMessage(content) {
       'funny': 'funny',
       'intimate': 'intimate',
       'neglect': 'neglect',
+      'gratitude': 'care',
+      'reassurance': 'care',
+      'teasing': 'funny',
+      'rejection': 'criticism',
     };
     if (bodyEventMap[analysis.type]) {
       await handleBodyEvent(character, bodyEventMap[analysis.type], analysis.intensity);
@@ -664,7 +675,7 @@ export async function sendMessage(content) {
 
         showToast('已停止生成', 'info');
       } else {
-        // 其他错误：与修复前行为一致，全部清理
+        // 其他错误：全部清理
         console.error('发送失败:', error);
         showToast('发送失败: ' + error.message, 'error');
 

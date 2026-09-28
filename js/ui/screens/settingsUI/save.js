@@ -77,10 +77,13 @@ async function handleSave(modalContent, ctx) {
   const repetitionPenalty = clampNum(q('#settings_repetitionPenalty')?.value, 1, 2, 1.0);
 
   // ---- 引擎 ----
-  const useLLMEmotion = q('#settingsUseLLMEmotion')?.checked ?? false;
   const engineEmotion = q('#settingsEngineEmotion')?.checked ?? true;
   const engineBody = q('#settingsEngineBody')?.checked ?? true;
   const engineTime = q('#settingsEngineTime')?.checked ?? true;
+
+  // ---- 情绪识别 ----
+  const emotionSemanticMode = q('#settingsEmotionSemanticMode')?.value || 'auto';
+  const emotionLLMArbiter = q('#settingsEmotionLLMArbiter')?.checked ?? false;
 
   // ---- 时间系统 ----
   const speedSelect = q('#settingsTimeSpeed');
@@ -201,7 +204,13 @@ async function handleSave(modalContent, ctx) {
   }
 
   if (sections.engines) {
-    payload.useLLMForEmotion = useLLMEmotion;
+    // 情绪识别配置。两个字段都要写：emotionPerception 是分类器的配置来源，
+    // useLLMForEmotion 另有读取方，不同步会让两处开关状态不一致。
+    payload.useLLMForEmotion = emotionLLMArbiter;
+    payload.emotionPerception = {
+      semanticMode: emotionSemanticMode,
+      useLLMArbiter: emotionLLMArbiter,
+    };
     payload.engineFlags = {
       emotion: engineEmotion,
       bodyState: engineBody,

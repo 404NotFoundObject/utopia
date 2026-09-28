@@ -1,4 +1,4 @@
-// js/utils/png.js - PNG 文件操作工具（修复 tEXt 块嵌入）
+// js/utils/png.js - PNG 文件操作工具（支持 tEXt 块嵌入）
 
 /**
  * 将 JSON 字符串嵌入到 PNG 的 tEXt 块中
@@ -23,7 +23,7 @@ export async function embedJSONToPNG(pngBlob, jsonString) {
   const textBytes = new TextEncoder().encode(textData);
   const dataLength = textBytes.length;
 
-  // ★★★ 修复：正确构建 tEXt 块：长度(4) + 'tEXt'(4) + 数据(N) + CRC(4) ★★★
+  // ★★★ tEXt 块结构：长度(4) + 'tEXt'(4) + 数据(N) + CRC(4) ★★★
   const tEXtChunk = new Uint8Array(4 + 4 + dataLength + 4);
   // 写入长度（大端）
   new DataView(tEXtChunk.buffer).setUint32(0, dataLength);

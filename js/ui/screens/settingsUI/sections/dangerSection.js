@@ -42,7 +42,7 @@ export function bindDangerSection(modalContent, ctx) {
         // ---------- 主数据库 ----------
         await deleteDatabase();
 
-        // ---------- AUD-9：插件数据库 ----------
+        // ---------- 插件数据库 ----------
         try {
           await deleteVfsDatabase();
         } catch (e) {
@@ -50,7 +50,7 @@ export function bindDangerSection(modalContent, ctx) {
           // 不阻塞流程，继续清理 localStorage
         }
 
-        // ---------- AUD-10：localStorage 清理 ----------
+        // ---------- localStorage 清理 ----------
         const keysToRemove = [
           'utopia_app_version',
           'lastMode',
@@ -58,7 +58,7 @@ export function bindDangerSection(modalContent, ctx) {
           'lastGroupId',
           'utopia-theme',
           'utopia_db_version',
-          'utopia:custom-themes',       // AUD-10：自定义主题
+          'utopia:custom-themes',       // 自定义主题
         ];
         for (const key of keysToRemove) {
           localStorage.removeItem(key);

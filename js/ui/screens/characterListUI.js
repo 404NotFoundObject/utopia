@@ -215,7 +215,7 @@ export function updateCharacterHighlight(selectedId) {
 async function showExportFormatDialog(char = null) {
   return new Promise((resolve) => {
     const charName = char ? char.name : '角色';
-    // ★ XSS 修复：角色名转义
+    // ★ 防 XSS：角色名转义
     const safeCharName = escapeHtml(charName);
 
     // ---- 结果保护：防止重复 resolve ----

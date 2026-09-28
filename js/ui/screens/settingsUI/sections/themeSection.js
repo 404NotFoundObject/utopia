@@ -98,7 +98,7 @@ export function bindThemeSection(modalContent, ctx) {
               //    （如 memory 的模型列表、tts 的音色列表）
               await main.bindSettingsSave(newContent);
 
-              // ★ 现在 DOM 已完全就绪，恢复用户之前的输入
+              // ★ DOM 已就绪，恢复用户之前的输入
               restoreSettingsForm(newContent, snapshot);
 
               // ★ 清理：异步任务已读完，避免属性残留

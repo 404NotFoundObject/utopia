@@ -6,7 +6,7 @@ const container = document.getElementById('toastContainer');
 /**
  * 显示 Toast 提示
  *
- * ★ XSS 修复：
+ * ★ 防 XSS：
  *   - message 经过 escapeHtml，防止从 API 错误信息 / 用户输入回显注入 HTML
  *   - type 经过白名单校验，防止 class 注入（如 type="foo\" onclick=\"..."）
  */

@@ -117,9 +117,90 @@ function ensureSchema(db, transaction) {
   }
 }
 
-export function openDB() {
+// ============================================================
+// Schema 探测
+// ============================================================
+
+/**
+ * 探测已打开的库与 EXPECTED_SCHEMA 之间的偏差。
+ *
+ * 三类偏差分开返回，因为处置方式完全不同：
+ *   - missingStores / missingIndexes：可通过抬升版本号触发 upgrade 自动补齐，**不丢数据**
+ *   - keyPathMismatches：主键路径不一致无法无损修复（改 keyPath 必须重建该 store），
+ *     只能交回上层提示用户决策
+ *
+ * @param {IDBDatabase} db
+ * @returns {{
+ *   missingStores: string[],
+ *   missingIndexes: Array<{store: string, index: string}>,
+ *   keyPathMismatches: Array<{store: string, actual: string|null, expected: string}>,
+ * }}
+ */
+function inspectSchema(db) {
+  const missingStores = [];
+  const missingIndexes = [];
+  const keyPathMismatches = [];
+
+  const existingNames = Array.from(db.objectStoreNames);
+  const tx = existingNames.length > 0 ? db.transaction(existingNames, 'readonly') : null;
+
+  for (const [storeName, schema] of Object.entries(EXPECTED_SCHEMA)) {
+    if (!existingNames.includes(storeName)) {
+      missingStores.push(storeName);
+      continue;
+    }
+
+    const store = tx.objectStore(storeName);
+
+    // 未指定 keyPath 时 IndexedDB 返回空字符串（外置主键），统一归一化为 null 便于比较
+    const actualKeyPath = store.keyPath === '' || store.keyPath === undefined ? null : store.keyPath;
+    if (actualKeyPath !== schema.keyPath) {
+      keyPathMismatches.push({ store: storeName, actual: actualKeyPath, expected: schema.keyPath });
+    }
+
+    for (const idx of schema.indexes || []) {
+      if (!store.indexNames.contains(idx.name)) {
+        missingIndexes.push({ store: storeName, index: idx.name });
+      }
+    }
+  }
+
+  return { missingStores, missingIndexes, keyPathMismatches };
+}
+
+/**
+ * 构造主键结构不兼容的错误，信息里点名具体是哪张表。
+ * @param {Array<{store: string, actual: string|null, expected: string}>} mismatches
+ * @returns {Error}
+ */
+function makeSchemaMismatchError(mismatches) {
+  const detail = mismatches
+    .map(m => {
+      const actual = m.actual === null ? '外置主键' : `"${m.actual}"`;
+      return `${m.store}（库中为 ${actual}，期望 "${m.expected}"）`;
+    })
+    .join('；');
+  const err = new Error(
+    `数据库主键结构与当前版本不兼容：${detail}。` +
+    `主键路径无法就地修改，需要删除并重建数据库。`
+  );
+  err.name = 'SchemaMismatchError';
+  return err;
+}
+
+// ============================================================
+// 打开数据库
+// ============================================================
+
+/**
+ * 按指定版本打开数据库。
+ * 传入 undefined 表示沿用已有的当前版本（不存在则建为 v1）。
+ * @param {number|undefined} version
+ * @returns {Promise<IDBDatabase>}
+ */
+function openAtVersion(version) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(DB_NAME, version);
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
@@ -136,31 +217,79 @@ export function openDB() {
       }
     };
 
-    request.onsuccess = () => {
-      const db = request.result;
-
-      const missing = [];
-      for (const storeName of Object.keys(EXPECTED_SCHEMA)) {
-        if (!db.objectStoreNames.contains(storeName)) {
-          missing.push(storeName);
-        }
-      }
-      if (missing.length > 0) {
-        console.error(
-          `[DB] ⚠️ 打开的 DB 缺少 store: ${missing.join(', ')}。` +
-          `这不应该发生，请检查浏览器兼容性或报告 bug。`
-        );
-      }
-
-      resolve(db);
-    };
-
+    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
     request.onblocked = () => {
       console.warn('[DB] 打开被阻塞，可能有其他页面正在使用旧版本');
       reject(new Error('数据库被其他页面阻塞，请关闭其他标签页后重试'));
     };
   });
+}
+
+/**
+ * 校验并按需修复 schema。
+ *
+ * 修复策略（顺序很重要）：
+ *   1. 先查主键结构——不一致就直接报错，不进入修复流程，避免用错误的 keyPath 继续跑
+ *   2. 缺表/缺索引 → 关闭当前连接，抬升版本号重开，由 ensureSchema 补齐（数据全保留）
+ *   3. 修复后再校验一次，仍不完整则报错
+ *
+ * @param {IDBDatabase} db
+ * @returns {Promise<IDBDatabase>}
+ */
+async function ensureSchemaCompatible(db) {
+  const first = inspectSchema(db);
+
+  if (first.keyPathMismatches.length > 0) {
+    db.close();
+    throw makeSchemaMismatchError(first.keyPathMismatches);
+  }
+
+  if (first.missingStores.length === 0 && first.missingIndexes.length === 0) {
+    return db;
+  }
+
+  // 注意：必须用「已有版本 + 1」并保证不低于 DB_VERSION。
+  // 少了 +1 不会触发 upgrade（版本没变），而低于现有版本又会直接抛 VersionError。
+  const repairVersion = Math.max(db.version + 1, DB_VERSION);
+  console.warn(
+    `[DB] schema 不完整（缺 ${first.missingStores.length} 张表、${first.missingIndexes.length} 个索引），` +
+    `正在自动补全至 v${repairVersion}…`
+  );
+
+  db.close();
+
+  const repaired = await openAtVersion(repairVersion);
+  const second = inspectSchema(repaired);
+
+  if (second.missingStores.length > 0 || second.missingIndexes.length > 0) {
+    repaired.close();
+    const err = new Error(
+      `数据库 schema 自动补全失败，仍缺少：${second.missingStores.join(', ') || '（无缺表）'}。`
+    );
+    err.name = 'SchemaRepairFailedError';
+    throw err;
+  }
+  if (second.keyPathMismatches.length > 0) {
+    repaired.close();
+    throw makeSchemaMismatchError(second.keyPathMismatches);
+  }
+
+  console.log('[DB] schema 自动补全完成，原有数据已保留');
+  return repaired;
+}
+
+export function openDB() {
+  return openAtVersion(DB_VERSION)
+    .catch((err) => {
+      // 已有库的版本高于 DB_VERSION（例如上次自愈抬升过版本），改用其当前版本打开
+      if (err && err.name === 'VersionError') {
+        console.warn(`[DB] 已有数据库版本高于 v${DB_VERSION}，按现有版本打开`);
+        return openAtVersion(undefined);
+      }
+      throw err;
+    })
+    .then(ensureSchemaCompatible);
 }
 
 function createStore(db, storeName) {
@@ -238,7 +367,7 @@ export async function getStores() {
 }
 
 // ============================================================
-// AUD-12/13/15/17：通用键级串行锁
+// 通用键级串行锁
 // ============================================================
 //
 // 用法：
@@ -279,11 +408,20 @@ export async function withKeyLock(namespace, key, fn) {
 }
 
 export async function checkDatabase() {
+  let db = null;
   try {
-    const db = await openDB();
-    const tx = db.transaction('characters', 'readonly');
-    const store = tx.objectStore('characters');
-    await store.count();
+    db = await openDB();
+
+    // IDBObjectStore.count() 返回的是 IDBRequest 而非 Promise，
+    // 直接 await 会立刻拿到请求对象本身、拿不到任何失败信息。
+    // 必须包一层 Promise 才真正起到「试读」的作用。
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('characters', 'readonly');
+      const request = tx.objectStore('characters').count();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
     return { ok: true };
   } catch (error) {
     console.error('[DB] 数据库检查失败:', error);
@@ -292,6 +430,12 @@ export async function checkDatabase() {
       error: error.message || '未知错误',
       code: error.name || 'UnknownError'
     };
+  } finally {
+    // openDB() 返回的连接不受 dbInstance 管理，这里必须自己关闭，
+    // 否则会留下一个活动连接，使后续 deleteDatabase() 触发 onblocked。
+    if (db) {
+      try { db.close(); } catch (_) {}
+    }
   }
 }
 

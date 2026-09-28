@@ -732,7 +732,7 @@ function sharedStyles() {
       .theme-maker-v2 {
         max-height: none;
       }
-      /* ★ 附带：窄屏下优化 header 布局，避免标题与按钮挤爆 */
+      /* ★ 窄屏下 header 布局：避免标题与按钮挤爆 */
       .tm-header {
         flex-wrap: wrap;
         gap: 0.4rem;

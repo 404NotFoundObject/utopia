@@ -30,7 +30,7 @@ import {
   isSpeechSupported,
 } from './services/sttService.js';
 
-const APP_VERSION = '3.7.1';
+const APP_VERSION = '3.8.0';
 const STORAGE_VERSION_KEY = 'utopia_app_version';
 const PENDING_CALL_END_KEY = 'utopia:pending-call-end';
 
@@ -1101,10 +1101,17 @@ async function init() {
       .then(m => m.default.start())
       .catch(err => console.warn('[App] 加载 Engine Monitor 失败:', err));
   }
+  // 就绪标志：init() 全程结束才会置位。
+  // __eventBus 在数据库校验通过后即挂载，此时各按钮的事件绑定尚未完成，
+  // 外部（如 E2E 测试）若以它为「可交互」信号会在点击时落空。
+  if (typeof window !== 'undefined') {
+    window.__utopiaReady = true;
+  }
   console.log('✅ Utopia 应用已启动');
 }
 
 init().catch(err => {
   console.error('❌ 启动失败:', err);
-  showToast('应用启动失败，请刷新重试', 'error');
+  // 带上真实原因：只提示"请刷新重试"会让数据库结构问题无从排查
+  showToast(`应用启动失败：${err?.message || '未知错误'}，请刷新重试`, 'error');
 });

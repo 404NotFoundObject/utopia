@@ -10,7 +10,7 @@ import { sendChatRequest } from '../core/api.js';
  * @returns {Promise<string>} 生成的摘要
  */
 export async function generateSummary(conversationText, existingSummary = '', maxTokens = 200, character = null) {
-  // ★ 修复 B1：兼容旧调用 —— 未传 character 时尝试从当前状态获取
+  // ★ 兼容旧调用：未传 character 时尝试从当前状态获取
   let effectiveChar = character;
   if (!effectiveChar) {
     try {

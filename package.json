@@ -1,6 +1,6 @@
 {
   "name": "utopia",
-  "version": "3.7.1",
+  "version": "3.8.0",
   "private": true,
   "license": "Apache-2.0",
   "description": "AI 角色扮演 Agent —— 让角色真正活起来的工具集",
@@ -10,6 +10,20 @@
   },
   "scripts": {
     "dev": "python -m http.server 8080",
-    "dev:node": "npx serve -l 8080"
+    "dev:node": "npx serve -l 8080",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:dom": "vitest run tests/dom",
+    "test:integration": "vitest run tests/integration",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@vitest/coverage-v8": "^5.0.2",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^30.1.1",
+    "vitest": "^5.0.2"
   }
 }

@@ -64,12 +64,11 @@ export function closeModal() {
 /**
  * 创建模态框 HTML
  *
- * ★ XSS 修复：
+ * ★ 防 XSS：
  *   - title 是纯文本语义，经过 escapeHtml
  *   - bodyHtml / footerHtml 是 HTML 语义，由调用方负责安全
  *
- * 注：此函数当前无调用方（预留给未来的标准模态框构建），
- *     修复是为防止未来误用。
+ * 注：此函数当前无调用方（预留给未来的标准模态框构建）。
  *
  * @param {string} title - 标题（纯文本）
  * @param {string} bodyHtml - 主体 HTML（调用方负责安全）

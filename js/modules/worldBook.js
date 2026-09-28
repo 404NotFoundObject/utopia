@@ -409,7 +409,7 @@ export async function syncWorldBookVectors() {
           return 'edited';
         }
 
-        // R2：updatedAt 变化 = 用户改过其他字段 → 只写向量，不覆盖 updatedAt
+        // updatedAt 变化 = 用户改过其他字段 → 只写向量，不覆盖 updatedAt
         if (fresh.updatedAt !== snapshot.rule.updatedAt) {
           fresh.vector = vec;
           fresh.vectorModel = currentModel;
