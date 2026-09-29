@@ -254,9 +254,26 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 2px 8px;
-    padding: 8px 16px 10px;
-    min-height: 180px;
-    border-top: 1px solid var(--color-border);
+    padding: 10px 16px 12px;
+    min-height: 190px;
+    /* 微信 PC 输入框是整块带描边的圆角面板 */
+    margin: 0 14px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+  }
+  /* 麦克风按钮由 app.js 直接插入 #chatInput（order 默认 0），会被 flex-wrap 顶到首行，
+     这里显式归位到右侧工具行，落在发送按钮左边；内联样式须用 !important 覆盖。 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput .mic-btn {
+    order: 3;
+    /* 独占 auto margin：把右侧工具行推到左，麦克风与发送按钮紧挨在最右 */
+    margin: 0 0 0 auto !important;
+    width: 30px !important;
+    height: 30px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+    color: var(--color-text-muted) !important;
+    font-size: 15px !important;
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-left"],
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-right"] {
@@ -296,7 +313,7 @@
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn {
     order: 4;
-    margin-left: auto;
+    margin-left: 0;
     width: auto;
     height: 30px;
     padding: 0 16px;
@@ -495,117 +512,136 @@
     padding: 10px;
   }
 
-  /* ============================================================
-     朋友圈页面化：仅对含 .social-feed 的模态生效（:has 限定，
-     设置 / 世界书等其他模态保持原样），整体变为全屏页面。
-     封面区（背景图 / 返回 / 换背景 / 头像昵称）由 wechatTheme.js 注入。
-     ============================================================ */
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) {
-    background: var(--color-bg-primary);
-    padding: 0;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .modal-content {
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    max-height: none;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-    background: var(--color-bg-primary);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: hidden;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  /* 封面下方的标题行弱化为透明工具行 */
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
-    margin-top: 34px;
-    background: transparent;
-    box-shadow: none;
-  }
+}
 
-  /* 封面区（wechatTheme.js 注入） */
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover {
-    position: relative;
-    height: 220px;
-    flex-shrink: 0;
-    background: #c8ccd4;
-    overflow: visible;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover .wx-cover-img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 0;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back {
-    position: absolute;
-    top: 10px;
-    left: 8px;
-    width: 38px;
-    height: 38px;
-    border: none;
-    background: transparent;
-    color: #ffffff;
-    font-size: 18px;
-    cursor: pointer;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    z-index: 2;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 38px;
-    height: 38px;
-    border: none;
-    background: transparent;
-    color: #ffffff;
-    font-size: 18px;
-    cursor: pointer;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    z-index: 2;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-upload-input {
-    display: none;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me {
-    position: absolute;
-    right: 14px;
-    bottom: -26px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    z-index: 2;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me .wx-me-name {
-    color: #ffffff;
-    font-size: 15px;
-    font-weight: 600;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me img {
-    width: 58px;
-    height: 58px;
-    border-radius: 6px;
-    border: 2px solid #ffffff;
-    object-fit: cover;
-    background: #ffffff;
-  }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) #socialCloseBtn {
-    display: none;
-  }
+/* ============================================================
+   六、朋友圈页面化（PC 与移动端统一布局）
+   仅对含 .social-feed 的模态生效（:has 限定），设置 / 世界书等其他
+   模态保持原样。模态变为整页：封面在上、内容整体上下滚动（帖子列表
+   不再内部定死滚动），PC 与移动端共用同一套布局。
+   封面区（背景图 / 返回 / 换背景 / 头像昵称）由 wechatTheme.js 注入。
+   ============================================================ */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) {
+  background: var(--color-bg-primary);
+  padding: 0;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .modal-content {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: var(--color-bg-primary);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed {
+  display: block;
+  width: 100%;
+  /* PC 下收成微信朋友圈那样的窄栏，移动端自然铺满 */
+  max-width: 560px;
+  max-height: none;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
+}
+/* 标题行弱化为透明工具行；顶部留出头像下沉 26px 的空间避免重叠 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
+  margin: 0;
+  padding: 36px 14px 10px;
+  background: transparent;
+  box-shadow: none;
+}
+/* 整体滚动：帖子列表不再内部滚动 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts {
+  display: block;
+  flex: none;
+  overflow: visible;
+  padding: 0 0 28px;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-post {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  box-shadow: none;
+}
+[data-theme="wechat"] #modalOverlay:has(.social-feed) .social-post {
+  background: #ffffff;
+  border-color: var(--color-border);
+}
+[data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-post {
+  background: #1f1f1f;
+  border-color: var(--color-border);
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) #socialCloseBtn {
+  display: none;
+}
+
+/* 封面区（wechatTheme.js 注入） */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover {
+  position: relative;
+  height: 240px;
+  background: #c8ccd4;
+  overflow: visible;
+}
+[data-theme="wechat-dark"] .wx-social-cover {
+  background: #2c2c2c;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover .wx-cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
+  position: absolute;
+  top: 10px;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back {
+  left: 8px;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
+  right: 10px;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-upload-input {
+  display: none;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me {
+  position: absolute;
+  right: 14px;
+  bottom: -26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 2;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me .wx-me-name {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me img {
+  width: 58px;
+  height: 58px;
+  border-radius: 6px;
+  border: 2px solid #ffffff;
+  object-fit: cover;
+  background: #ffffff;
 }

@@ -133,6 +133,75 @@ test.describe('微信主题 · 桌面', () => {
     expect(info.sendRightGap).toBeLessThan(20);
     expect(info.sendBottomGap).toBeLessThan(14);
   });
+
+  test('输入区麦克风按钮在发送按钮左侧且同行', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    await page.evaluate(() => {
+      document.getElementById('welcomePage').style.display = 'none';
+      document.getElementById('chatContainer').style.display = 'flex';
+    });
+
+    const pos = await page.evaluate(() => {
+      const mic = document.querySelector('#chatInput .mic-btn');
+      const send = document.getElementById('sendBtn');
+      if (!mic || !send) return null;
+      const m = mic.getBoundingClientRect();
+      const s = send.getBoundingClientRect();
+      return { micRight: m.right, sendLeft: s.left, micBottom: m.bottom, sendBottom: s.bottom };
+    });
+    expect(pos).not.toBeNull();
+    // 与发送按钮同一行（底边对齐），且紧贴其左侧
+    expect(Math.abs(pos.micBottom - pos.sendBottom)).toBeLessThan(6);
+    expect(pos.sendLeft - pos.micRight).toBeGreaterThanOrEqual(-2);
+    expect(pos.sendLeft - pos.micRight).toBeLessThan(30);
+  });
+
+  test('朋友圈页面化（PC 与移动端统一）：全屏 + 封面 + 整页滚动', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    // 多铺几条动态，保证可滚动
+    await page.evaluate(async () => {
+      const social = await import('/js/modules/social.js');
+      for (let i = 0; i < 6; i++) {
+        await social.publishPostByUser({ id: 'user', name: '我' }, `滚动测试动态 ${i + 1}`);
+      }
+    });
+
+    await page.locator('#socialBtn').click();
+    await expect(page.locator('#modalOverlay')).toBeVisible();
+    await page.waitForTimeout(450);
+
+    // 模态全屏（与移动端同一套布局）
+    const box = await page.locator('#modalContent').boundingBox();
+    const vp = page.viewportSize();
+    expect(box.width).toBeGreaterThanOrEqual(vp.width - 20);
+    expect(box.height).toBeGreaterThanOrEqual(vp.height - 20);
+
+    const cover = page.locator('.wx-social-cover');
+    await expect(cover).toBeVisible();
+    await expect(cover.locator('.wx-cover-back')).toBeVisible();
+    await expect(page.locator('#socialCloseBtn')).toBeHidden();
+
+    // 整页滚动：滚动发生在模态本身，帖子列表不再内部滚动
+    const scroll = await page.evaluate(() => {
+      const mc = document.getElementById('modalContent');
+      const posts = mc.querySelector('.social-posts');
+      mc.scrollTop = 200;
+      return {
+        scrollTop: mc.scrollTop,
+        scrollable: mc.scrollHeight > mc.clientHeight,
+        postsOverflow: getComputedStyle(posts).overflowY,
+      };
+    });
+    expect(scroll.scrollable).toBe(true);
+    expect(scroll.scrollTop).toBeGreaterThan(100);
+    expect(scroll.postsOverflow).toBe('visible');
+
+    // 返回 → 关闭页面
+    await page.locator('.wx-cover-back').click();
+    await expect(page.locator('#modalOverlay')).toBeHidden();
+  });
 });
 
 test.describe('微信主题 · 移动端', () => {
