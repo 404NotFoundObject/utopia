@@ -8,11 +8,14 @@
    列表层与底部 dock。深浅两种微信各自的颜色差异用字面值书写。
    ============================================================ */
 
-/* 返回按钮（仅微信主题移动端显示，由 wechatTheme.js 注入） */
-#wxBackBtn {
+/* wechatTheme.js 注入的节点：默认一律隐藏，
+   微信主题的对应断点内再放开（非微信主题零残留）。 */
+#wxBackBtn,
+#wxUserAvatar,
+#wxDockChatBtn,
+#wxPlusBtn,
+#wxPlusMenu {
   display: none;
-  align-items: center;
-  justify-content: center;
 }
 
 /* ============================================================
@@ -30,15 +33,70 @@
 
 /* ============================================================
    二、聊天气泡
+   微信式观感：小圆角、靠头像一侧的上角收尖、伸出一条小尾巴；
+   气泡宽度收窄到 72%（JS 内联 maxWidth 需 !important 覆盖）；
+   气泡内不显示时间（微信的时间位于消息组之间，此处直接去除）。
    用户气泡底色来自 --color-primary-gradient（主题变量已设为
-   微信绿），这里覆盖文字颜色与边框；对方气泡改为纯白 / 深灰。
-   气泡宽度收窄到 72%（JS 内联 maxWidth 需 !important 覆盖）。
+   微信绿），尾巴取渐变起点色；对方气泡纯白 / 深灰。
    ============================================================ */
-:is([data-theme="wechat"], [data-theme="wechat-dark"]) .message .bubble {
-  max-width: 72% !important;
-}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .message .bubble,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .group-message-bubble {
   max-width: 72% !important;
+  position: relative;
+}
+
+/* 尾巴：用户气泡（绿）朝右，对方气泡（白 / 深灰）朝左 */
+[data-theme="wechat"] .message.user .bubble::after,
+[data-theme="wechat"] .group-message.own .group-message-bubble::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: -5px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-right: 0;
+  border-left-color: #95ec69;
+}
+[data-theme="wechat"] .message.assistant .bubble::after,
+[data-theme="wechat"] .group-message:not(.own) .group-message-bubble::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-left: 0;
+  border-right-color: #ffffff;
+}
+[data-theme="wechat-dark"] .message.user .bubble::after,
+[data-theme="wechat-dark"] .group-message.own .group-message-bubble::after {
+  border-left-color: #3eb575;
+}
+[data-theme="wechat-dark"] .message.assistant .bubble::after,
+[data-theme="wechat-dark"] .group-message:not(.own) .group-message-bubble::after {
+  border-right-color: #2c2c2c;
+}
+
+/* 靠头像一侧的上角收尖，与尾巴衔接 */
+[data-theme="wechat"] .message.user .bubble,
+[data-theme="wechat"] .group-message.own .group-message-bubble,
+[data-theme="wechat-dark"] .message.user .bubble,
+[data-theme="wechat-dark"] .group-message.own .group-message-bubble {
+  border-top-right-radius: 2px !important;
+}
+[data-theme="wechat"] .message.assistant .bubble,
+[data-theme="wechat"] .group-message:not(.own) .group-message-bubble,
+[data-theme="wechat-dark"] .message.assistant .bubble,
+[data-theme="wechat-dark"] .group-message:not(.own) .group-message-bubble {
+  border-top-left-radius: 2px !important;
+}
+
+/* 气泡内时间：微信主题下一律不显示 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .message .bubble .timestamp,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .group-message-bubble .timestamp {
+  display: none;
 }
 
 [data-theme="wechat"] .message.user .bubble,
@@ -150,6 +208,27 @@
     display: block !important;
     font-size: 10px;
   }
+  /* 左上角用户头像（wechatTheme.js 注入，头像源 settings.user.avatar） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxUserAvatar {
+    display: block;
+    width: 32px;
+    height: 32px;
+    margin: 6px auto 8px;
+    border-radius: 4px;
+    object-fit: cover;
+    cursor: pointer;
+    flex-shrink: 0;
+    order: 0;
+  }
+  /* 移动端注入的「聊天」tab 按钮在桌面无意义 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxDockChatBtn {
+    display: none !important;
+  }
+  /* 右上角加号与其折叠菜单同样仅用于移动端列表层 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusBtn,
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu {
+    display: none !important;
+  }
   /* 图标栏占位：列表列整体让出宽度 */
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sidebar {
     margin-left: 56px;
@@ -192,11 +271,15 @@
     display: none !important;
   }
 
-  /* 底部 dock：主按钮行常显，更多按钮固定在右端 */
+  /* 底部 dock：只保留 聊天 / 插件 / 朋友圈 / 设置 四项。
+     两个按钮行改 display:contents，全部按钮直接参与 footer 的
+     flex 布局并用 order 重排——纯 CSS 规则，sidebar.js 在 resize
+     时整体重建按钮后依然成立。其余按钮收进右上角「+」折叠菜单
+     （菜单项点击由 wechatTheme.js 转发给对应 footer 按钮）。 */
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer {
     position: fixed;
     left: 0;
-    right: 52px;
+    right: 0;
     bottom: 0;
     height: 52px;
     flex-direction: row !important;
@@ -209,14 +292,12 @@
     z-index: 95;
     overflow: visible;
   }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer .sidebar-footer-buttons,
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer .sidebar-btn-row {
-    flex-direction: row !important;
-    flex: 1;
-    justify-content: space-around;
-    gap: 0;
-    padding: 0;
+    display: contents !important;
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer .sidebar-btn {
+    order: 9;
     max-width: none;
     min-height: 40px;
     padding: 4px 0;
@@ -230,35 +311,94 @@
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer .sidebar-btn i {
     font-size: 17px;
   }
+  /* 四个常驻 tab；「聊天」点击回到会话列表层（事件由 wechatTheme.js 绑定） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #wxDockChatBtn {
+    display: flex !important;
+    order: 1;
+    color: var(--color-primary);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #pluginBtn {
+    order: 2;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #socialBtn {
+    order: 3;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #settingsBtn {
+    order: 4;
+  }
+  /* 其余按钮与「更多」展开钮退场，动作收进 + 菜单 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #themeToggleBtn,
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #worldbookBtn,
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #importBtn,
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #createBtn,
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer #createGroupBtn,
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) .expand-toggle-container {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    width: 52px;
-    height: 52px;
-    margin: 0;
-    padding: 0;
-    border-bottom: none;
-    border-top: 1px solid var(--color-border);
+    display: none !important;
+  }
+  /* 用户头像为 PC 端专属，移动端不显示 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxUserAvatar {
+    display: none !important;
+  }
+
+  /* 右上角「+」与折叠菜单（仿微信列表页右上角） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-header {
+    position: relative;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusBtn {
+    display: flex !important;
     align-items: center;
     justify-content: center;
-    z-index: 96;
+    width: 34px;
+    height: 34px;
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--color-text-primary);
+    font-size: 18px;
+    cursor: pointer;
   }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .expand-toggle-container .expand-toggle {
-    width: 100%;
-    height: 100%;
-    min-height: unset;
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 10px;
+    min-width: 184px;
+    background: #3e3e3e;
+    border-radius: 8px;
+    padding: 2px 0;
+    z-index: 98;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    display: none;
   }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .sidebar-footer .secondary-row {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 52px;
-    flex-direction: row !important;
-    justify-content: space-around;
-    padding: 4px 2px 6px;
-    border-top: 1px solid var(--color-border);
-    z-index: 96;
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu.open {
+    display: block;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    right: 16px;
+    width: 0;
+    height: 0;
+    border: 5px solid transparent;
+    border-top: 0;
+    border-bottom-color: #3e3e3e;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu .wx-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    color: #ffffff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu .wx-menu-item + .wx-menu-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu .wx-menu-item i {
+    width: 20px;
+    text-align: center;
+    font-size: 15px;
   }
 
   /* 汉堡按钮退场：列表层即会话列表，对话页由返回按钮回列表 */
@@ -267,6 +407,8 @@
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxBackBtn {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages {
