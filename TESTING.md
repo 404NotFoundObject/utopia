@@ -53,6 +53,7 @@ tests/
 │   ├── importmap-alias.test.js
 │   ├── core/                # state / utils
 │   ├── modules/             # tokenBudget / sceneRegistry / profileDefaults
+│   ├── ui/                  # 主题预设与视图状态机（微信主题）
 │   └── utils/               # png
 ├── dom/                     # jsdom 环境下的 UI 组件
 │   ├── toast.test.js
@@ -66,10 +67,11 @@ tests/
 └── e2e/                     # 真实浏览器
     ├── smoke.spec.js
     ├── schema-recovery.spec.js
-    └── emotion.spec.js
+    ├── emotion.spec.js
+    └── wechat-theme.spec.js     # 桌面/移动端按视口自动 skip
 ```
 
-当前规模：**Vitest 15 个文件 / 417 例，E2E 3 个 spec / 28 例**。
+当前规模：**Vitest 17 个文件 / 424 例，E2E 4 个 spec / 20 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，共执行 40 次）。
 
 ---
 

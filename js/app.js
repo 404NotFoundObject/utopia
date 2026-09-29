@@ -15,6 +15,7 @@ import { showToast } from './ui/components/toast.js';
 
 import { initTheme, bindThemeToggle } from './ui/layout/theme.js';
 import { initSidebar } from './ui/layout/sidebar.js';
+import { initWechatTheme } from './ui/layout/wechatTheme.js';
 import { renderCharacterList, initCharacterListSubscription, updateCharacterHighlight } from './ui/screens/characterListUI.js';
 import { renderCharacterForm } from './ui/screens/characterFormUI.js';
 import { renderImportModal } from './ui/screens/importUI.js';
@@ -30,7 +31,7 @@ import {
   isSpeechSupported,
 } from './services/sttService.js';
 
-const APP_VERSION = '3.8.0';
+const APP_VERSION = '3.9.0';
 const STORAGE_VERSION_KEY = 'utopia_app_version';
 const PENDING_CALL_END_KEY = 'utopia:pending-call-end';
 
@@ -1072,6 +1073,7 @@ async function init() {
 
   bindUIEvents();
   initSidebar();
+  initWechatTheme();
 
   window.addEventListener('resize', handleResize);
   handleResize();

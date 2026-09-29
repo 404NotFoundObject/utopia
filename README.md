@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.8.0-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.0-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -157,7 +157,8 @@ npm run test:e2e # Playwright，约 4min（首次需 npx playwright install chro
 ### 🎨 其他
 
 - **朋友圈**：角色和用户可发布动态，AI 自动互动
-- **主题系统**：3 套内置主题（亮色 / 暗色 / 赛博朋克）+ 自定义主题制作器
+- **主题系统**：5 套内置主题（亮色 / 暗色 / 赛博朋克 / 微信 / 微信暗色）+ 自定义主题制作器
+- **微信主题**（实验）：一键切换成微信观感——桌面三栏变左侧图标栏，移动端变「列表 → 对话」两层视图，方头像、绿白气泡
 - **命令行**：20+ 命令覆盖环境查看、时间控制、记忆管理、角色切换
 - **多厂商 API**：OpenAI / Anthropic / Google Gemini / Cohere / DeepSeek / Mistral / Groq / Perplexity / xAI
 - **角色卡兼容**：Utopia v3.1 / SillyTavern v2/v3（含 PNG 卡）/ Character.AI / 通用格式
@@ -225,6 +226,16 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.0
+
+**新增微信主题（实验功能）。**
+
+- **两套内置主题**：`wechat`（浅色）与 `wechat-dark`（暗色），在「设置 → 外观」的下拉中以「微信 · 实验」提供。走既有主题通路（`THEME_PRESETS` → `applyTheme`），不引入第二套 UI 结构
+- **桌面端**：侧栏底部重排为最左侧 56px 垂直图标栏，列表列相应让位，形成 PC 微信式三栏观感
+- **移动端**：两级视图——`#sidebar` 变为全屏会话列表层，选中会话后进入对话页，对话页头部出现返回按钮；底部重排为微信式 dock
+- **观感细节**：方形圆角头像（含群聊）、气泡宽度收窄至 72%、微信品牌绿 `#07C160` 与配套灰阶/红色系
+- **零侵入**：纯增量实现，未修改 `chatUI.js` / `sidebar.js` / `save.js`；切回其他主题不残留任何状态
 
 ### v3.8.0
 

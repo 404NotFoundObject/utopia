@@ -188,6 +188,8 @@ function updateThemeIcon(theme, isCustom) {
 
   if (isCustom) {
     icon.className = 'fas fa-palette';
+  } else if (theme === 'wechat' || theme === 'wechat-dark') {
+    icon.className = 'fa-brands fa-weixin';
   } else if (theme === 'dark') {
     icon.className = 'fas fa-sun';
   } else if (theme === 'cyberpunk') {
