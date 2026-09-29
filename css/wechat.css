@@ -99,6 +99,12 @@
   display: none;
 }
 
+/* 聊天顶栏只显示名称，不显示头像（微信式；单聊群聊共用 #characterInfo） */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #characterInfo img,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #charAvatar {
+  display: none !important;
+}
+
 [data-theme="wechat"] .message.user .bubble,
 [data-theme="wechat"] .group-message.own .group-message-bubble {
   color: #191919 !important;
@@ -176,7 +182,7 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: 56px;
+    width: 64px;
     flex-direction: column !important;
     flex-wrap: nowrap !important;
     justify-content: flex-start;
@@ -211,9 +217,9 @@
   /* 左上角用户头像（wechatTheme.js 注入，头像源 settings.user.avatar） */
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxUserAvatar {
     display: block;
-    width: 32px;
-    height: 32px;
-    margin: 6px auto 8px;
+    width: 36px;
+    height: 36px;
+    margin: 8px auto 10px;
     border-radius: 4px;
     object-fit: cover;
     cursor: pointer;
@@ -231,7 +237,7 @@
   }
   /* 图标栏占位：列表列整体让出宽度 */
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sidebar {
-    margin-left: 56px;
+    margin-left: 64px;
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sidebar.collapsed {
     width: var(--sidebar-width) !important;
@@ -241,6 +247,80 @@
     :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sidebar .character-item .info {
       display: block;
     }
+  }
+
+  /* 输入区微信化：白底通栏、工具行在上、输入区占主体、发送按钮右下角 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput {
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 2px 8px;
+    padding: 8px 16px 10px;
+    min-height: 180px;
+    border-top: 1px solid var(--color-border);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-left"],
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-right"] {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-left"] {
+    order: 1;
+    width: 100%;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-left"]:empty {
+    display: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-right"] {
+    order: 3;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #messageInput {
+    order: 2;
+    width: 100%;
+    flex: 1 1 100%;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 6px 2px;
+    min-height: 100px;
+    max-height: none;
+    resize: none;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #messageInput:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn {
+    order: 4;
+    margin-left: auto;
+    width: auto;
+    height: 30px;
+    padding: 0 16px;
+    border-radius: 4px;
+    background: var(--color-primary);
+    color: #ffffff;
+    font-size: 13px;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn i {
+    display: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn:not(:disabled)::after {
+    content: '发送';
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn:hover:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+    filter: brightness(1.05);
+  }
+  [data-theme="wechat"] #chatInput {
+    background: #ffffff;
+  }
+  [data-theme="wechat-dark"] #chatInput {
+    background: #1f1f1f;
   }
 }
 
@@ -413,5 +493,119 @@
 
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages {
     padding: 10px;
+  }
+
+  /* ============================================================
+     朋友圈页面化：仅对含 .social-feed 的模态生效（:has 限定，
+     设置 / 世界书等其他模态保持原样），整体变为全屏页面。
+     封面区（背景图 / 返回 / 换背景 / 头像昵称）由 wechatTheme.js 注入。
+     ============================================================ */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) {
+    background: var(--color-bg-primary);
+    padding: 0;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: var(--color-bg-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* 封面下方的标题行弱化为透明工具行 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
+    margin-top: 34px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* 封面区（wechatTheme.js 注入） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover {
+    position: relative;
+    height: 220px;
+    flex-shrink: 0;
+    background: #c8ccd4;
+    overflow: visible;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover .wx-cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back {
+    position: absolute;
+    top: 10px;
+    left: 8px;
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    z-index: 2;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    z-index: 2;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-upload-input {
+    display: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me {
+    position: absolute;
+    right: 14px;
+    bottom: -26px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 2;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me .wx-me-name {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-me img {
+    width: 58px;
+    height: 58px;
+    border-radius: 6px;
+    border: 2px solid #ffffff;
+    object-fit: cover;
+    background: #ffffff;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) #socialCloseBtn {
+    display: none;
   }
 }

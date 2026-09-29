@@ -4,6 +4,7 @@ import {
   setMobileView,
   currentMobileView,
   ensureInjectedNodes,
+  ensureSocialCover,
 } from '../../../js/ui/layout/wechatTheme.js';
 import { getAppState } from '../../../js/core/state.js';
 
@@ -99,5 +100,65 @@ describe('wechatTheme 注入节点', () => {
     state.set('settings', { user: { avatar: 'data:image/png;base64,AAA' } });
     ensureInjectedNodes();
     expect(document.getElementById('wxUserAvatar').src).toContain('data:image/png;base64,AAA');
+  });
+});
+
+describe('朋友圈页面化封面', () => {
+  const INJECTED_IDS = ['wxBackBtn', 'wxDockChatBtn', 'wxUserAvatar', 'wxPlusBtn', 'wxPlusMenu'];
+  beforeEach(() => {
+    for (const id of INJECTED_IDS) document.getElementById(id)?.remove();
+    localStorage.removeItem('utopia:wx-social-cover');
+  });
+
+  /** 在模态内容里放置一个最小 .social-feed 结构 */
+  function mountFeed() {
+    const feed = document.createElement('div');
+    feed.className = 'social-feed';
+    document.getElementById('modalContent').appendChild(feed);
+    return feed;
+  }
+
+  test('注入封面：返回 / 相机 / 上传入口 / 头像昵称，且幂等', () => {
+    const state = getAppState();
+    state.set('settings', { user: { name: '阿澈', avatar: 'data:image/png;base64,ME' } });
+    const feed = mountFeed();
+
+    ensureSocialCover();
+
+    const cover = feed.querySelector('.wx-social-cover');
+    expect(cover).not.toBeNull();
+    expect(cover.querySelector('.wx-cover-back')).not.toBeNull();
+    expect(cover.querySelector('.wx-cover-camera')).not.toBeNull();
+    expect(cover.querySelector('.wx-cover-upload-input')?.type).toBe('file');
+    expect(cover.querySelector('.wx-me-name').textContent).toBe('阿澈');
+    expect(cover.querySelector('.wx-social-me img').src).toContain('base64,ME');
+    // 无已保存背景时不渲染背景 img
+    expect(cover.querySelector('.wx-cover-img')).toBeNull();
+
+    ensureSocialCover();
+    expect(feed.querySelectorAll('.wx-social-cover').length).toBe(1);
+  });
+
+  test('已保存背景时封面渲染背景图', () => {
+    localStorage.setItem('utopia:wx-social-cover', 'data:image/jpeg;base64,COVER');
+    const feed = mountFeed();
+
+    ensureSocialCover();
+
+    const bg = feed.querySelector('.wx-cover-img');
+    expect(bg).not.toBeNull();
+    expect(bg.src).toContain('base64,COVER');
+  });
+
+  test('返回按钮关闭模态', async () => {
+    const feed = mountFeed();
+    ensureSocialCover();
+    // overlay 处于打开态
+    const overlay = document.getElementById('modalOverlay');
+    overlay.classList.remove('hidden');
+
+    feed.querySelector('.wx-cover-back').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(overlay.classList.contains('hidden')).toBe(true);
   });
 });

@@ -13,6 +13,10 @@
 //                     移动端列表层右上角「+」与折叠菜单；菜单项点击
 //                     转发给 footer 内被隐藏的原按钮（事件绑定仍在
 //                     sidebar.js 侧，转发 click 即可复用）。
+// - .wx-social-cover  朋友圈页面化封面（仅移动端由 CSS 生效）：背景图
+//                     （可上传，localStorage 持久化）、返回按钮、
+//                     右下角用户头像与昵称；动态列表/发布/评论逻辑
+//                     复用 socialUI.js 原实现，本模块只注入封面。
 //
 // 边界：
 // - 不改动 sidebar.js 的抽屉与按钮重建逻辑：非微信主题下一切照旧；
@@ -21,11 +25,16 @@
 // - 朋友圈 / 世界书 / 设置等仍走模态框，不属于两层视图。
 
 import { getAppState } from '../../core/state.js';
+import { closeModal } from '../components/modal.js';
+import { showToast } from '../components/toast.js';
 
 const state = getAppState();
 
 const USER_AVATAR_PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'64\' height=\'64\' viewBox=\'0 0 64 64\'%3E%3Ccircle cx=\'32\' cy=\'32\' r=\'32\' fill=\'%23e0e0e6\'/%3E%3Ctext x=\'32\' y=\'41\' text-anchor=\'middle\' fill=\'%238a8aaa\' font-size=\'20\' font-family=\'sans-serif\'%3E?%3C/text%3E%3C/svg%3E';
+
+/** 朋友圈背景图（移动端页面模式）的本地存储键 */
+const SOCIAL_COVER_KEY = 'utopia:wx-social-cover';
 
 /** 「+」折叠菜单项：target 为 footer 内对应按钮 id，点击时转发 click */
 const PLUS_MENU_ITEMS = [
@@ -173,6 +182,93 @@ function closePlusMenu() {
   document.getElementById('wxPlusMenu')?.classList.remove('open');
 }
 
+/** 图片读入并压缩为 JPEG dataURL（控制 localStorage 占用） */
+function compressImage(file, maxSize = 1280, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * 朋友圈页面化封面（幂等）：openSocialFeed 渲染模态后由 observer 触发，
+ * 在 .social-feed 顶部注入微信式封面区——背景图（可上传，localStorage 持久化）、
+ * 返回按钮、右上角相机（上传入口）、右下角用户头像与昵称。
+ * 动态列表 / 发布 / 评论等逻辑全部复用 socialUI.js 原有实现。
+ */
+export function ensureSocialCover() {
+  const feed = document.querySelector('#modalContent .social-feed');
+  if (!feed || feed.querySelector('.wx-social-cover')) return;
+
+  const cover = document.createElement('div');
+  cover.className = 'wx-social-cover';
+  const saved = (() => {
+    try { return localStorage.getItem(SOCIAL_COVER_KEY); } catch (_) { return null; }
+  })();
+  cover.innerHTML = `
+    <button class="wx-cover-back" type="button" aria-label="返回"><i class="fas fa-chevron-left"></i></button>
+    <button class="wx-cover-camera" type="button" aria-label="更换背景" title="更换背景"><i class="fas fa-camera"></i></button>
+    <input type="file" class="wx-cover-upload-input" accept="image/*">
+    <div class="wx-social-me">
+      <span class="wx-me-name"></span>
+      <img alt="我的头像">
+    </div>
+  `;
+  feed.insertBefore(cover, feed.firstChild);
+
+  if (saved) {
+    const bg = document.createElement('img');
+    bg.className = 'wx-cover-img';
+    bg.alt = '';
+    bg.src = saved;
+    cover.insertBefore(bg, cover.firstChild);
+  }
+
+  const settings = state.get('settings');
+  cover.querySelector('.wx-me-name').textContent = settings?.user?.name || '我';
+  cover.querySelector('.wx-social-me img').src = settings?.user?.avatar || USER_AVATAR_PLACEHOLDER;
+
+  cover.querySelector('.wx-cover-back').addEventListener('click', () => closeModal());
+
+  const uploadInput = cover.querySelector('.wx-cover-upload-input');
+  cover.querySelector('.wx-cover-camera').addEventListener('click', () => uploadInput.click());
+  uploadInput.addEventListener('change', async () => {
+    const file = uploadInput.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file);
+      try { localStorage.setItem(SOCIAL_COVER_KEY, dataUrl); } catch (_) { /* 超限时仅本次生效 */ }
+      let bg = cover.querySelector('.wx-cover-img');
+      if (!bg) {
+        bg = document.createElement('img');
+        bg.className = 'wx-cover-img';
+        bg.alt = '';
+        cover.insertBefore(bg, cover.firstChild);
+      }
+      bg.src = dataUrl;
+      showToast('背景已更新', 'success');
+    } catch (_) {
+      showToast('背景更新失败', 'error');
+    } finally {
+      uploadInput.value = '';
+    }
+  });
+}
+
 /** 点击菜单与「+」以外区域时收起菜单 */
 function bindPlusMenuDismiss() {
   document.addEventListener('click', (e) => {
@@ -193,9 +289,10 @@ export function ensureInjectedNodes() {
 }
 
 /**
- * sidebar.js 跨端 resize 时会整体重建 footer 按钮，注入节点可能被清掉。
- * 观察 #sidebar 子树，变动后补注入。注入是幂等的：补齐完成后不再有
- * DOM 变更，observer 不会形成循环。
+ * sidebar.js 跨端 resize 时会整体重建 footer 按钮，注入节点可能被清掉；
+ * 朋友圈模态渲染 / 重渲染时需要补封面。观察 #sidebar 与 #modalOverlay
+ * 两个子树，变动后统一补齐。所有注入均幂等：补齐后不再产生 DOM 变更，
+ * observer 不会形成循环。
  */
 function bindRebuildObserver() {
   const sidebar = document.getElementById('sidebar');
@@ -207,9 +304,12 @@ function bindRebuildObserver() {
     setTimeout(() => {
       scheduled = false;
       ensureInjectedNodes();
+      ensureSocialCover();
     }, 100);
   });
   observer.observe(sidebar, { childList: true, subtree: true });
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) observer.observe(overlay, { childList: true, subtree: true });
 }
 
 let initialized = false;

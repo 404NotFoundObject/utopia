@@ -36,20 +36,24 @@ test.describe('微信主题 · 桌面', () => {
     );
     expect(primary).toBe('#07c160');
 
-    // 侧栏 footer 重排为最左垂直图标栏
+    // 侧栏 footer 重排为最左垂直图标栏（64px 宽）
     const footerBox = await page.locator('.sidebar-footer').boundingBox();
     expect(footerBox.x).toBeLessThan(8);
-    expect(footerBox.width).toBeLessThan(70);
+    expect(footerBox.width).toBeGreaterThanOrEqual(60);
+    expect(footerBox.width).toBeLessThan(72);
 
     // 列表列让出图标栏宽度
     const sidebarBox = await page.locator('#sidebar').boundingBox();
-    expect(sidebarBox.x).toBeGreaterThanOrEqual(50);
+    expect(sidebarBox.x).toBeGreaterThanOrEqual(56);
 
     // 头像方形圆角（默认主题下是全圆）
     const radius = await page.evaluate(() =>
       getComputedStyle(document.getElementById('charAvatar')).borderRadius
     );
     expect(radius).toBe('6px');
+
+    // 聊天顶栏不显示头像，只留名称
+    await expect(page.locator('#charAvatar')).toBeHidden();
   });
 
   test('暗色微信：data-theme 与背景变量', async ({ page }) => {
@@ -93,6 +97,41 @@ test.describe('微信主题 · 桌面', () => {
     expect(info.content).toBe('""');
     expect(info.tailColor).toBe('rgb(255, 255, 255)');
     expect(info.tsDisplay).toBe('none');
+  });
+
+  test('输入区微信化：工具行在上、输入区加高、发送为右下角文字按钮', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    // 打开对话区，输入区才有布局
+    await page.evaluate(() => {
+      document.getElementById('welcomePage').style.display = 'none';
+      const chat = document.getElementById('chatContainer');
+      chat.style.display = 'flex';
+    });
+
+    const info = await page.evaluate(() => {
+      const input = document.getElementById('chatInput');
+      const send = document.getElementById('sendBtn');
+      const box = input.getBoundingClientRect();
+      const sendBox = send.getBoundingClientRect();
+      return {
+        minHeight: getComputedStyle(input).minHeight,
+        inputBg: getComputedStyle(input).backgroundColor,
+        sendLabel: getComputedStyle(send, '::after').content,
+        sendRadius: getComputedStyle(send).borderRadius,
+        sendWidth: sendBox.width,
+        sendRightGap: box.right - sendBox.right,
+        sendBottomGap: box.bottom - sendBox.bottom,
+      };
+    });
+    expect(parseFloat(info.minHeight)).toBeGreaterThanOrEqual(150);
+    expect(info.inputBg).toBe('rgb(255, 255, 255)');
+    expect(info.sendLabel).toBe('"发送"');
+    expect(info.sendRadius).toBe('4px');
+    expect(info.sendWidth).toBeGreaterThan(50);
+    // 发送按钮贴输入区右下角
+    expect(info.sendRightGap).toBeLessThan(20);
+    expect(info.sendBottomGap).toBeLessThan(14);
   });
 });
 
@@ -172,5 +211,36 @@ test.describe('微信主题 · 移动端', () => {
 
     // 转发后菜单收起
     await expect(page.locator('#wxPlusMenu')).toBeHidden();
+  });
+
+  test('朋友圈为页面模式：全屏 + 封面 + 背景上传入口 + 返回', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    await page.locator('#socialBtn').click();
+    await expect(page.locator('#modalOverlay')).toBeVisible();
+
+    // 页面化：模态变全屏（等打开动画结束再测量）
+    await page.waitForTimeout(450);
+    const box = await page.locator('#modalContent').boundingBox();
+    const vp = page.viewportSize();
+    expect(box.width).toBeGreaterThanOrEqual(vp.width - 20);
+    expect(box.height).toBeGreaterThanOrEqual(vp.height - 20);
+
+    // 封面注入：背景 / 相机上传入口 / 返回按钮 / 用户昵称
+    const cover = page.locator('.wx-social-cover');
+    await expect(cover).toBeVisible();
+    await expect(cover.locator('.wx-cover-camera')).toBeVisible();
+    await expect(cover.locator('.wx-cover-upload-input')).toHaveCount(1);
+    await expect(cover.locator('.wx-cover-back')).toBeVisible();
+
+    const meName = await cover.locator('.wx-me-name').textContent();
+    expect(meName.length).toBeGreaterThan(0);
+
+    // 原有关闭按钮（×）退场
+    await expect(page.locator('#socialCloseBtn')).toBeHidden();
+
+    // 返回 → 关闭页面
+    await cover.locator('.wx-cover-back').click();
+    await expect(page.locator('#modalOverlay')).toBeHidden();
   });
 });
