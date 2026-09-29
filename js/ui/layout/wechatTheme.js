@@ -13,10 +13,10 @@
 //                     移动端列表层右上角「+」与折叠菜单；菜单项点击
 //                     转发给 footer 内被隐藏的原按钮（事件绑定仍在
 //                     sidebar.js 侧，转发 click 即可复用）。
-// - .wx-social-cover  朋友圈页面化封面（仅移动端由 CSS 生效）：背景图
-//                     （可上传，localStorage 持久化）、返回按钮、
-//                     右下角用户头像与昵称；动态列表/发布/评论逻辑
-//                     复用 socialUI.js 原实现，本模块只注入封面。
+// - .wx-social-cover  朋友圈封面（仅微信主题注入；移动端全屏页面 /
+//                     PC 悬浮窗共用）：背景图（可上传，localStorage
+//                     持久化）、返回按钮、右下角用户头像与昵称；
+//                     动态列表 / 发布 / 评论逻辑复用 socialUI.js 原实现。
 //
 // 边界：
 // - 不改动 sidebar.js 的抽屉与按钮重建逻辑：非微信主题下一切照旧；
@@ -205,13 +205,19 @@ function compressImage(file, maxSize = 1280, quality = 0.85) {
 }
 
 /**
- * 朋友圈页面化封面（幂等）：openSocialFeed 渲染模态后由 observer 触发，
- * 在 .social-feed 顶部注入微信式封面区——背景图（可上传，localStorage 持久化）、
- * 返回按钮、右上角相机（上传入口）、右下角用户头像与昵称。
+ * 朋友圈封面（幂等）：openSocialFeed 渲染模态后由 observer 触发，
+ * 仅在微信主题下于 .social-feed 顶部注入微信式封面区——背景图（可上传，
+ * localStorage 持久化）、返回按钮、右上角相机（上传入口）、右下角用户
+ * 头像与昵称。非微信主题不注入，并清除主题切换后可能残留的封面，
+ * 使朋友圈恢复 social.css 原生模态布局。
  * 动态列表 / 发布 / 评论等逻辑全部复用 socialUI.js 原有实现。
  */
 export function ensureSocialCover() {
   const feed = document.querySelector('#modalContent .social-feed');
+  if (!isWechatTheme()) {
+    feed?.querySelector('.wx-social-cover')?.remove();
+    return;
+  }
   if (!feed || feed.querySelector('.wx-social-cover')) return;
 
   const cover = document.createElement('div');
@@ -336,7 +342,11 @@ export function initWechatTheme() {
   window.addEventListener('resize', refreshMode);
 
   if (window.__eventBus && typeof window.__eventBus.on === 'function') {
-    window.__eventBus.on('theme:changed', refreshMode);
+    // 主题切换后视图状态与朋友圈封面（注入 / 清除）都要重算
+    window.__eventBus.on('theme:changed', () => {
+      refreshMode();
+      ensureSocialCover();
+    });
   }
 
   // 选中角色 / 群组后进入对话页（仅微信主题 + 移动端）

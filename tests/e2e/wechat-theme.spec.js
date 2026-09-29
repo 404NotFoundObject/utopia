@@ -117,6 +117,8 @@ test.describe('微信主题 · 桌面', () => {
       return {
         minHeight: getComputedStyle(input).minHeight,
         inputBg: getComputedStyle(input).backgroundColor,
+        // 聊天页底色由 #chatMessages 绘制（--color-bg-secondary）
+        chatBg: getComputedStyle(document.getElementById('chatMessages')).backgroundColor,
         sendLabel: getComputedStyle(send, '::after').content,
         sendRadius: getComputedStyle(send).borderRadius,
         sendWidth: sendBox.width,
@@ -125,7 +127,9 @@ test.describe('微信主题 · 桌面', () => {
       };
     });
     expect(parseFloat(info.minHeight)).toBeGreaterThanOrEqual(150);
-    expect(info.inputBg).toBe('rgb(255, 255, 255)');
+    // 输入区与聊天页同底色（--color-bg-secondary，浅色微信下 #ededed）
+    expect(info.inputBg).toBe(info.chatBg);
+    expect(info.inputBg).toBe('rgb(237, 237, 237)');
     expect(info.sendLabel).toBe('"发送"');
     expect(info.sendRadius).toBe('4px');
     expect(info.sendWidth).toBeGreaterThan(50);
@@ -157,7 +161,7 @@ test.describe('微信主题 · 桌面', () => {
     expect(pos.sendLeft - pos.micRight).toBeLessThan(30);
   });
 
-  test('朋友圈页面化（PC 与移动端统一）：全屏 + 封面 + 整页滚动', async ({ page }) => {
+  test('朋友圈 PC 悬浮窗：定宽标题居中 + 圆角 + 内部整页滚动', async ({ page }) => {
     await openWithTheme(page, 'wechat');
 
     // 多铺几条动态，保证可滚动
@@ -172,11 +176,23 @@ test.describe('微信主题 · 桌面', () => {
     await expect(page.locator('#modalOverlay')).toBeVisible();
     await page.waitForTimeout(450);
 
-    // 模态全屏（与移动端同一套布局）
+    // PC 为居中悬浮窗：520px 定宽、圆角 12px，明显小于视口（非全屏页面）
     const box = await page.locator('#modalContent').boundingBox();
     const vp = page.viewportSize();
-    expect(box.width).toBeGreaterThanOrEqual(vp.width - 20);
-    expect(box.height).toBeGreaterThanOrEqual(vp.height - 20);
+    expect(box.width).toBeGreaterThanOrEqual(500);
+    expect(box.width).toBeLessThanOrEqual(530);
+    expect(box.height).toBeLessThanOrEqual(vp.height - 60);
+    // 水平居中
+    expect(Math.abs(box.x + box.width / 2 - vp.width / 2)).toBeLessThan(4);
+
+    const shape = await page.evaluate(() => {
+      const mc = document.getElementById('modalContent');
+      const cs = getComputedStyle(mc);
+      return { radius: cs.borderRadius, overflowY: cs.overflowY, shadow: cs.boxShadow };
+    });
+    expect(shape.radius).toBe('12px');
+    expect(shape.overflowY).toBe('auto');
+    expect(shape.shadow).toContain('rgba');
 
     const cover = page.locator('.wx-social-cover');
     await expect(cover).toBeVisible();
@@ -198,10 +214,63 @@ test.describe('微信主题 · 桌面', () => {
     expect(scroll.scrollTop).toBeGreaterThan(100);
     expect(scroll.postsOverflow).toBe('visible');
 
-    // 返回 → 关闭页面
+    // 返回 → 关闭悬浮窗
     await page.locator('.wx-cover-back').click();
     await expect(page.locator('#modalOverlay')).toBeHidden();
   });
+
+  // 回归：朋友圈布局曾被微信主题的封面注入 / 页面化样式污染，
+  // 非微信主题必须保持 social.css 原生模态。
+  for (const themeId of ['light', 'dark', 'cyberpunk']) {
+    test(`非微信主题（${themeId}）朋友圈保持原生模态布局`, async ({ page }) => {
+      await openWithTheme(page, themeId);
+
+      await page.evaluate(async () => {
+        const social = await import('/js/modules/social.js');
+        await social.publishPostByUser({ id: 'user', name: '我' }, '原生主题动态');
+      });
+
+      await page.locator('#socialBtn').click();
+      await expect(page.locator('#modalOverlay')).toBeVisible();
+      await page.waitForTimeout(450);
+
+      // 不注入任何微信封面元素，原生关闭按钮保留
+      expect(await page.locator('.wx-social-cover').count()).toBe(0);
+      expect(await page.locator('#modalContent .wx-cover-back').count()).toBe(0);
+      await expect(page.locator('#socialCloseBtn')).toBeVisible();
+
+      // 原生 .social-feed 自身限高滚动（微信主题的 520px 悬浮窗样式未生效）
+      const feed = await page.evaluate(() => {
+        const el = document.getElementById('modalContent').querySelector('.social-feed');
+        const cs = getComputedStyle(el);
+        return {
+          overflowY: cs.overflowY,
+          radius: getComputedStyle(document.getElementById('modalContent')).borderRadius,
+          posts: el.querySelectorAll('.social-post').length,
+        };
+      });
+      expect(feed.overflowY).toBe('auto');
+      expect(feed.posts).toBeGreaterThanOrEqual(1);
+      expect(feed.radius).not.toBe('12px');
+
+      // 模态整体落在视口内，无横向溢出
+      const layout = await page.evaluate(() => {
+        const b = document.getElementById('modalContent').getBoundingClientRect();
+        return {
+          left: b.left,
+          right: b.right,
+          width: b.width,
+          height: b.height,
+          docOverflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
+        };
+      });
+      expect(layout.left).toBeGreaterThanOrEqual(0);
+      expect(layout.right).toBeLessThanOrEqual(page.viewportSize().width + 1);
+      expect(layout.width).toBeGreaterThan(200);
+      expect(layout.height).toBeGreaterThan(100);
+      expect(layout.docOverflowX).toBe(false);
+    });
+  }
 });
 
 test.describe('微信主题 · 移动端', () => {

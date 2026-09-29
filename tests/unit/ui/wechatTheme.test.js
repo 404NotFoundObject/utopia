@@ -108,6 +108,8 @@ describe('朋友圈页面化封面', () => {
   beforeEach(() => {
     for (const id of INJECTED_IDS) document.getElementById(id)?.remove();
     localStorage.removeItem('utopia:wx-social-cover');
+    // 封面仅微信主题注入，默认置于微信主题上下文
+    document.documentElement.setAttribute('data-theme', 'wechat');
   });
 
   /** 在模态内容里放置一个最小 .social-feed 结构 */
@@ -160,5 +162,23 @@ describe('朋友圈页面化封面', () => {
     feed.querySelector('.wx-cover-back').click();
     await new Promise((r) => setTimeout(r, 0));
     expect(overlay.classList.contains('hidden')).toBe(true);
+  });
+
+  test('非微信主题不注入封面，并清除切换前留下的残留', () => {
+    // 模拟从微信主题切到亮色主题：残留旧封面 + social-feed 仍在模态中
+    document.documentElement.setAttribute('data-theme', 'light');
+    const feed = mountFeed();
+    const stale = document.createElement('div');
+    stale.className = 'wx-social-cover';
+    feed.appendChild(stale);
+
+    ensureSocialCover();
+
+    expect(feed.querySelector('.wx-social-cover')).toBeNull();
+
+    // 暗色 / 赛博朋克等非微信主题同样不注入
+    document.documentElement.setAttribute('data-theme', 'dark');
+    ensureSocialCover();
+    expect(feed.querySelector('.wx-social-cover')).toBeNull();
   });
 });

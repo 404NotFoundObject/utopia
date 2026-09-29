@@ -148,12 +148,12 @@
   color: #ffffff;
 }
 
-/* 输入区底色（浅色微信为纯白，暗色为深灰面板） */
+/* 输入区底色与聊天页（#chatMessages）同色 */
 [data-theme="wechat"] #chatInput {
-  background: #ffffff;
+  background: var(--color-bg-secondary);
 }
 [data-theme="wechat-dark"] #chatInput {
-  background: #1f1f1f;
+  background: var(--color-bg-secondary);
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .send-btn {
   border-radius: 4px !important;
@@ -334,10 +334,10 @@
     filter: brightness(1.05);
   }
   [data-theme="wechat"] #chatInput {
-    background: #ffffff;
+    background: var(--color-bg-secondary);
   }
   [data-theme="wechat-dark"] #chatInput {
-    background: #1f1f1f;
+    background: var(--color-bg-secondary);
   }
 }
 
@@ -515,51 +515,81 @@
 }
 
 /* ============================================================
-   六、朋友圈页面化（PC 与移动端统一布局）
-   仅对含 .social-feed 的模态生效（:has 限定），设置 / 世界书等其他
-   模态保持原样。模态变为整页：封面在上、内容整体上下滚动（帖子列表
-   不再内部定死滚动），PC 与移动端共用同一套布局。
-   封面区（背景图 / 返回 / 换背景 / 头像昵称）由 wechatTheme.js 注入。
+   六、朋友圈（微信主题）
+   封面（wechatTheme.js 注入）与卡片样式全局生效；布局分端：
+   移动端为全屏页面（内容整页上下滚动），PC 端为居中悬浮窗
+   （窄窗圆角阴影，内部整页滚动）。:has 限定 .social-feed，
+   设置 / 世界书等其他模态不受影响；非微信主题不注入封面，
+   朋友圈保持 social.css 原生模态布局。
    ============================================================ */
-:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) {
-  background: var(--color-bg-primary);
-  padding: 0;
+
+/* ---- 移动端：全屏页面 ---- */
+@media (max-width: 768px) {
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) {
+    background: var(--color-bg-primary);
+    padding: 0;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .modal-content {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: var(--color-bg-primary);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed {
+    display: block;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
 }
-:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .modal-content {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  border-radius: 0;
-  background: var(--color-bg-primary);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+
+/* ---- PC：悬浮窗模态 ---- */
+@media (min-width: 769px) {
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .modal-content {
+    display: block;
+    width: 520px;
+    height: min(84vh, 780px);
+    max-width: calc(100vw - 48px);
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 12px;
+    background: var(--color-bg-primary);
+    overflow-y: auto;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed {
+    display: block;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
 }
-:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed {
-  display: block;
-  width: 100%;
-  /* PC 下收成微信朋友圈那样的窄栏，移动端自然铺满 */
-  max-width: 560px;
-  max-height: none;
-  min-height: 100%;
-  margin: 0 auto;
-  padding: 0;
-  overflow: visible;
-}
-/* 标题行弱化为透明工具行；顶部留出头像下沉 26px 的空间避免重叠 */
+
+/* ---- 两端共用：标题行 / 帖子列表 / 帖子卡 / 关闭按钮 ---- */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
   margin: 0;
   padding: 36px 14px 10px;
   background: transparent;
   box-shadow: none;
 }
-/* 整体滚动：帖子列表不再内部滚动 */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts {
   display: block;
-  flex: none;
   overflow: visible;
   padding: 0 0 28px;
 }

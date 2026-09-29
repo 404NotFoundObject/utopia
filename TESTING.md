@@ -54,6 +54,7 @@ tests/
 │   ├── core/                # state / utils
 │   ├── modules/             # tokenBudget / sceneRegistry / profileDefaults
 │   ├── ui/                  # 主题预设与视图状态机（微信主题）
+│   ├── pwa.test.js          # PWA 资源完整性（manifest / SW / 接线）
 │   └── utils/               # png
 ├── dom/                     # jsdom 环境下的 UI 组件
 │   ├── toast.test.js
@@ -71,7 +72,7 @@ tests/
     └── wechat-theme.spec.js     # 桌面/移动端按视口自动 skip
 ```
 
-当前规模：**Vitest 17 个文件 / 430 例，E2E 4 个 spec / 27 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，按视口自动跳过不适用用例）。
+当前规模：**Vitest 18 个文件 / 435 例，E2E 4 个 spec / 30 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，按视口自动跳过不适用用例）。
 
 ---
 
