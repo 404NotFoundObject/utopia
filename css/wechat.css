@@ -345,8 +345,17 @@
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn i {
     display: none;
   }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn:not(:disabled)::after {
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn::after {
     content: '发送';
+  }
+  /* 禁用态（等待角色回复）：保持文字与尺寸，底色换浅一档的绿，
+     否则内容为空、按钮塌缩成无字色块；切换瞬时生效，不做过渡 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn:disabled {
+    background: var(--color-primary-light);
+    opacity: 1;
+    cursor: not-allowed;
+    filter: none;
+    transition: none;
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #sendBtn:hover:not(:disabled) {
     transform: none;

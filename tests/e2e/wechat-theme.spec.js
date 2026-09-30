@@ -161,6 +161,32 @@ test.describe('微信主题 · 桌面', () => {
     // 发送按钮贴输入区右下角
     expect(info.sendRightGap).toBeLessThan(20);
     expect(info.sendBottomGap).toBeLessThan(14);
+
+    // 禁用态（发送后等待角色回复）：文字仍在、尺寸不塌缩、浅绿底
+    // 注意 .send-btn 有 transition: all，须等过渡完成再断言，否则读到起点色
+    const dis = await page.evaluate(async () => {
+      const send = document.getElementById('sendBtn');
+      send.disabled = true;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 260));
+      const cs = getComputedStyle(send);
+      const after = getComputedStyle(send, '::after');
+      const box = send.getBoundingClientRect();
+      const out = {
+        label: after.content,
+        width: box.width,
+        height: box.height,
+        bg: cs.backgroundColor,
+        opacity: cs.opacity,
+      };
+      send.disabled = false;
+      return out;
+    });
+    expect(dis.label).toBe('"发送"');
+    expect(dis.width).toBeGreaterThan(50);
+    expect(dis.height).toBe(30);
+    expect(dis.bg).toBe('rgb(149, 236, 105)');
+    expect(parseFloat(dis.opacity)).toBeCloseTo(1);
   });
 
   test('输入区麦克风按钮在发送按钮左侧且同行', async ({ page }) => {
