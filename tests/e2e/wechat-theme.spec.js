@@ -430,7 +430,7 @@ test.describe('微信主题 · 移动端', () => {
     await expect(page.locator('#sidebar')).toBeVisible();
   });
 
-  test('列表页选中项不再整行绿色，改为弱高亮', async ({ page }) => {
+  test('列表页选中项为弱高亮，非整行绿色', async ({ page }) => {
     await openWithTheme(page, 'wechat-dark');
 
     // 造数并选中第一个角色，保持在列表层

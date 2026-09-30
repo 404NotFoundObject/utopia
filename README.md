@@ -132,6 +132,31 @@ Utopia 选择另一条路：**把底层引擎内置**。
   <em>不止PC，响应式WEB支持绝大多数的设备</em>
 </p>
 
+### 💬 微信主题（实验）
+
+一键切换成微信观感——桌面端侧栏变左侧图标栏、输入区带描边外框与「发送」按钮，移动端变「列表 → 对话」两层视图。微信式气泡尾巴、方头像、绿白气泡，细节高度还原。
+
+<p align="center">
+  <img src="assets/screenshots/wechat-pc-light.png" width="800" alt="微信主题 · 桌面端浅色">
+</p>
+<p align="center">
+  <em>桌面端浅色：左侧图标栏 + 用户头像，微信式气泡与输入区。</em>
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/wechat-pc-dark.png" width="800" alt="微信主题 · 桌面端暗色">
+</p>
+<p align="center">
+  <em>桌面端暗色：微信暗色观感，同样的布局与交互。</em>
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/wechat-mobile.png" width="360" alt="微信主题 · 移动端">
+</p>
+<p align="center">
+  <em>移动端：全屏对话页，返回按钮 + 底部 dock。</em>
+</p>
+
 ### 📞 语音
 
 - **TTS**：Web Speech API / Kokoro / OpenAI 兼容 API
@@ -144,8 +169,8 @@ Worker 隔离、钩子系统（before / after / error）、UI 槽位系统、方
 
 ### 🧪 自动化测试
 
-- **Vitest**：15 个文件 / 417 个用例，覆盖纯逻辑单元、DOM 组件（含 XSS 转义）、存储与引擎集成
-- **Playwright E2E**：34 个用例，在真实浏览器中验证冷启动、数据库 schema 恢复、情绪识别接线，覆盖桌面与移动两个视口
+- **Vitest**：18 个文件 / 440 个用例，覆盖纯逻辑单元、DOM 组件（含 XSS 转义）、存储与引擎集成
+- **Playwright E2E**：覆盖应用冷启动、数据库 schema 恢复、情绪识别接线、微信主题，在真实浏览器中验证桌面与移动两个视口
 - 见 [TESTING.md](TESTING.md)
 
 ```bash
@@ -248,7 +273,7 @@ Utopia 内置完整的交互式文档：
 - **事件类别 12 → 18**：新增拒绝疏离、第三方示好、安抚澄清、感谢、抱怨、调侃，每类配有独立情绪影响向量
 - **新增情绪识别调试面板**：可查看任一输入的切分、命中与结构标注、两层得分与融合权重
 - **数据库 schema 自愈**：缺表 / 缺索引自动补齐且不丢数据；主键结构不兼容时给出可读提示
-- **新增测试模块**：Vitest 417 个用例 + Playwright 34 个用例
+- **新增测试模块**：Vitest 440 个用例 + Playwright E2E 套件
 - **稳定性**：网络时间请求增加超时上限；启动失败提示携带真实原因
 
 ### v3.7.1
