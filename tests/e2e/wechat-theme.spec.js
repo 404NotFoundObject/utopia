@@ -116,12 +116,13 @@ test.describe('微信主题 · 桌面', () => {
       const sendBox = send.getBoundingClientRect();
       return {
         minHeight: getComputedStyle(input).minHeight,
+        // 输入面板整体一色（--color-bg-input），与聊天页形成微信式细微色差
         inputBg: getComputedStyle(input).backgroundColor,
         // 聊天页底色由 #chatMessages 绘制（--color-bg-secondary）
         chatBg: getComputedStyle(document.getElementById('chatMessages')).backgroundColor,
         // 输入区外围边缘留白露出 #main，须与聊天页同色（不留浅色缝）
         mainBg: getComputedStyle(document.getElementById('main')).backgroundColor,
-        // 输入框本体比外围容器亮一档（--color-bg-input）
+        // textarea 融入面板，不单独设底色
         textareaBg: getComputedStyle(document.getElementById('messageInput')).backgroundColor,
         sendLabel: getComputedStyle(send, '::after').content,
         sendRadius: getComputedStyle(send).borderRadius,
@@ -131,13 +132,14 @@ test.describe('微信主题 · 桌面', () => {
       };
     });
     expect(parseFloat(info.minHeight)).toBeGreaterThanOrEqual(150);
-    // 输入区与聊天页同底色（--color-bg-secondary，浅色微信下 #ededed）
-    expect(info.inputBg).toBe(info.chatBg);
-    expect(info.inputBg).toBe('rgb(237, 237, 237)');
-    // 外围留白与聊天页同色，输入框本体略亮（#ffffff）
+    // 外围留白与聊天页同色（浅色微信下 #ededed），不留更浅的缝
     expect(info.mainBg).toBe(info.chatBg);
-    expect(info.textareaBg).toBe('rgb(255, 255, 255)');
-    expect(info.textareaBg).not.toBe(info.inputBg);
+    expect(info.mainBg).toBe('rgb(237, 237, 237)');
+    // 输入面板整体一色且与聊天页略有区别（浅色白面板 / 灰聊天页）
+    expect(info.inputBg).toBe('rgb(255, 255, 255)');
+    expect(info.inputBg).not.toBe(info.chatBg);
+    // textarea 融入面板，不出现独立的白色块
+    expect(info.textareaBg).toBe('rgba(0, 0, 0, 0)');
     expect(info.sendLabel).toBe('"发送"');
     expect(info.sendRadius).toBe('4px');
     expect(info.sendWidth).toBeGreaterThan(50);

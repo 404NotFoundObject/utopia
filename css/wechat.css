@@ -154,12 +154,13 @@
 [data-theme="wechat-dark"] #main {
   background: var(--color-bg-secondary);
 }
-/* 输入面板本体与聊天页同色 */
+/* 输入面板整体一色（微信式）：面板与聊天页之间有细微色差（浅色白面板 / 灰聊天页），
+   textarea 与工具行融入面板，不再单独设色 */
 [data-theme="wechat"] #chatInput {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-input);
 }
 [data-theme="wechat-dark"] #chatInput {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-input);
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .send-btn {
   border-radius: 4px !important;
@@ -302,12 +303,12 @@
     order: 2;
     width: 100%;
     flex: 1 1 100%;
-    /* 输入框本体比外围容器亮一档（浅色白 / 暗色深灰面板），微信式细微色差 */
-    background: var(--color-bg-input);
+    /* 融入面板：面板整体一色，textarea 不单独设底色 */
+    background: transparent;
     border: none;
     box-shadow: none;
-    border-radius: 6px;
-    padding: 8px 12px;
+    border-radius: 0;
+    padding: 6px 2px;
     min-height: 100px;
     max-height: none;
     resize: none;
@@ -341,10 +342,10 @@
     filter: brightness(1.05);
   }
   [data-theme="wechat"] #chatInput {
-    background: var(--color-bg-secondary);
+    background: var(--color-bg-input);
   }
   [data-theme="wechat-dark"] #chatInput {
-    background: var(--color-bg-secondary);
+    background: var(--color-bg-input);
   }
 }
 
