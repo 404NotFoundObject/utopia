@@ -15,6 +15,15 @@
 import { applyTheme, getCurrentTheme, getAvailableThemes } from '../../../../ui/layout/theme.js';
 import { openModal } from '../../../../ui/components/modal.js';
 import { snapshotSettingsForm, restoreSettingsForm } from '../snapshot.js';
+import { getTitlebarPrefs, setTitlebarPrefs, isWcoActive } from '../../../../pwa.js';
+
+// 顶栏取色来源：value 对应 js/pwa.js 的 TITLEBAR_COLOR_VARS
+const TITLEBAR_COLOR_OPTIONS = [
+  { value: 'input', label: '面板底色（玻璃感更明显）' },
+  { value: 'secondary', label: '聊天页底色（与页面无缝）' },
+  { value: 'primary', label: '主底色' },
+  { value: 'sidebar', label: '侧栏底色' },
+];
 
 /**
  * 渲染主题 section
@@ -53,8 +62,85 @@ export function renderThemeSection(settings, ctx) {
         <button class="btn btn-sm" id="settingsThemeMakerBtn">🎨 主题制作器</button>
         <span class="help-text">自定义颜色、圆角、阴影等，实时预览</span>
       </div>
+      ${renderTitlebarRows(ctx)}
     </div>
   `;
+}
+
+/**
+ * 渲染窗口装饰器（PWA 桌面窗口顶栏）设置行
+ *
+ * 仅在安装后的桌面 PWA 窗口（窗口控件叠加）中可见效果，
+ * 浏览器标签页里这些项不会改变任何外观。
+ */
+function renderTitlebarRows(ctx) {
+  const tb = getTitlebarPrefs();
+  const alphaPct = Math.round(tb.alpha * 100);
+
+  return `
+    <div class="setting-row">
+      <label>窗口磨砂玻璃</label>
+      ${ctx.toggleHtml('settingsTitlebarGlass', tb.glass)}
+      <span class="help-text">桌面窗口顶栏半透明 + 背景模糊</span>
+    </div>
+    <div class="setting-row">
+      <label>顶栏不透明度</label>
+      <input type="range" id="settingsTitlebarAlpha" min="20" max="100" step="1" value="${alphaPct}" />
+      <span class="help-text" id="settingsTitlebarAlphaText">${alphaPct}%</span>
+    </div>
+    <div class="setting-row">
+      <label>顶栏模糊半径</label>
+      <input type="range" id="settingsTitlebarBlur" min="0" max="48" step="1" value="${tb.blur}" />
+      <span class="help-text" id="settingsTitlebarBlurText">${tb.blur}px</span>
+    </div>
+    <div class="setting-row">
+      <label>顶栏取色</label>
+      <select id="settingsTitlebarColor">
+        ${TITLEBAR_COLOR_OPTIONS.map((o) => `
+          <option value="${o.value}" ${tb.color === o.value ? 'selected' : ''}>${o.label}</option>
+        `).join('')}
+      </select>
+      <span class="help-text">${
+        isWcoActive()
+          ? '窗口控件叠加已启用，改动即时可见'
+          : '仅安装为桌面应用后生效（浏览器标签页不显示该顶栏）'
+      }</span>
+    </div>
+  `;
+}
+
+/**
+ * 绑定窗口装饰器设置行
+ * 改动直接写入 localStorage 并即时应用，不依赖「保存设置」按钮
+ */
+function bindTitlebarRows(modalContent) {
+  const glass = modalContent.querySelector('#settingsTitlebarGlass');
+  const alpha = modalContent.querySelector('#settingsTitlebarAlpha');
+  const alphaText = modalContent.querySelector('#settingsTitlebarAlphaText');
+  const blur = modalContent.querySelector('#settingsTitlebarBlur');
+  const blurText = modalContent.querySelector('#settingsTitlebarBlurText');
+  const color = modalContent.querySelector('#settingsTitlebarColor');
+
+  if (glass) {
+    glass.addEventListener('change', () => setTitlebarPrefs({ glass: glass.checked }));
+  }
+  if (alpha) {
+    alpha.addEventListener('input', () => {
+      const pct = Number(alpha.value);
+      if (alphaText) alphaText.textContent = `${pct}%`;
+      setTitlebarPrefs({ alpha: pct / 100 });
+    });
+  }
+  if (blur) {
+    blur.addEventListener('input', () => {
+      const px = Number(blur.value);
+      if (blurText) blurText.textContent = `${px}px`;
+      setTitlebarPrefs({ blur: px });
+    });
+  }
+  if (color) {
+    color.addEventListener('change', () => setTitlebarPrefs({ color: color.value }));
+  }
 }
 
 /**
@@ -69,6 +155,8 @@ export function bindThemeSection(modalContent, ctx) {
       applyTheme(themeSelect.value);
     });
   }
+
+  bindTitlebarRows(modalContent);
 
   const themeMakerBtn = modalContent.querySelector('#settingsThemeMakerBtn');
   if (themeMakerBtn) {

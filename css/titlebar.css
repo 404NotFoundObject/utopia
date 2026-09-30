@@ -1,0 +1,87 @@
+/* ============================================================
+   窗口装饰器（PWA 桌面窗口顶栏）
+   ------------------------------------------------------------
+   仅在「窗口控件叠加」（Window Controls Overlay, WCO）模式下生效：
+   浏览器把系统标题栏区域让给页面，只保留最小化 / 最大化 / 关闭按钮，
+   顶栏于是由页面自绘，颜色与透明度完全跟随主题。
+
+   开关由 js/pwa.js 写入 <html data-wco="on|off" data-wco-glass="on|off">：
+     - data-wco="on"    ：当前处于 WCO 模式（安装后的桌面 PWA 窗口）
+     - data-wco-glass   ：磨砂玻璃开关（用户可在设置 → 主题里调整）
+
+   非 WCO 场景（浏览器标签页、移动端、用户手动关掉叠加层）下本文件
+   所有规则都不生效，页面外观与之前完全一致。
+   ============================================================ */
+
+#pwaTitleBar {
+  display: none;
+}
+
+html[data-wco="on"] {
+  --pwa-titlebar-height: env(titlebar-area-height, 32px);
+  /* 装饰条底色：默认与聊天页同色，可在设置里切换取色来源 */
+  --pwa-titlebar-bg: var(--color-bg-secondary);
+  --pwa-glass-alpha: 0.72;
+  --pwa-glass-blur: 18px;
+}
+
+/* 让出标题栏高度，避免应用内容被窗口控件压住 */
+html[data-wco="on"] #app {
+  padding-top: var(--pwa-titlebar-height, 0px);
+}
+
+html[data-wco="on"] #pwaTitleBar {
+  display: block;
+  position: fixed;
+  top: env(titlebar-area-y, 0);
+  left: 0;
+  right: 0;
+  height: env(titlebar-area-height, 32px);
+  z-index: var(--z-overlay, 300);
+  background: var(--pwa-titlebar-bg, var(--color-bg-secondary));
+  /* 该区域替代系统标题栏，需可拖动窗口 */
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* ---- 磨砂玻璃：半透明 + 模糊页面自身内容 ---- */
+html[data-wco="on"][data-wco-glass="on"] #pwaTitleBar {
+  background: color-mix(
+    in srgb,
+    var(--pwa-titlebar-bg, var(--color-bg-secondary)) calc(var(--pwa-glass-alpha, 0.72) * 100%),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(var(--pwa-glass-blur, 18px)) saturate(160%);
+  backdrop-filter: blur(var(--pwa-glass-blur, 18px)) saturate(160%);
+}
+
+/* 玻璃高光：即使下方是纯色（页面里可滚动内容不会经过装饰条下方），
+   也能读出一层通透的质感，而不是一块死板的纯色条 */
+html[data-wco="on"][data-wco-glass="on"] #pwaTitleBar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+/* 不支持 color-mix() 的浏览器：退回同色不透明，避免出现透明空洞 */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  html[data-wco="on"][data-wco-glass="on"] #pwaTitleBar {
+    background: var(--pwa-titlebar-bg, var(--color-bg-secondary));
+  }
+}
+
+/* 暗色主题下叠加层自带深底，玻璃层不必再压暗；浅色下用极淡描边收边 */
+html[data-wco="on"] #pwaTitleBar {
+  border-bottom: 1px solid transparent;
+}
+html[data-wco="on"][data-theme="light"] #pwaTitleBar,
+html[data-wco="on"][data-theme="wechat"] #pwaTitleBar {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+html[data-wco="on"][data-theme="dark"] #pwaTitleBar,
+html[data-wco="on"][data-theme="wechat-dark"] #pwaTitleBar,
+html[data-wco="on"][data-theme="cyberpunk"] #pwaTitleBar {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}

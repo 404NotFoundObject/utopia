@@ -11,6 +11,7 @@
  *   3. Service Worker 注册 → installed → activated，scope 正确
  *   4. SW 接管后二次刷新离线仍能打开（离线应用壳）
  *   5. 可安装性信号（beforeinstallprompt）
+ *   6. 窗口装饰器（装饰条挂载、底色跟随主题、WCO 模式探测）
  *
  * 退出码：0 = 全部通过；1 = 存在 ERROR 项
  */
@@ -187,8 +188,52 @@ try {
       'headless 环境常不派发该事件；真实 Chrome 中以地址栏「安装」图标为准',
     );
 
+  // ---------- 6. 窗口装饰器 ----------
+  section('6. 窗口装饰器（Window Controls Overlay）');
+  const wco = await page.evaluate(() => ({
+    manifestHasWco: null, // 由下方请求补齐
+    barExists: !!document.getElementById('pwaTitleBar'),
+    dataWco: document.documentElement.dataset.wco ?? null,
+    dataGlass: document.documentElement.dataset.wcoGlass ?? null,
+    titlebarBg: document.documentElement.style.getPropertyValue('--pwa-titlebar-bg').trim(),
+    glassAlpha: document.documentElement.style.getPropertyValue('--pwa-glass-alpha').trim(),
+    metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null,
+    themeBg: getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-bg-secondary')
+      .trim(),
+    cssLoaded: [...document.styleSheets].some((s) => (s.href || '').includes('titlebar.css')),
+  }));
+
+  if (wco.barExists) record('PASS', '窗口装饰条已挂载（#pwaTitleBar，非 WCO 模式下由 CSS 隐藏）');
+  else record('ERROR', '窗口装饰条未挂载', 'js/pwa.js 未注入 #pwaTitleBar');
+
+  if (wco.cssLoaded) record('PASS', 'titlebar.css 已加载');
+  else record('ERROR', 'titlebar.css 未加载', 'index.html 未引入或路径 404');
+
+  if (wco.titlebarBg.startsWith('var(--color-'))
+    record('PASS', '装饰条底色引用主题变量（切主题即换色）', wco.titlebarBg);
+  else record('WARN', '装饰条底色未取到主题变量', `当前值：${wco.titlebarBg || '(空)'}`);
+
+  if (wco.metaThemeColor && wco.metaThemeColor.toLowerCase() === wco.themeBg.toLowerCase())
+    record('PASS', 'meta theme-color 与当前主题底色一致', wco.metaThemeColor);
+  else
+    record(
+      'WARN',
+      'meta theme-color 与主题底色不一致',
+      `meta=${wco.metaThemeColor} · --color-bg-secondary=${wco.themeBg}（多为首帧时序差异）`,
+    );
+
+  if (wco.dataWco === 'on')
+    record('PASS', '当前处于窗口控件叠加模式', `glass=${wco.dataGlass} alpha=${wco.glassAlpha}`);
+  else
+    record(
+      'WARN',
+      '当前不在窗口控件叠加模式',
+      'headless 未安装为应用；真实环境安装后打开独立窗口即自动启用',
+    );
+
   // ---------- 控制台错误 ----------
-  section('6. 控制台');
+  section('7. 控制台');
   const real = consoleErrors.filter(
     (e) => !/ERR_(NAME_NOT_RESOLVED|INTERNET_DISCONNECTED|CONNECTION|PROXY)|cdn|font|googleapis|Failed to load resource/i.test(e),
   );

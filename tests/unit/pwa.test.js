@@ -44,5 +44,70 @@ describe('PWA 资源完整性', () => {
     expect(html).toContain('rel="manifest"');
     expect(html).toContain('theme-color');
     expect(html).toContain('js/pwa.js');
+    // 窗口装饰器样式表须在 wechat.css 之后，保证变量覆盖顺序一致
+    expect(html).toContain('css/titlebar.css');
+    expect(html.indexOf('css/titlebar.css')).toBeGreaterThan(html.indexOf('css/wechat.css'));
+  });
+
+  test('manifest 声明窗口控件叠加，桌面窗口顶栏交由页面自绘', () => {
+    const manifest = JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf-8'));
+    expect(Array.isArray(manifest.display_override)).toBe(true);
+    expect(manifest.display_override[0]).toBe('window-controls-overlay');
+    // 叠加层不可用时应退回独立窗口，而不是 browser
+    expect(manifest.display_override).toContain('standalone');
+  });
+});
+
+/**
+ * 窗口装饰器（Window Controls Overlay）
+ * 颜色由页面自绘、跟随主题；磨砂玻璃参数可在设置里调整。
+ */
+describe('窗口装饰器（WCO）', () => {
+  test('titlebar.css 只在 WCO 模式生效，并提供拖动区与磨砂层', () => {
+    const css = readFileSync(resolve(root, 'css/titlebar.css'), 'utf-8');
+    expect(css).toContain('env(titlebar-area-height');
+    expect(css).toContain('-webkit-app-region: drag');
+    expect(css).toContain('backdrop-filter');
+    expect(css).toContain('--pwa-glass-alpha');
+    expect(css).toContain('color-mix(');
+    // 默认隐藏：非 WCO 场景不得改变任何外观
+    expect(css).toMatch(/#pwaTitleBar\s*\{\s*display:\s*none/);
+  });
+
+  test('装饰条底色通过 var() 间接引用主题色，切主题即换色', () => {
+    const js = readFileSync(resolve(root, 'js/pwa.js'), 'utf-8');
+    expect(js).toContain("'--color-bg-secondary'");
+    expect(js).toContain('setProperty(\'--pwa-titlebar-bg\', `var(${colorVar})`)');
+  });
+
+  test('主题切换监听在 __eventBus 延迟挂载时仍能补挂', () => {
+    const js = readFileSync(resolve(root, 'js/pwa.js'), 'utf-8');
+    expect(js).toContain('window.__eventBus');
+    expect(js).toContain('setInterval');
+  });
+
+  test('偏好写入后立即生效并做区间裁剪', async () => {
+    const mod = await import('../../js/pwa.js');
+
+    expect(document.getElementById('pwaTitleBar')).toBeTruthy();
+
+    mod.setTitlebarPrefs({ glass: true, alpha: 0.5, blur: 12, color: 'input' });
+    const style = document.documentElement.style;
+    expect(style.getPropertyValue('--pwa-glass-alpha').trim()).toBe('0.5');
+    expect(style.getPropertyValue('--pwa-glass-blur').trim()).toBe('12px');
+    expect(style.getPropertyValue('--pwa-titlebar-bg').trim()).toBe('var(--color-bg-input)');
+    expect(document.documentElement.dataset.wcoGlass).toBe('on');
+
+    // 越界值裁剪到合法区间；非法取色回退到默认
+    mod.setTitlebarPrefs({ alpha: 9, blur: -3, color: 'sidebar' });
+    mod.setTitlebarPrefs({ alpha: 0.8, blur: 12, color: 'not-a-color' });
+    const prefs = mod.getTitlebarPrefs();
+    expect(prefs.alpha).toBe(0.8);
+    expect(prefs.blur).toBe(12);
+    expect(prefs.color).toBe('input');
+
+    // 关掉玻璃后回到不透明
+    mod.setTitlebarPrefs({ glass: false });
+    expect(document.documentElement.dataset.wcoGlass).toBe('off');
   });
 });
