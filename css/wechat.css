@@ -148,7 +148,13 @@
   color: #ffffff;
 }
 
-/* 输入区底色与聊天页（#chatMessages）同色 */
+/* 输入区外围边缘留白露出的是 #main 背景，须与聊天页（#chatMessages）同色，
+   否则输入面板四周会有一圈更浅的缝 */
+[data-theme="wechat"] #main,
+[data-theme="wechat-dark"] #main {
+  background: var(--color-bg-secondary);
+}
+/* 输入面板本体与聊天页同色 */
 [data-theme="wechat"] #chatInput {
   background: var(--color-bg-secondary);
 }
@@ -296,11 +302,12 @@
     order: 2;
     width: 100%;
     flex: 1 1 100%;
-    background: transparent;
+    /* 输入框本体比外围容器亮一档（浅色白 / 暗色深灰面板），微信式细微色差 */
+    background: var(--color-bg-input);
     border: none;
     box-shadow: none;
-    border-radius: 0;
-    padding: 6px 2px;
+    border-radius: 6px;
+    padding: 8px 12px;
     min-height: 100px;
     max-height: none;
     resize: none;

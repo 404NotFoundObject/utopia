@@ -17,7 +17,8 @@
     "test:dom": "vitest run tests/dom",
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:pwa": "node tools/check-pwa.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
