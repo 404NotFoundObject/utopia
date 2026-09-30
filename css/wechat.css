@@ -105,6 +105,17 @@
   display: none !important;
 }
 
+/* 聊天顶栏与聊天页同底色，去掉分割线、以淡淡投影分层（微信式） */
+[data-theme="wechat"] #chatHeader,
+[data-theme="wechat-dark"] #chatHeader {
+  background: var(--color-bg-secondary);
+  border-bottom-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+[data-theme="wechat-dark"] #chatHeader {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
 [data-theme="wechat"] .message.user .bubble,
 [data-theme="wechat"] .group-message.own .group-message-bubble {
   color: #191919 !important;

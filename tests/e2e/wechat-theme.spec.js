@@ -54,6 +54,15 @@ test.describe('微信主题 · 桌面', () => {
 
     // 聊天顶栏不显示头像，只留名称
     await expect(page.locator('#charAvatar')).toBeHidden();
+
+    // 顶栏与聊天页同底色，以阴影分层（不靠分割线）
+    const headerInfo = await page.evaluate(() => ({
+      headerBg: getComputedStyle(document.getElementById('chatHeader')).backgroundColor,
+      chatBg: getComputedStyle(document.getElementById('chatMessages')).backgroundColor,
+      shadow: getComputedStyle(document.getElementById('chatHeader')).boxShadow,
+    }));
+    expect(headerInfo.headerBg).toBe(headerInfo.chatBg);
+    expect(headerInfo.shadow).not.toBe('none');
   });
 
   test('暗色微信：data-theme 与背景变量', async ({ page }) => {
