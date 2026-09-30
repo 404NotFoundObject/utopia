@@ -190,6 +190,11 @@
 /* 移动端（≤768，列表层）：选中项用与页面底色相近、略亮一档的弱高亮，
    文字走常规配色，左侧 3px 色条一并去掉 */
 @media (max-width: 768px) {
+  /* 列表卡片拉高到微信式行高（36px 头像 + 28px 上下内边距 ≈ 64px） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
   [data-theme="wechat"] .character-item.active {
     background: #f2f2f2;
     border-left-color: transparent;

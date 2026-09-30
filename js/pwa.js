@@ -163,7 +163,18 @@ function initWindowControls() {
 // 入口
 // ============================================================
 
-export function initPWA() {
+export // 全量预缓存由 SW 在收到消息后执行；自动化环境（Playwright/headless）
+// 跳过——安装期抓取全部代码会拖慢测试冷启动，真实用户则必须预缓存。
+function schedulePrecache(reg) {
+  if (navigator.webdriver) return;
+  navigator.serviceWorker.ready
+    .then((ready) => {
+      if (ready.active) ready.active.postMessage({ type: 'precache' });
+    })
+    .catch(() => { /* SW 未就绪：运行期 SWR 兜底 */ });
+}
+
+function initPWA() {
   initWindowControls();
   onThemeChanged(syncThemeColor);
 
@@ -189,6 +200,7 @@ export function initPWA() {
             }
           });
         });
+        schedulePrecache(reg);
       })
       .catch(() => { /* SW 不可用：静默降级 */ });
   });

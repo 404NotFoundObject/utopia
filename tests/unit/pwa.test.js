@@ -44,9 +44,32 @@ describe('PWA 资源完整性', () => {
     expect(html).toContain('rel="manifest"');
     expect(html).toContain('theme-color');
     expect(html).toContain('js/pwa.js');
+    // 键盘弹出时收缩布局视口：WEBAPK 与浏览器快捷方式行为一致
+    expect(html).toContain('interactive-widget=resizes-content');
     // 窗口装饰器样式表须在 wechat.css 之后，保证变量覆盖顺序一致
     expect(html).toContain('css/titlebar.css');
     expect(html.indexOf('css/titlebar.css')).toBeGreaterThan(html.indexOf('css/wechat.css'));
+  });
+
+  test('sw.js 递归预缓存同源资源（覆盖动态导入模块），由页面消息驱动', () => {
+    const sw = readFileSync(resolve(root, 'sw.js'), 'utf-8');
+    expect(sw).toContain('precacheAppAssets');
+    expect(sw).toContain('importmap');
+    expect(sw).toMatch(/import\s*\(\s*/);
+    expect(sw).toContain('MAX_PRECACHE');
+    // 预缓存不阻塞安装，由页面消息触发（自动化环境不发消息）
+    expect(sw).toContain("addEventListener('message'");
+    expect(sw).toMatch(/type !== 'precache'/);
+    // 资源引用过滤：只收同源 http(s)
+    expect(sw).toMatch(/origin !== self\.location\.origin/);
+    const pwa = readFileSync(resolve(root, 'js/pwa.js'), 'utf-8');
+    expect(pwa).toMatch(/type: 'precache'/);
+    expect(pwa).toContain('webdriver');
+  });
+
+  test('移动端键盘弹出由布局视口收缩承载', () => {
+    const css = readFileSync(resolve(root, 'css/layout.css'), 'utf-8');
+    expect(css).toContain('100dvh');
   });
 
   test('manifest 声明窗口控件叠加，桌面窗口顶栏交由页面自绘', () => {

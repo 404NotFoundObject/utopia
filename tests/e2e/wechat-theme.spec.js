@@ -464,14 +464,39 @@ test.describe('微信主题 · 移动端', () => {
     });
 
     expect(active).not.toBeNull();
-    // 不再整行微信绿
+    // 弱高亮非微信绿
     expect(active.bg).not.toBe('rgb(7, 193, 96)');
     // 暗色弱高亮 #222222
     expect(active.bg).toBe('rgb(34, 34, 34)');
     // 左侧 3px 色条一并去掉
     expect(active.borderLeftColor).toBe('rgba(0, 0, 0, 0)');
-    // 文字恢复常规配色（不再是高亮白）
+    // 文字走常规配色（非高亮白）
     expect(active.nameColor).not.toBe('rgb(255, 255, 255)');
+  });
+
+  test('列表卡片行高对齐微信（约 64px）', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    await page.evaluate(async () => {
+      const { getAppState } = await import('/js/core/state.js');
+      const { createCharacter } = await import('/js/modules/character.js');
+      const chars = getAppState().get('characters') || [];
+      for (let i = chars.length; i < 2; i++) {
+        await createCharacter({ name: `行高测试角色${i}`, description: 'E2E 造数' }, { skipApiCheck: true });
+      }
+      const { renderCharacterList } = await import('/js/ui/screens/characterListUI.js');
+      await renderCharacterList();
+      const { setMobileView } = await import('/js/ui/layout/wechatTheme.js');
+      setMobileView('list');
+    });
+    await page.waitForTimeout(400);
+
+    const height = await page.evaluate(() => {
+      const el = document.querySelectorAll('#characterList .character-item')[1];
+      return el ? el.getBoundingClientRect().height : 0;
+    });
+    expect(height).toBeGreaterThanOrEqual(60);
+    expect(height).toBeLessThan(72);
   });
 
   test('dock 只保留 聊天 / 插件 / 朋友圈 / 设置 且按序排列', async ({ page }) => {

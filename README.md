@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.0-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.1-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -252,6 +252,10 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.1
+
+实机反馈修复：PWA 安装期递归预缓存全部同源代码（动态导入的功能模块离线可用）；移动端键盘行为统一（`interactive-widget=resizes-content`，输入框始终贴键盘上方）；微信主题移动端列表卡片行高对齐微信。
 
 ### v3.9.0
 

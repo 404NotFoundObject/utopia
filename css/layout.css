@@ -5,6 +5,9 @@
 #app {
   display: flex;
   height: 100vh;
+  /* 动态视口兜底：配合 interactive-widget=resizes-content，键盘弹出时
+     布局视口收缩，输入区始终贴在键盘上方、页面不整体滚动 */
+  height: 100dvh;
   overflow: hidden;
   background: var(--color-bg-secondary);
 }
