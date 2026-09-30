@@ -18,7 +18,10 @@
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "check:pwa": "node tools/check-pwa.mjs"
+    "check:pwa": "node tools/check-pwa.mjs",
+    "check:smoke": "node tools/smoke-full.mjs",
+    "check:crud": "node tools/smoke-crud.mjs",
+    "check:all": "npm run test && npm run check:pwa && npm run check:smoke && npm run check:crud && npm run test:e2e"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
