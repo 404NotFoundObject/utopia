@@ -120,24 +120,30 @@ describe('朋友圈页面化封面', () => {
     return feed;
   }
 
-  test('注入封面：返回 / 相机 / 上传入口 / 头像昵称，且幂等', () => {
+  test('注入固定顶栏与封面：返回 / 标题 / 相机 / 上传入口 / 头像昵称，且幂等', () => {
     const state = getAppState();
     state.set('settings', { user: { name: '阿澈', avatar: 'data:image/png;base64,ME' } });
     const feed = mountFeed();
 
     ensureSocialCover();
 
+    const topbar = feed.querySelector('.wx-cover-topbar');
     const cover = feed.querySelector('.wx-social-cover');
+    expect(topbar).not.toBeNull();
     expect(cover).not.toBeNull();
-    expect(cover.querySelector('.wx-cover-back')).not.toBeNull();
-    expect(cover.querySelector('.wx-cover-camera')).not.toBeNull();
-    expect(cover.querySelector('.wx-cover-upload-input')?.type).toBe('file');
+    // 顶栏在封面之前（sticky 贴顶生效前提），返回 / 标题 / 相机 / 上传入口都在顶栏内
+    expect(topbar.nextElementSibling).toBe(cover);
+    expect(topbar.querySelector('.wx-cover-back')).not.toBeNull();
+    expect(topbar.querySelector('.wx-cover-title').textContent).toBe('朋友圈');
+    expect(topbar.querySelector('.wx-cover-camera')).not.toBeNull();
+    expect(topbar.querySelector('.wx-cover-upload-input')?.type).toBe('file');
     expect(cover.querySelector('.wx-me-name').textContent).toBe('阿澈');
     expect(cover.querySelector('.wx-social-me img').src).toContain('base64,ME');
     // 无已保存背景时不渲染背景 img
     expect(cover.querySelector('.wx-cover-img')).toBeNull();
 
     ensureSocialCover();
+    expect(feed.querySelectorAll('.wx-cover-topbar').length).toBe(1);
     expect(feed.querySelectorAll('.wx-social-cover').length).toBe(1);
   });
 
@@ -164,6 +170,31 @@ describe('朋友圈页面化封面', () => {
     expect(overlay.classList.contains('hidden')).toBe(true);
   });
 
+  test('封面滚出视口后顶栏进入 solid 态，回到顶部后退出', () => {
+    const feed = mountFeed();
+    ensureSocialCover();
+
+    const topbar = feed.querySelector('.wx-cover-topbar');
+    const cover = feed.querySelector('.wx-social-cover');
+    const scroller = document.getElementById('modalContent');
+    const fireScroll = () => scroller.dispatchEvent(new Event('scroll'));
+
+    // 封面仍在视口内（bottom > 0）→ 非 solid
+    cover.getBoundingClientRect = () => ({ bottom: 240 });
+    fireScroll();
+    expect(topbar.classList.contains('solid')).toBe(false);
+
+    // 封面完全滚出顶部（bottom <= 0）→ solid
+    cover.getBoundingClientRect = () => ({ bottom: 0 });
+    fireScroll();
+    expect(topbar.classList.contains('solid')).toBe(true);
+
+    // 回滚到顶部 → 退出 solid
+    cover.getBoundingClientRect = () => ({ bottom: 120 });
+    fireScroll();
+    expect(topbar.classList.contains('solid')).toBe(false);
+  });
+
   test('非微信主题不注入封面，并清除切换前留下的残留', () => {
     // 模拟从微信主题切到亮色主题：残留旧封面 + social-feed 仍在模态中
     document.documentElement.setAttribute('data-theme', 'light');
@@ -175,10 +206,12 @@ describe('朋友圈页面化封面', () => {
     ensureSocialCover();
 
     expect(feed.querySelector('.wx-social-cover')).toBeNull();
+    expect(feed.querySelector('.wx-cover-topbar')).toBeNull();
 
     // 暗色 / 赛博朋克等非微信主题同样不注入
     document.documentElement.setAttribute('data-theme', 'dark');
     ensureSocialCover();
     expect(feed.querySelector('.wx-social-cover')).toBeNull();
+    expect(feed.querySelector('.wx-cover-topbar')).toBeNull();
   });
 });

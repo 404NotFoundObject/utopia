@@ -692,6 +692,62 @@
   display: none;
 }
 
+/* 固定顶栏（sticky 贴滚动容器顶部，height 0 不占位；封面阶段仅悬浮按钮，
+   封面滚出视口后 ::before 磨砂背景与标题淡入，返回按钮始终可达） */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-topbar {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 6;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-topbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: rgba(247, 247, 247, 0.88);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+[data-theme="wechat-dark"] .wx-cover-topbar::before {
+  background: rgba(30, 30, 30, 0.88);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-topbar.solid::before {
+  opacity: 1;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-title {
+  position: absolute;
+  top: 0;
+  left: 52px;
+  right: 52px;
+  height: 48px;
+  line-height: 48px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: none;
+}
+[data-theme="wechat-dark"] .wx-cover-title {
+  color: #f5f5f5;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-topbar.solid .wx-cover-title {
+  opacity: 1;
+  transform: none;
+}
+
 /* 封面区（wechatTheme.js 注入） */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover {
   position: relative;
@@ -713,7 +769,7 @@
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
   position: absolute;
-  top: 10px;
+  top: 5px;
   width: 38px;
   height: 38px;
   border: none;
@@ -722,13 +778,20 @@
   font-size: 18px;
   cursor: pointer;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  z-index: 2;
+  transition: color 0.22s ease, text-shadow 0.22s ease;
+  z-index: 3;
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back {
   left: 8px;
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
   right: 10px;
+}
+/* 封面滚出后：浅色主题图标转深色融入磨砂栏；深色主题保持浅色 */
+[data-theme="wechat"] .wx-cover-topbar.solid .wx-cover-back,
+[data-theme="wechat"] .wx-cover-topbar.solid .wx-cover-camera {
+  color: #1a1a1a;
+  text-shadow: none;
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-upload-input {
   display: none;

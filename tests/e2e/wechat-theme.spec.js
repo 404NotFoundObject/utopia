@@ -316,7 +316,8 @@ test.describe('微信主题 · 桌面', () => {
 
     const cover = page.locator('.wx-social-cover');
     await expect(cover).toBeVisible();
-    await expect(cover.locator('.wx-cover-back')).toBeVisible();
+    await expect(page.locator('.wx-cover-topbar .wx-cover-back')).toBeVisible();
+    await expect(page.locator('.wx-cover-topbar .wx-cover-title')).toHaveText('朋友圈');
     await expect(page.locator('#socialCloseBtn')).toBeHidden();
 
     // 整页滚动：滚动发生在模态本身，帖子列表不再内部滚动
@@ -334,8 +335,27 @@ test.describe('微信主题 · 桌面', () => {
     expect(scroll.scrollTop).toBeGreaterThan(100);
     expect(scroll.postsOverflow).toBe('visible');
 
+    // 封面滚出视口后：顶栏仍贴滚动容器顶部（sticky），并进入 solid 磨砂态
+    await page.evaluate(() => {
+      document.getElementById('modalContent').scrollTop = 400;
+    });
+    await page.waitForTimeout(120);
+    const topbar = page.locator('.wx-cover-topbar');
+    await expect(topbar).toHaveClass(/solid/);
+    const barBox = await topbar.boundingBox();
+    const mcBox = await page.locator('#modalContent').boundingBox();
+    expect(Math.abs(barBox.y - mcBox.y)).toBeLessThanOrEqual(2);
+    await expect(page.locator('.wx-cover-topbar .wx-cover-back')).toBeVisible();
+
+    // 回滚到顶部 → solid 退场
+    await page.evaluate(() => {
+      document.getElementById('modalContent').scrollTop = 0;
+    });
+    await page.waitForTimeout(120);
+    await expect(topbar).not.toHaveClass(/solid/);
+
     // 返回 → 关闭悬浮窗
-    await page.locator('.wx-cover-back').click();
+    await page.locator('.wx-cover-topbar .wx-cover-back').click();
     await expect(page.locator('#modalOverlay')).toBeHidden();
   });
 
@@ -543,6 +563,14 @@ test.describe('微信主题 · 移动端', () => {
   test('朋友圈为页面模式：全屏 + 封面 + 背景上传入口 + 返回', async ({ page }) => {
     await openWithTheme(page, 'wechat');
 
+    // 多铺几条动态，保证长列表可滚动
+    await page.evaluate(async () => {
+      const social = await import('/js/modules/social.js');
+      for (let i = 0; i < 6; i++) {
+        await social.publishPostByUser({ id: 'user', name: '我' }, `滚动测试动态 ${i + 1}`);
+      }
+    });
+
     await page.locator('#socialBtn').click();
     await expect(page.locator('#modalOverlay')).toBeVisible();
 
@@ -556,9 +584,9 @@ test.describe('微信主题 · 移动端', () => {
     // 封面注入：背景 / 相机上传入口 / 返回按钮 / 用户昵称
     const cover = page.locator('.wx-social-cover');
     await expect(cover).toBeVisible();
-    await expect(cover.locator('.wx-cover-camera')).toBeVisible();
-    await expect(cover.locator('.wx-cover-upload-input')).toHaveCount(1);
-    await expect(cover.locator('.wx-cover-back')).toBeVisible();
+    await expect(page.locator('.wx-cover-topbar .wx-cover-camera')).toBeVisible();
+    await expect(page.locator('.wx-cover-topbar .wx-cover-upload-input')).toHaveCount(1);
+    await expect(page.locator('.wx-cover-topbar .wx-cover-back')).toBeVisible();
 
     const meName = await cover.locator('.wx-me-name').textContent();
     expect(meName.length).toBeGreaterThan(0);
@@ -566,8 +594,19 @@ test.describe('微信主题 · 移动端', () => {
     // 原有关闭按钮（×）退场
     await expect(page.locator('#socialCloseBtn')).toBeHidden();
 
+    // 长列表滚动后：返回按钮仍在顶栏可达，顶栏进入 solid 态
+    await page.evaluate(() => {
+      document.getElementById('modalContent').scrollTop = 600;
+    });
+    await page.waitForTimeout(120);
+    const topbar = page.locator('.wx-cover-topbar');
+    await expect(topbar).toHaveClass(/solid/);
+    const barBox = await topbar.boundingBox();
+    expect(barBox.y).toBeLessThanOrEqual(2);
+    await expect(page.locator('.wx-cover-topbar .wx-cover-back')).toBeVisible();
+
     // 返回 → 关闭页面
-    await cover.locator('.wx-cover-back').click();
+    await page.locator('.wx-cover-topbar .wx-cover-back').click();
     await expect(page.locator('#modalOverlay')).toBeHidden();
   });
 });

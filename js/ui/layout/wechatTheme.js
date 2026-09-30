@@ -13,9 +13,11 @@
 //                     移动端列表层右上角「+」与折叠菜单；菜单项点击
 //                     转发给 footer 内被隐藏的原按钮（事件绑定仍在
 //                     sidebar.js 侧，转发 click 即可复用）。
+// - .wx-cover-topbar  朋友圈固定顶栏（sticky 贴顶：返回 / 标题 / 相机，
+//                     封面滚出后进入磨砂 solid 态）
 // - .wx-social-cover  朋友圈封面（仅微信主题注入；移动端全屏页面 /
 //                     PC 悬浮窗共用）：背景图（可上传，localStorage
-//                     持久化）、返回按钮、右下角用户头像与昵称；
+//                     持久化）、右下角用户头像与昵称；
 //                     动态列表 / 发布 / 评论逻辑复用 socialUI.js 原实现。
 //
 // 边界：
@@ -205,75 +207,117 @@ function compressImage(file, maxSize = 1280, quality = 0.85) {
 }
 
 /**
- * 朋友圈封面（幂等）：openSocialFeed 渲染模态后由 observer 触发，
- * 仅在微信主题下于 .social-feed 顶部注入微信式封面区——背景图（可上传，
- * localStorage 持久化）、返回按钮、右上角相机（上传入口）、右下角用户
- * 头像与昵称。非微信主题不注入，并清除主题切换后可能残留的封面，
- * 使朋友圈恢复 social.css 原生模态布局。
- * 动态列表 / 发布 / 评论等逻辑全部复用 socialUI.js 原有实现。
+ * 朋友圈封面与固定顶栏（幂等）：openSocialFeed 渲染模态后由 observer 触发，
+ * 仅在微信主题下于 .social-feed 顶部注入微信式结构——
+ * - .wx-cover-topbar：sticky 固定顶栏（返回按钮 / 居中标题 / 相机上传入口），
+ *   始终贴滚动容器顶部，长列表滚动时返回按钮不会随之滚出屏幕；封面滚出
+ *   视口后进入 .solid 态（磨砂背景 + 标题浮现，见 css/wechat.css）。
+ * - .wx-social-cover：封面区——背景图（可上传，localStorage 持久化）、
+ *   右下角用户头像与昵称。
+ * 非微信主题不注入，并清除主题切换后可能残留的注入节点，使朋友圈恢复
+ * social.css 原生模态布局。动态列表 / 发布 / 评论等逻辑全部复用
+ * socialUI.js 原有实现。
  */
 export function ensureSocialCover() {
   const feed = document.querySelector('#modalContent .social-feed');
   if (!isWechatTheme()) {
+    feed?.querySelector('.wx-cover-topbar')?.remove();
     feed?.querySelector('.wx-social-cover')?.remove();
     return;
   }
-  if (!feed || feed.querySelector('.wx-social-cover')) return;
+  if (!feed) return;
+  let topbar = feed.querySelector('.wx-cover-topbar');
+  const isNewTopbar = !topbar;
+  if (isNewTopbar) {
+    topbar = document.createElement('div');
+    topbar.className = 'wx-cover-topbar';
+    topbar.innerHTML = `
+      <button class="wx-cover-back" type="button" aria-label="返回"><i class="fas fa-chevron-left"></i></button>
+      <span class="wx-cover-title">朋友圈</span>
+      <button class="wx-cover-camera" type="button" aria-label="更换背景" title="更换背景"><i class="fas fa-camera"></i></button>
+      <input type="file" class="wx-cover-upload-input" accept="image/*">
+    `;
+    feed.insertBefore(topbar, feed.firstChild);
+  }
 
-  const cover = document.createElement('div');
-  cover.className = 'wx-social-cover';
-  const saved = (() => {
-    try { return localStorage.getItem(SOCIAL_COVER_KEY); } catch (_) { return null; }
-  })();
-  cover.innerHTML = `
-    <button class="wx-cover-back" type="button" aria-label="返回"><i class="fas fa-chevron-left"></i></button>
-    <button class="wx-cover-camera" type="button" aria-label="更换背景" title="更换背景"><i class="fas fa-camera"></i></button>
-    <input type="file" class="wx-cover-upload-input" accept="image/*">
-    <div class="wx-social-me">
-      <span class="wx-me-name"></span>
-      <img alt="我的头像">
-    </div>
-  `;
-  feed.insertBefore(cover, feed.firstChild);
+  let cover = feed.querySelector('.wx-social-cover');
+  const isNewCover = !cover;
+  if (isNewCover) {
+    const saved = (() => {
+      try { return localStorage.getItem(SOCIAL_COVER_KEY); } catch (_) { return null; }
+    })();
+    cover = document.createElement('div');
+    cover.className = 'wx-social-cover';
+    cover.innerHTML = `
+      <div class="wx-social-me">
+        <span class="wx-me-name"></span>
+        <img alt="我的头像">
+      </div>
+    `;
+    feed.insertBefore(cover, topbar.nextSibling);
 
-  if (saved) {
-    const bg = document.createElement('img');
-    bg.className = 'wx-cover-img';
-    bg.alt = '';
-    bg.src = saved;
-    cover.insertBefore(bg, cover.firstChild);
+    if (saved) {
+      const bg = document.createElement('img');
+      bg.className = 'wx-cover-img';
+      bg.alt = '';
+      bg.src = saved;
+      cover.insertBefore(bg, cover.firstChild);
+    }
   }
 
   const settings = state.get('settings');
   cover.querySelector('.wx-me-name').textContent = settings?.user?.name || '我';
   cover.querySelector('.wx-social-me img').src = settings?.user?.avatar || USER_AVATAR_PLACEHOLDER;
 
-  cover.querySelector('.wx-cover-back').addEventListener('click', () => closeModal());
+  if (isNewTopbar) {
+    topbar.querySelector('.wx-cover-back').addEventListener('click', () => closeModal());
 
-  const uploadInput = cover.querySelector('.wx-cover-upload-input');
-  cover.querySelector('.wx-cover-camera').addEventListener('click', () => uploadInput.click());
-  uploadInput.addEventListener('change', async () => {
-    const file = uploadInput.files?.[0];
-    if (!file) return;
-    try {
-      const dataUrl = await compressImage(file);
-      try { localStorage.setItem(SOCIAL_COVER_KEY, dataUrl); } catch (_) { /* 超限时仅本次生效 */ }
-      let bg = cover.querySelector('.wx-cover-img');
-      if (!bg) {
-        bg = document.createElement('img');
-        bg.className = 'wx-cover-img';
-        bg.alt = '';
-        cover.insertBefore(bg, cover.firstChild);
+    const uploadInput = topbar.querySelector('.wx-cover-upload-input');
+    topbar.querySelector('.wx-cover-camera').addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', async () => {
+      const file = uploadInput.files?.[0];
+      if (!file) return;
+      try {
+        const dataUrl = await compressImage(file);
+        try { localStorage.setItem(SOCIAL_COVER_KEY, dataUrl); } catch (_) { /* 超限时仅本次生效 */ }
+        let bg = cover.querySelector('.wx-cover-img');
+        if (!bg) {
+          bg = document.createElement('img');
+          bg.className = 'wx-cover-img';
+          bg.alt = '';
+          cover.insertBefore(bg, cover.firstChild);
+        }
+        bg.src = dataUrl;
+        showToast('背景已更新', 'success');
+      } catch (_) {
+        showToast('背景更新失败', 'error');
+      } finally {
+        uploadInput.value = '';
       }
-      bg.src = dataUrl;
-      showToast('背景已更新', 'success');
-    } catch (_) {
-      showToast('背景更新失败', 'error');
-    } finally {
-      uploadInput.value = '';
-    }
-  });
+    });
+  }
+
+  syncSocialTopbarSolid();
 }
+
+/**
+ * 顶栏 solid 态同步：封面（含头像区）完全滚出视口顶部后，固定顶栏从
+ * 「封面上的悬浮按钮」切换为「磨砂标题栏」。由模块级滚动监听驱动；
+ * #modalContent 为复用元素，监听器只注册一次，避免随模态重开而累积。
+ */
+function syncSocialTopbarSolid() {
+  const feed = document.querySelector('#modalContent .social-feed');
+  const topbar = feed?.querySelector('.wx-cover-topbar');
+  if (!topbar) return;
+  const cover = feed.querySelector('.wx-social-cover');
+  const bottom = cover ? cover.getBoundingClientRect().bottom : 0;
+  topbar.classList.toggle('solid', bottom <= 0);
+}
+
+document.addEventListener('scroll', (e) => {
+  if (e.target?.id !== 'modalContent') return;
+  syncSocialTopbarSolid();
+}, { capture: true, passive: true });
 
 /** 点击菜单与「+」以外区域时收起菜单 */
 function bindPlusMenuDismiss() {
