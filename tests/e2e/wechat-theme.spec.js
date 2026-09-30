@@ -124,6 +124,8 @@ test.describe('微信主题 · 桌面', () => {
         mainBg: getComputedStyle(document.getElementById('main')).backgroundColor,
         // textarea 融入面板，不单独设底色
         textareaBg: getComputedStyle(document.getElementById('messageInput')).backgroundColor,
+        // 提示文字（textarea 左沿）与面板左边框的间距，微信约 12px
+        textLeftGap: document.getElementById('messageInput').getBoundingClientRect().left - box.left,
         sendLabel: getComputedStyle(send, '::after').content,
         sendRadius: getComputedStyle(send).borderRadius,
         sendWidth: sendBox.width,
@@ -131,7 +133,11 @@ test.describe('微信主题 · 桌面', () => {
         sendBottomGap: box.bottom - sendBox.bottom,
       };
     });
+    // 面板高度收敛：不再是过高的 190px
     expect(parseFloat(info.minHeight)).toBeGreaterThanOrEqual(150);
+    expect(parseFloat(info.minHeight)).toBeLessThan(170);
+    // 提示文字贴近左边框
+    expect(info.textLeftGap).toBeLessThanOrEqual(14);
     // 外围留白与聊天页同色（浅色微信下 #ededed），不留更浅的缝
     expect(info.mainBg).toBe(info.chatBg);
     expect(info.mainBg).toBe('rgb(237, 237, 237)');

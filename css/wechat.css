@@ -261,8 +261,9 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 2px 8px;
-    padding: 10px 16px 12px;
-    min-height: 190px;
+    /* 收紧内边距：提示文字贴近面板边框（微信约 12px） */
+    padding: 8px 12px 10px;
+    min-height: 150px;
     /* 微信 PC 输入框是整块带描边的圆角面板 */
     margin: 0 14px 14px;
     border: 1px solid var(--color-border);
@@ -308,7 +309,7 @@
     border: none;
     box-shadow: none;
     border-radius: 0;
-    padding: 6px 2px;
+    padding: 2px 0;
     min-height: 100px;
     max-height: none;
     resize: none;

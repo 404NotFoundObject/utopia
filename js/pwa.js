@@ -6,12 +6,30 @@
 
 import { showToast } from './ui/components/toast.js';
 
+// 窗口装饰器 / 浏览器 UI 色（PWA 标题栏、地址栏）跟随当前主题底色
+function syncThemeColor() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) return;
+  const color = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-bg-secondary')
+    .trim();
+  if (color) meta.setAttribute('content', color);
+}
+
 export function initPWA() {
+  if (window.__eventBus && typeof window.__eventBus.on === 'function') {
+    window.__eventBus.on('theme:changed', syncThemeColor);
+  }
+
   if (!('serviceWorker' in navigator)) return;
   // file:// 或非安全上下文（除 localhost 外的 http）无法注册 SW
   if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
 
   window.addEventListener('load', () => {
+    // 主题变量由 theme.js 在启动流程中注入，须等其就绪后再取色
+    syncThemeColor();
+    setTimeout(syncThemeColor, 300);
+
     navigator.serviceWorker
       .register('./sw.js')
       .then((reg) => {
