@@ -65,6 +65,75 @@ test.describe('微信主题 · 桌面', () => {
     expect(headerInfo.shadow).not.toBe('none');
   });
 
+  test('会话列表：行间分隔线内缩对齐文字，选中项整行绿色', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    // 保证至少两个列表项，并选中第一项
+    await page.evaluate(async () => {
+      const { getAppState } = await import('/js/core/state.js');
+      const { createCharacter } = await import('/js/modules/character.js');
+      const chars = getAppState().get('characters') || [];
+      for (let i = chars.length; i < 2; i++) {
+        await createCharacter({ name: `分隔线测试角色${i}`, description: 'E2E 造数' }, { skipApiCheck: true });
+      }
+      getAppState().set('currentCharacterId', (getAppState().get('characters') || [])[0].id);
+      const { renderCharacterList } = await import('/js/ui/screens/characterListUI.js');
+      await renderCharacterList();
+    });
+    await page.waitForTimeout(400);
+
+    const info = await page.evaluate(() => {
+      const items = [...document.querySelectorAll('#characterList .character-item')];
+      const boxes = items.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom };
+      });
+      // 行间分隔线挂在后一项的 ::before 上
+      const dividers = items.slice(1).map((el) => {
+        const cs = getComputedStyle(el, '::before');
+        const itemCs = getComputedStyle(el);
+        const avatar = el.querySelector('.avatar');
+        const avatarW = avatar ? parseFloat(getComputedStyle(avatar).width) : 0;
+        return {
+          content: cs.content,
+          bg: cs.backgroundColor,
+          left: parseFloat(cs.left),
+          height: cs.height,
+          // 文字起始处 = 行内边距 + 头像宽 + 间距
+          expectedLeft: parseFloat(itemCs.paddingLeft) + avatarW + parseFloat(itemCs.columnGap),
+        };
+      });
+      const active = document.querySelector('#characterList .character-item.active');
+      return {
+        count: items.length,
+        boxes,
+        dividers,
+        activeBg: active ? getComputedStyle(active).backgroundColor : null,
+        activeName: active ? getComputedStyle(active.querySelector('.name')).color : null,
+      };
+    });
+
+    expect(info.count).toBeGreaterThanOrEqual(2);
+
+    // 行首尾相接（列表 gap 归零），分隔线才贴得住行缘
+    for (let i = 1; i < info.boxes.length; i++) {
+      expect(Math.abs(info.boxes[i].top - info.boxes[i - 1].bottom)).toBeLessThan(1.5);
+    }
+
+    expect(info.dividers.length).toBe(info.count - 1);
+    for (const d of info.dividers) {
+      expect(d.content).toBe('""');
+      expect(d.bg).not.toBe('rgba(0, 0, 0, 0)');
+      expect(d.height).toBe('1px');
+      // 内缩到文字起始处（头像右侧），不压在头像下方
+      expect(Math.abs(d.left - d.expectedLeft)).toBeLessThan(1);
+    }
+
+    // PC 端选中项保持整行绿色 + 白字
+    expect(info.activeBg).toBe('rgb(7, 193, 96)');
+    expect(info.activeName).toBe('rgb(255, 255, 255)');
+  });
+
   test('暗色微信：data-theme 与背景变量', async ({ page }) => {
     await openWithTheme(page, 'wechat-dark');
 
@@ -359,6 +428,50 @@ test.describe('微信主题 · 移动端', () => {
     await page.locator('#wxBackBtn').click();
     await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'list');
     await expect(page.locator('#sidebar')).toBeVisible();
+  });
+
+  test('列表页选中项不再整行绿色，改为弱高亮', async ({ page }) => {
+    await openWithTheme(page, 'wechat-dark');
+
+    // 造数并选中第一个角色，保持在列表层
+    await page.evaluate(async () => {
+      const { getAppState } = await import('/js/core/state.js');
+      const { createCharacter } = await import('/js/modules/character.js');
+      const chars = getAppState().get('characters') || [];
+      for (let i = chars.length; i < 2; i++) {
+        await createCharacter({ name: `弱高亮测试角色${i}`, description: 'E2E 造数' }, { skipApiCheck: true });
+      }
+      getAppState().set('currentCharacterId', (getAppState().get('characters') || [])[0].id);
+      const { renderCharacterList } = await import('/js/ui/screens/characterListUI.js');
+      await renderCharacterList();
+      // 选中角色会触发视图状态机切到对话页；测试要验证的是列表页观感，切回列表层
+      const { setMobileView } = await import('/js/ui/layout/wechatTheme.js');
+      setMobileView('list');
+    });
+    await page.waitForTimeout(400);
+
+    await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'list');
+    await expect(page.locator('#sidebar')).toBeVisible();
+
+    const active = await page.evaluate(() => {
+      const el = document.querySelector('#characterList .character-item.active');
+      if (!el) return null;
+      return {
+        bg: getComputedStyle(el).backgroundColor,
+        borderLeftColor: getComputedStyle(el).borderLeftColor,
+        nameColor: getComputedStyle(el.querySelector('.name')).color,
+      };
+    });
+
+    expect(active).not.toBeNull();
+    // 不再整行微信绿
+    expect(active.bg).not.toBe('rgb(7, 193, 96)');
+    // 暗色弱高亮 #222222
+    expect(active.bg).toBe('rgb(34, 34, 34)');
+    // 左侧 3px 色条一并去掉
+    expect(active.borderLeftColor).toBe('rgba(0, 0, 0, 0)');
+    // 文字恢复常规配色（不再是高亮白）
+    expect(active.nameColor).not.toBe('rgb(255, 255, 255)');
   });
 
   test('dock 只保留 聊天 / 插件 / 朋友圈 / 设置 且按序排列', async ({ page }) => {

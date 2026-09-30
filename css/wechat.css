@@ -146,10 +146,14 @@
 
 /* ============================================================
    三、会话列表（角色与群组）
-   选中项绿色高亮（来自截图观感）；列表项去圆角、加分隔线。
+   PC 端选中项保持微信绿高亮；列表项去圆角，行与行之间加微信式
+   分隔线（从文字起始处画到右缘，参考微信会话列表）。
+   移动端列表页的选中项不再整行绿色——改为与页面底色相近、略亮
+   一档的弱高亮，文字恢复常规配色（PC 端不受影响）。
    ============================================================ */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item {
   border-radius: 0;
+  position: relative; /* 承载行间分隔线 ::before */
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item.active {
   background: var(--color-primary);
@@ -157,6 +161,49 @@
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item.active .name,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item.active .desc {
   color: #ffffff;
+}
+
+/* 行间分隔线：微信会话列表的细线从「文字起始处」（头像右侧）画到
+   右缘，不压在头像下方。::before 的定位基准是 padding box（不含
+   3px 左色条），偏移 = 12px 行内边距 + 36px 头像 + 12px 间距，
+   与 sidebar.css 的 .character-item 结构一致。列表 gap 归零让行
+   首尾相接，分隔线挂在后一项顶部。 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-list {
+  gap: 0;
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item + .character-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(var(--spacing-md) + 36px + var(--spacing-md));
+  right: 0;
+  height: 1px;
+  background: var(--color-border);
+  pointer-events: none;
+}
+/* 行悬停的位移动画会把分隔线带着一起滑走，微信主题下关闭
+   （悬停反馈仍由背景色承担） */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item:hover {
+  transform: none;
+}
+
+/* 移动端（≤768，列表层）：选中项不再整行绿色——与页面底色相近、
+   略亮一档的弱高亮，文字恢复常规配色，左侧 3px 色条一并去掉 */
+@media (max-width: 768px) {
+  [data-theme="wechat"] .character-item.active {
+    background: #f2f2f2;
+    border-left-color: transparent;
+  }
+  [data-theme="wechat-dark"] .character-item.active {
+    background: #222222;
+    border-left-color: transparent;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item.active .name {
+    color: var(--color-text-primary);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item.active .desc {
+    color: var(--color-text-muted);
+  }
 }
 
 /* 输入区外围边缘留白露出的是 #main 背景，须与聊天页（#chatMessages）同色，
