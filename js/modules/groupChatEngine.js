@@ -185,10 +185,19 @@ export async function runAutoSpeakCycle(groupId, options = {}) {
       .filter(m => m.memberType === 'character' && !m.isMuted && m.character)
       .map(m => ({ ...m, character: m.character }));
 
+    // 审计 P2-9：每轮最多几人自主发言（可配置，默认 3），避免一次刷屏
+    const maxSpeakersPerCycle = options.maxSpeakersPerCycle
+      ?? group.settings?.maxSpeakersPerCycle
+      ?? 3;
+    let spokeThisCycle = 0;
+
     for (const member of activeCharacters) {
+      // 审计 P2-9：每轮自主发言设置人数上限，避免一次刷屏
+      if (spokeThisCycle >= maxSpeakersPerCycle) break;
+
       const character = member.character;
-      const lastActive = member.lastActiveAt || 0;
-      const now = getGameTime();
+      const lastActive = member.lastActiveAtReal || member.lastActiveAt || 0;
+      const now = Date.now();
 
       const probability = calculateSpeakProbability(
         character,
@@ -199,6 +208,7 @@ export async function runAutoSpeakCycle(groupId, options = {}) {
 
       if (Math.random() < probability) {
         await generateAutoSpeak(groupId, character.id, members);
+        spokeThisCycle++;
         await sleep(1000);
       }
     }
@@ -210,6 +220,8 @@ export async function runAutoSpeakCycle(groupId, options = {}) {
 function calculateSpeakProbability(character, group, lastActive, now) {
   const extraversion = (character.personalityParameters?.extraversion || 50) / 100;
   const energy = character.bodyState?.energy || 50;
+  // 审计 P2-9：now/lastActive 现为真实时间戳（Date.now / lastActiveAtReal），
+  // 用真实时间计算 elapsed，倍速不再放大自动发言概率。
   const elapsed = (now - lastActive) / 1000;
   const interval = group.settings?.autoSpeakInterval || 180;
 

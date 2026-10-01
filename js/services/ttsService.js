@@ -19,6 +19,12 @@ let currentAudioSource = null;
 let isPlaying = false;
 let onEndCallbacks = [];
 
+// 审计 P2-3：追踪在途的 Kokoro fetch 与 Web Speech 重试 timer，
+// 使 stop() 能真正取消尚未完成的合成/重试，而非等它返回后再播放。
+let kokoroAbortController = null;
+let webSpeechRetryTimer = null;
+let stopped = false;
+
 // ============================================================
 // 1. 音色列表获取（含性别推断、分组）
 // ============================================================
@@ -164,14 +170,19 @@ function getTTSConfig(character) {
     const provider = ttsSettings.provider || 'web-speech';
     const kokoroUrl = ttsSettings.kokoroUrl || 'http://localhost:8880/v1/audio/speech';
     const kokoroModel = ttsSettings.kokoroModel || 'kokoro-v0.19';
+    // 审计 P2-4：此前 getTTSConfig 漏返回 kokoroApiKey，导致 Authorization 头从不发送
+    const kokoroApiKey = ttsSettings.kokoroApiKey || '';
 
-    return { voice, speed, pitch, provider, kokoroUrl, kokoroModel };
+    return { voice, speed, pitch, provider, kokoroUrl, kokoroModel, kokoroApiKey };
 }
 
 export async function speak(text, character = null, options = {}) {
     if (!text || text.trim().length === 0) return;
 
     stop();
+
+    // 新一次播放开始，复位停止标志
+    stopped = false;
 
     const config = getTTSConfig(character);
     const provider = config.provider;
@@ -188,6 +199,9 @@ function speakWithWebSpeech(text, config, options) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const trySpeak = () => {
+            // 已被 stop() 取消，不再发声（审计 P2-3）
+            if (stopped) return;
+
             if (!window.speechSynthesis) {
                 reject(new Error('浏览器不支持 Speech Synthesis API'));
                 return;
@@ -249,7 +263,11 @@ function speakWithWebSpeech(text, config, options) {
                     attempts++;
                     const delay = TTS_RETRY_DELAY_BASE * Math.pow(2, attempts - 1);
                     console.warn(`[TTS] 错误 "${e.error}"，${delay}ms 后重试 (${attempts}/${TTS_MAX_RETRIES})`);
-                    setTimeout(trySpeak, delay);
+                    // 追踪重试 timer，使 stop() 能取消（审计 P2-3）
+                    webSpeechRetryTimer = setTimeout(() => {
+                        webSpeechRetryTimer = null;
+                        if (!stopped) trySpeak();
+                    }, delay);
                     return;
                 }
 
@@ -286,6 +304,9 @@ function speakWithWebSpeech(text, config, options) {
 
 // ---------- 2.2 Kokoro API ----------
 async function speakWithKokoro(text, config, options) {
+    // 审计 P2-3：为在途 fetch 挂 AbortController，使 stop() 能取消尚未完成的合成
+    kokoroAbortController = new AbortController();
+
     try {
         const response = await fetch(config.kokoroUrl, {
             method: 'POST',
@@ -300,7 +321,11 @@ async function speakWithKokoro(text, config, options) {
                 speed: config.speed,
                 response_format: 'mp3',
             }),
+            signal: kokoroAbortController.signal,
         });
+
+        // 已被 stop() 取消，丢弃结果（审计 P2-3）
+        if (stopped) return;
 
         if (!response.ok) {
             throw new Error(`Kokoro API 请求失败: ${response.status} ${response.statusText}`);
@@ -308,10 +333,21 @@ async function speakWithKokoro(text, config, options) {
 
         const audioData = await response.arrayBuffer();
 
+        // 解码期间可能被 stop()，再次检查
+        if (stopped) return;
+
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         currentAudioContext = audioContext;
 
         const audioBuffer = await audioContext.decodeAudioData(audioData);
+
+        // 解码完成后若已被 stop()，关闭 context 不再播放
+        if (stopped) {
+            try { audioContext.close(); } catch (_) {}
+            currentAudioContext = null;
+            return;
+        }
+
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
@@ -347,11 +383,17 @@ async function speakWithKokoro(text, config, options) {
         });
 
     } catch (error) {
+        // stop() 触发的 abort 不降级、不报错（审计 P2-3）
+        if (error.name === 'AbortError' || stopped) {
+            return;
+        }
         console.error('[TTS] Kokoro 合成失败:', error);
         if (options.onError) options.onError(error);
         // 降级到 Web Speech
         console.log('[TTS] 降级到 Web Speech API');
         return speakWithWebSpeech(text, config, options);
+    } finally {
+        kokoroAbortController = null;
     }
 }
 
@@ -360,6 +402,20 @@ async function speakWithKokoro(text, config, options) {
 // ============================================================
 
 export function stop() {
+    stopped = true;
+
+    // 取消在途的 Kokoro fetch（审计 P2-3）
+    if (kokoroAbortController) {
+        try { kokoroAbortController.abort(); } catch (_) {}
+        kokoroAbortController = null;
+    }
+
+    // 取消 Web Speech 的待执行重试 timer（审计 P2-3）
+    if (webSpeechRetryTimer) {
+        clearTimeout(webSpeechRetryTimer);
+        webSpeechRetryTimer = null;
+    }
+
     if (currentUtterance) {
         window.speechSynthesis?.cancel();
         currentUtterance = null;

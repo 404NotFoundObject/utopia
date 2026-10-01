@@ -5,6 +5,10 @@ import { getEffectiveParams } from './runtimeParams.js';
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
   const controller = new AbortController();
+  // 注意：此超时只保护「建立连接 + 收到响应头」阶段（首字节超时）。
+  // 一旦 await fetch() resolve（响应头到达），下方 finally 立即清除 timer，
+  // 因此流式 body 的读取完全不受此超时影响——长回复不会被中途 abort。
+  // （审计 P2-15：慢模型/长上下文的首字节可能超过 60s，流式路径用更长的首字节超时兜底。）
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   const externalSignal = options.signal;
@@ -21,6 +25,8 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
 
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
+    // 响应头已到达：立即清除首字节超时，确保流式读取期间不再受 timer 影响
+    clearTimeout(timer);
     return response;
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -327,7 +333,7 @@ export async function sendChatRequest(params) {
     headers,
     body: JSON.stringify(vendorReq),
     signal,
-  }, 60000);
+  }, stream ? 120000 : 60000);
 
   if (!response.ok) {
     const text = await response.text();

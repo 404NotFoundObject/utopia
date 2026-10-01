@@ -128,6 +128,32 @@ function toColorInputValue(value) {
   return '#000000';
 }
 
+/**
+ * 校验一个值是否为「安全的 CSS 颜色」。
+ * 审计 P2-22：导入主题时，任意键值会写入 :root，`url(https://…)` 之类可作追踪信标。
+ * 这里只接受明确的颜色字面量（hex / rgb / hsl / 命名色），拒绝 url()、表达式等。
+ */
+export function isValidColorValue(value) {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  if (!v) return false;
+
+  // 拒绝可能包含 URL / 表达式的危险值
+  if (/url\s*\(/i.test(v)) return false;
+  if (v.includes(';') || v.includes('{') || v.includes('}')) return false;
+
+  // hex：#RGB / #RGBA / #RRGGBB / #RRGGBBAA
+  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return true;
+
+  // rgb() / rgba() / hsl() / hsla()
+  if (/^(rgb|rgba|hsl|hsla)\([^)]*\)$/i.test(v)) return true;
+
+  // 命名色（仅字母与空格，且不含表达式关键字）
+  if (/^[a-zA-Z]+$/.test(v)) return true;
+
+  return false;
+}
+
 function downloadJson(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1102,11 +1128,21 @@ function onImport() {
   input.click();
 }
 
-function validateImportedTheme(data) {
+export function validateImportedTheme(data) {
   if (!data || typeof data !== 'object') return null;
   if (!data.variables && !data.baseTheme) return null;
 
   const base = THEME_PRESETS[data.baseTheme] ? data.baseTheme : 'light';
+
+  // 构建允许的键名白名单（COLOR_GROUPS 中定义的所有颜色变量）。
+  // 审计 P2-22：此前任意键都会写入 :root，可覆盖任意应用变量；
+  // 现在只接受白名单内的颜色变量，且值必须是合法颜色。
+  const allowedKeys = new Set();
+  for (const group of COLOR_GROUPS) {
+    for (const item of group.items) {
+      allowedKeys.add(item.key);
+    }
+  }
 
   // 校验 variables 中的键
   const vars = {};
@@ -1115,6 +1151,10 @@ function validateImportedTheme(data) {
       if (typeof k !== 'string') continue;
       if (typeof v !== 'string') continue;
       if (k.startsWith('--radius-') || k.startsWith('--shadow-')) continue;
+      // 白名单外的键直接丢弃（不写入 :root）
+      if (!allowedKeys.has(k)) continue;
+      // 值必须是安全颜色，否则丢弃
+      if (!isValidColorValue(v)) continue;
       vars[k] = v;
     }
   }

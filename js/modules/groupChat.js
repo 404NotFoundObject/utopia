@@ -37,6 +37,9 @@ function toFiniteNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// 审计 P2-10：群聊角色成员数上限（FAQ 声明表单限制 2-10 人，此处落实代码层硬上限）
+const MAX_GROUP_CHARACTERS = 10;
+
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
@@ -491,6 +494,16 @@ export async function getGroupsByUser(userId = 'user') {
 
 export async function addGroupMember(groupId, memberId, memberType, role = 'member') {
   const stores = await getStores();
+
+  // 审计 P2-10：限制角色成员数，避免无限膨胀（用户自己不计入）
+  if (memberType === 'character') {
+    const existing = await stores.group_members.getByIndex('groupId', groupId);
+    const charCount = existing.filter(m => m.memberType === 'character').length;
+    if (charCount >= MAX_GROUP_CHARACTERS) {
+      throw new Error(`群聊最多支持 ${MAX_GROUP_CHARACTERS} 个角色成员`);
+    }
+  }
+
   const member = {
     id: generateUUID(),
     groupId,
@@ -625,6 +638,9 @@ export async function sendGroupMessage(groupId, senderId, senderType, content, m
   const member = members.find(m => m.memberId === senderId && m.memberType === senderType);
   if (member) {
     member.lastActiveAt = getGameTime();
+    // 审计 P2-9：额外记录真实时间戳，供自动发言概率用真实时间计算 elapsed，
+    // 避免倍速越高（游戏时间走得越快）角色越爱插话。
+    member.lastActiveAtReal = Date.now();
     member.speakCount = (member.speakCount || 0) + 1;
     await stores.group_members.update(member.id, member);
   }
@@ -860,11 +876,16 @@ export async function generateCharacterReplyStream(groupId, characterId, userMes
 
       await sendGroupMessage(groupId, character.id, 'character', finalContent, mentions.map(c => c.id), null, false);
 
-      try {
-        const { addMemory } = await import('./memory.js');
-        await addMemory(character.id, userMessage, finalContent);
-      } catch (e) {
-        console.warn('[GroupChat] 记忆存储失败:', e);
+      // 仅当 mentionDepth === 0（用户真实发言触发）时写记忆。
+      // 递归路径（mentionDepth ≥ 1）传来的 userMessage 是「上一个角色的台词」，
+      // 若照写会把 A 的台词当成「用户曾说」污染 B 的记忆（审计 P2-8）。
+      if (mentionDepth === 0) {
+        try {
+          const { addMemory } = await import('./memory.js');
+          await addMemory(character.id, userMessage, finalContent);
+        } catch (e) {
+          console.warn('[GroupChat] 记忆存储失败:', e);
+        }
       }
 
       groupChatUI.unmarkGroupStreaming(tempMsgId);
