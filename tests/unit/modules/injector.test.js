@@ -21,6 +21,18 @@ describe('modules/injector · 基础规则', () => {
     expect(styleRule.content).toContain('转述');
   });
 
+  it('明确括号内省略主语「我」，直接写动作/感受', () => {
+    const rules = getBaseRules();
+    const styleRule = rules.find(r => r.id === 'output_style');
+    expect(styleRule.content).toContain('省略主语');
+    expect(styleRule.content).toContain('（轻轻点头）');
+    expect(styleRule.content).toContain('（拉住你的手）');
+    expect(styleRule.content).toContain('（感觉有些局促）');
+    // 错误示例必须存在，用于反例引导
+    expect(styleRule.content).toContain('（我轻轻点头）');
+    expect(styleRule.content).toContain('（我感觉有些局促）');
+  });
+
   it('output_style 排在身份锁定之后的高优先级（priority=2）', () => {
     const rules = getBaseRules();
     const identity = rules.find(r => r.id === 'identity_lock');
