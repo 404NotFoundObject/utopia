@@ -81,6 +81,8 @@ export function onUiChange(callback) {
 
 const hotkeyInstances = new Map();       // pluginId -> hotkeyInstance
 const loadingInstances = new Map();      // pluginId -> loadingInstance
+const tooltipInstances = new Map();      // pluginId -> tooltipInstance（卸载时 destroy）
+const dragDropInstances = new Map();     // pluginId -> dragDropInstance（卸载时 destroy）
 const configChangeUnsubscribers = new Map();   // pluginId -> Set<unsubscribe>
 
 // ============================================================
@@ -222,9 +224,17 @@ export function createUiApi(pluginId, manifest) {
     // ★ UI 增强
     // ============================================================
     contextMenu: createPluginContextMenu(pluginId),
-    tooltip: createPluginTooltip(pluginId),
+    tooltip: (() => {
+      const inst = createPluginTooltip(pluginId);
+      tooltipInstances.set(pluginId, inst);
+      return inst;
+    })(),
     loading: loadingInstance,
-    dragDrop: createPluginDragDrop(pluginId),
+    dragDrop: (() => {
+      const inst = createPluginDragDrop(pluginId);
+      dragDropInstances.set(pluginId, inst);
+      return inst;
+    })(),
 
     // ============================================================
     // 模态框接口
@@ -505,6 +515,18 @@ export function unregisterAllInjections(pluginId) {
   if (loadingInstance) {
     try { loadingInstance.reset(); } catch (_) {}
     loadingInstances.delete(pluginId);
+  }
+
+  // ---- 4.5 清 tooltip / dragDrop 实例（防止全局监听器泄漏） ----
+  const tooltipInstance = tooltipInstances.get(pluginId);
+  if (tooltipInstance) {
+    try { tooltipInstance.destroy(); } catch (_) {}
+    tooltipInstances.delete(pluginId);
+  }
+  const dragDropInstance = dragDropInstances.get(pluginId);
+  if (dragDropInstance) {
+    try { dragDropInstance.destroy(); } catch (_) {}
+    dragDropInstances.delete(pluginId);
   }
 
   const cfgUnsubs = configChangeUnsubscribers.get(pluginId);

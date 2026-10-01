@@ -2,6 +2,9 @@
 
 /**
  * 将 JSON 字符串嵌入到 PNG 的 tEXt 块中
+ *
+ * 兼容 SillyTavern 规范：关键字 `chara\0`，载荷为 base64 编码的 JSON。
+ *
  * @param {Blob} pngBlob - 原始 PNG 图片 Blob
  * @param {string} jsonString - 要嵌入的 JSON 字符串
  * @returns {Promise<Blob>} 新的 PNG Blob
@@ -18,8 +21,10 @@ export async function embedJSONToPNG(pngBlob, jsonString) {
     }
   }
   
-  // 构建 tEXt 块数据
-  const textData = `chara ${jsonString}`;
+  // 构建 tEXt 块数据：SillyTavern 规范 = 'chara\0' + base64(JSON)
+  const jsonBytes = new TextEncoder().encode(jsonString);
+  const base64 = bytesToBase64(jsonBytes);
+  const textData = 'chara\0' + base64;
   const textBytes = new TextEncoder().encode(textData);
   const dataLength = textBytes.length;
 
@@ -107,17 +112,62 @@ export async function extractJSONFromPNG(pngBlob) {
     if (type === 'tEXt') {
       const textData = data.slice(pos + 8, pos + 8 + length);
       const text = new TextDecoder().decode(textData);
+      // 兼容三种关键字约定：
+      //   'chara\0' + base64(JSON)  —— SillyTavern 规范（本库写入即此格式）
+      //   'chara '  + 原始 JSON      —— 历史版本
+      //   'chara\0' + 原始 JSON      —— 其他工具的变体
+      if (text.startsWith('chara\0')) {
+        const payload = text.substring(6);
+        return decodeCharaPayload(payload);
+      }
       if (text.startsWith('chara ')) {
-        try {
-          return JSON.parse(text.substring(6));
-        } catch {
-          return null;
-        }
+        const payload = text.substring(6);
+        return decodeCharaPayload(payload);
       }
     }
     pos += 12 + length;
   }
   return null;
+}
+
+/**
+ * 解析 chara 关键字后的载荷：优先按 base64 解码，失败则按原始 UTF-8 JSON 解析。
+ * @param {string} payload
+ * @returns {Object|null}
+ */
+function decodeCharaPayload(payload) {
+  // base64（SillyTavern 规范）
+  try {
+    const bytes = base64ToBytes(payload);
+    const jsonStr = new TextDecoder().decode(bytes);
+    return JSON.parse(jsonStr);
+  } catch (_) {
+    // 历史/其他工具的原始 JSON
+    try {
+      return JSON.parse(payload);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+// ---------- base64 编解码（跨环境安全：Node 无 btoa/atob） ----------
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 // ---------- CRC-32 实现 ----------

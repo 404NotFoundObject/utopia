@@ -181,6 +181,29 @@ export async function sendMessage(content) {
     return;
   }
 
+  // 真实发送路径触发 before 钩子（修复审计 P1-5：此前用户发消息不经过 _api 代理，
+  // chat.sendMessage:before 钩子只在插件自身发起的 RPC 时触发）。
+  // 插件可改写 content（如敏感词过滤），或返回 { cancelled: true } 中断发送。
+  let finalContent = content;
+  try {
+    const { triggerHook } = await import('../plugins/hookSystem.js');
+    const beforeCtx = await triggerHook('chat.sendMessage:before', {
+      args: [content],
+      module: 'chat',
+      method: 'sendMessage',
+      cancelled: false,
+    });
+    if (beforeCtx._stopped || beforeCtx.cancelled) {
+      return;
+    }
+    if (Array.isArray(beforeCtx.args) && beforeCtx.args.length > 0) {
+      finalContent = beforeCtx.args[0];
+    }
+  } catch (err) {
+    // 钩子异常不阻塞发送
+  }
+  content = finalContent;
+
   state.set('sending', true);
 
   let convId = null;

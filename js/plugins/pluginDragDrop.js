@@ -357,5 +357,18 @@ export function createPluginDragDrop(pluginId) {
         }
       };
     },
+
+    /**
+     * 销毁：移除全局拖拽监听器与拖拽幽灵（插件卸载时调用，避免监听器泄漏）
+     */
+    destroy() {
+      detachListeners();
+      if (ghostEl) {
+        ghostEl.remove();
+        ghostEl = null;
+      }
+      currentDragData = null;
+      currentDragSource = null;
+    },
   };
 }

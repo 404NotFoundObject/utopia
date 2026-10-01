@@ -49,6 +49,29 @@ const subscribedEvents = new Map();
 // pluginId -> unsubscribe 函数列表
 const eventUnsubscribers = new Map();
 
+// 事件广播器：由 pluginRuntime 注入，用于把主线程 emit 的事件回传给 Worker。
+// 修复审计 P1-4：Worker 的 api.events.on 订阅后，此前全链路无任何代码向 Worker post event:emit。
+let eventBroadcaster = null;
+
+/**
+ * 注入事件广播器（由 pluginRuntime 调用，避免循环依赖）。
+ * @param {(event: string, args: any[]) => void} broadcaster
+ */
+export function setEventBroadcaster(broadcaster) {
+  eventBroadcaster = broadcaster;
+}
+
+/**
+ * 主线程侧统一的事件发射：先触发本地 eventBus，再广播给订阅了该事件的 Worker。
+ */
+function emitToWorkers(event, args) {
+  if (typeof eventBroadcaster === 'function') {
+    try {
+      eventBroadcaster(event, args);
+    } catch (_) {}
+  }
+}
+
 // ============================================================
 // 模块包装器：Proxy 自动钩子
 // ============================================================
@@ -194,8 +217,16 @@ const _api = {
     subscribe: (event, callback) => eventBus.on(event, callback),
     unsubscribe: (event, callback) => eventBus.off(event, callback),
 
-    emit: (event, ...args) => eventBus.emit(event, ...args),
-    emitAsync: (event, ...args) => eventBus.emitAsync(event, ...args),
+    emit: (event, ...args) => {
+      const result = eventBus.emit(event, ...args);
+      emitToWorkers(event, args);
+      return result;
+    },
+    emitAsync: async (event, ...args) => {
+      const result = await eventBus.emitAsync(event, ...args);
+      emitToWorkers(event, args);
+      return result;
+    },
     getEventNames: () => eventBus.getEventNames(),
   },
 

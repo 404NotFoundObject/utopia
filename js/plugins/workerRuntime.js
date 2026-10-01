@@ -164,6 +164,18 @@ function _workerRuntimeMain() {
   };
 
   // ============================================================
+  // postToUI：Worker → UI 消息通道
+  // ============================================================
+  // 主线程收到 ui:message 后会 dispatchCustomMessage 转发给 ui.js 注册的监听器。
+  api.postToUI = (message) => {
+    self.postMessage({
+      type: 'ui:message',
+      payload: message,
+    });
+    return true;
+  };
+
+  // ============================================================
   // 钩子 API
   // ============================================================
   api.hooks = {

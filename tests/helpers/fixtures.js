@@ -33,6 +33,55 @@ export function tinyPngBlob() {
 }
 
 /**
+ * 构造一个「SillyTavern 规范」的 chara tEXt 块数据（不经过 embedJSONToPNG），
+ * 用于交叉验证提取器能读真实 ST 卡：'chara\0' + base64(UTF-8 JSON)。
+ * @param {string} jsonString
+ * @returns {Uint8Array} tEXt 块的数据部分（不含 length/type/CRC 头）
+ */
+export function makeCharaTextData(jsonString) {
+  const jsonBytes = new TextEncoder().encode(jsonString);
+  // 手动 base64（浏览器/Node 均可用 btoa）
+  let binary = '';
+  for (let i = 0; i < jsonBytes.length; i++) {
+    binary += String.fromCharCode(jsonBytes[i]);
+  }
+  const base64 = btoa(binary);
+  return new TextEncoder().encode('chara\0' + base64);
+}
+
+/**
+ * 构造一个包含 ST 规范 chara tEXt 块的完整 PNG Blob（独立于 embedJSONToPNG）。
+ * 在 IHDR 之后插入 tEXt，供提取器交叉验证。
+ * @param {string} jsonString
+ * @returns {Blob}
+ */
+export function makeSTCharaPng(jsonString) {
+  const base = tinyPngArrayBuffer();
+  const baseBytes = new Uint8Array(base);
+  const textData = makeCharaTextData(jsonString);
+
+  // 定位 IHDR 块结束位置（IHDR 固定 13 字节数据）
+  // 块结构：len(4) + type(4) + data(13) + crc(4) = 25 字节，从偏移 8 开始
+  const insertPos = 8 + 25;
+
+  const chunkLen = 4 + 4 + textData.length + 4;
+  const out = new Uint8Array(baseBytes.length + chunkLen);
+  out.set(baseBytes.subarray(0, insertPos), 0);
+
+  const view = new DataView(out.buffer);
+  view.setUint32(insertPos, textData.length); // length（大端）
+  out[insertPos + 4] = 't'.charCodeAt(0);
+  out[insertPos + 5] = 'E'.charCodeAt(0);
+  out[insertPos + 6] = 'X'.charCodeAt(0);
+  out[insertPos + 7] = 't'.charCodeAt(0);
+  out.set(textData, insertPos + 8);
+  // CRC 留空（提取器不校验 CRC）
+  out.set(baseBytes.subarray(insertPos), insertPos + 8 + textData.length + 4);
+
+  return new Blob([out], { type: 'image/png' });
+}
+
+/**
  * 解析 PNG 的块结构（仅读头部，不校验 CRC）。
  * @param {Uint8Array} bytes
  * @returns {Array<{type: string, length: number, offset: number}>}

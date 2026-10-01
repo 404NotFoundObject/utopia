@@ -12,7 +12,7 @@
 
 import { getPluginFiles } from './pluginVfs.js';
 import { getWorkerRuntimeCode } from './workerRuntime.js';
-import { invokeApiMethod } from './pluginApi.js';
+import { invokeApiMethod, setEventBroadcaster, getPluginSubscribedEvents } from './pluginApi.js';
 import { assertPermission } from './permissionChecker.js';
 import { setWorkerResolver } from './hookSystem.js';
 
@@ -33,6 +33,21 @@ const readyPromises = new Map();
 setWorkerResolver((pluginId) => {
   const state = workers.get(pluginId);
   return state ? state.worker : null;
+});
+
+// 注入事件广播器：把主线程 emit 的事件回传给订阅了该事件的 Worker，
+// 修复审计 P1-4「Worker 事件系统没有发送方」。
+setEventBroadcaster((event, args) => {
+  for (const [pluginId, state] of workers.entries()) {
+    const subscribed = getPluginSubscribedEvents(pluginId);
+    if (!subscribed.includes(event)) continue;
+    try {
+      state.worker.postMessage({
+        type: 'event:emit',
+        payload: { event, args },
+      });
+    } catch (_) {}
+  }
 });
 
 // ============================================================

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { embedJSONToPNG, extractJSONFromPNG } from '../../../js/utils/png.js';
-import { tinyPngBlob, parsePngChunks } from '../../helpers/fixtures.js';
+import { tinyPngBlob, parsePngChunks, makeSTCharaPng } from '../../helpers/fixtures.js';
 
 async function toBytes(blob) {
   return new Uint8Array(await blob.arrayBuffer());
@@ -25,8 +25,20 @@ describe('utils/png · tEXt 块读写', () => {
       const out = await embedJSONToPNG(tinyPngBlob(), json);
       const bytes = await toBytes(out);
       const textChunk = parsePngChunks(bytes).find(c => c.type === 'tEXt');
-      // 数据为 'chara ' + json
-      expect(textChunk.length).toBe(new TextEncoder().encode('chara ' + json).length);
+      // 数据为 'chara\0' + base64(json)
+      const base64 = btoa(new TextEncoder().encode(json).reduce((s, b) => s + String.fromCharCode(b), ''));
+      expect(textChunk.length).toBe(new TextEncoder().encode('chara\0' + base64).length);
+    });
+
+    it('tEXt 载荷符合 SillyTavern 规范（chara\\0 + base64）', async () => {
+      const json = JSON.stringify({ name: '柳如烟' });
+      const out = await embedJSONToPNG(tinyPngBlob(), json);
+      const bytes = await toBytes(out);
+      const textChunk = parsePngChunks(bytes).find(c => c.type === 'tEXt');
+      const dataBytes = bytes.subarray(textChunk.offset + 8, textChunk.offset + 8 + textChunk.length);
+      const text = new TextDecoder().decode(dataBytes);
+      expect(text.startsWith('chara\0')).toBe(true);
+      expect(text.startsWith('chara ')).toBe(false);
     });
 
     it('非 PNG 输入抛出明确错误', async () => {
@@ -83,5 +95,41 @@ describe('utils/png · tEXt 块读写', () => {
       const second = await embedJSONToPNG(first, JSON.stringify({ v: 'second' }));
       expect(await extractJSONFromPNG(second)).toEqual({ v: 'second' });
     });
+
+    it('读取真实 SillyTavern 卡（chara\\0 + base64，独立构造）', async () => {
+      const payload = { name: '真实 ST 卡', description: '来自 SillyTavern 导出' };
+      const stPng = makeSTCharaPng(JSON.stringify(payload));
+      expect(await extractJSONFromPNG(stPng)).toEqual(payload);
+    });
+
+    it('兼容历史格式 chara + 空格 + 原始 JSON', async () => {
+      // 手工构造历史格式的 tEXt 数据，走独立解码路径验证向后兼容
+      const legacy = await embedLegacyCharaPng({ legacy: true });
+      expect(await extractJSONFromPNG(legacy)).toEqual({ legacy: true });
+    });
   });
 });
+
+/**
+ * 手工构造「历史格式」chara + 空格 + 原始 JSON 的 PNG（不经 embedJSONToPNG），
+ * 用于验证提取器对旧文件的向后兼容。
+ */
+async function embedLegacyCharaPng(obj) {
+  const base = tinyPngBlob();
+  const baseBytes = new Uint8Array(await base.arrayBuffer());
+  const textData = new TextEncoder().encode('chara ' + JSON.stringify(obj));
+
+  const insertPos = 8 + 25; // IHDR 之后
+  const chunkLen = 4 + 4 + textData.length + 4;
+  const out = new Uint8Array(baseBytes.length + chunkLen);
+  out.set(baseBytes.subarray(0, insertPos), 0);
+  const view = new DataView(out.buffer);
+  view.setUint32(insertPos, textData.length);
+  out[insertPos + 4] = 't'.charCodeAt(0);
+  out[insertPos + 5] = 'E'.charCodeAt(0);
+  out[insertPos + 6] = 'X'.charCodeAt(0);
+  out[insertPos + 7] = 't'.charCodeAt(0);
+  out.set(textData, insertPos + 8);
+  out.set(baseBytes.subarray(insertPos), insertPos + 8 + textData.length + 4);
+  return new Blob([out], { type: 'image/png' });
+}

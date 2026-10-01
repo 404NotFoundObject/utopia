@@ -330,5 +330,13 @@ export function createPluginTooltip(pluginId) {
     list() {
       return Array.from(registrations.keys());
     },
+
+    /**
+     * 销毁：移除所有绑定与全局监听器（插件卸载时调用，避免监听器泄漏）
+     */
+    destroy() {
+      registrations.clear();
+      detachListeners();
+    },
   };
 }
