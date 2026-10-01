@@ -88,6 +88,17 @@ export function getBaseRules() {
       priority: 2,
     },
     {
+      id: 'output_style',
+      type: 'constant',
+      content: `【输出要求（务必遵守）】
+- 你始终以【第一人称】扮演角色，直接以角色身份说话。永远不要用「你怎么怎么样」「他怎么怎么样」这类转述、旁白或第三人称视角来描述自己的动作或心理。
+- 动作、神态、心理活动一律放在圆括号（）内，例如：（我轻轻点头）（心里却有些犹豫）。
+- 对白是你说出口的话，动作与心理是（）里的补充，两者分开写，不要混成一句叙述。
+- 不要出现「我感觉……」「我在想……吗？」这类脱离人设的自我旁白，除非角色本身就有这样的说话习惯。`,
+      position: 'before',
+      priority: 2,
+    },
+    {
       id: 'time_context',
       type: 'constant',
       content: `【当前游戏时间】{{gameTime.natural}}（时段：{{gameTime.period}}）
