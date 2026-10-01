@@ -15,14 +15,15 @@ import { speak, stop as stopTTS, isSpeaking } from '../../services/ttsService.js
 import { startListening, stopListening, getFinalTranscript, resetTranscript, isCurrentlyListening, isSpeechSupported } from '../../services/sttService.js';
 import globalEventBus from '../../core/eventBus.js';
 
-import { applyInjection } from '../../modules/injector.js';
 import {
-  fitContextByBudget,
   systemMsg,
   PRIORITY,
-  computeBudget,
-  getWorldBookBudgetRatio,
 } from '../../modules/tokenBudget.js';
+import {
+  buildChatContext,
+  buildFinalMessages,
+  applyEngineEffects,
+} from '../../modules/chatContext.js';
 
 let currentCall = null;
 let timerInterval = null;
@@ -613,13 +614,20 @@ async function processUserMessage(call) {
   try {
     await addSubtitle(call, 'user', call.userMessage);
 
-    const character = call.character;
+    let character = call.character;
     const convId = call.convId;
     const state = getAppState();
     const settings = state.get('settings') || {};
 
     const stores = await getStores();
     const conv = await stores.conversations.get(convId);
+
+    // 情感/身体状态更新（审计 P1-6：通话此前只读取不更新情感，这里补上闭环）
+    try {
+      character = await applyEngineEffects({ character, userMessage: call.userMessage });
+    } catch (e) {
+      console.warn('[通话] 情感状态更新失败:', e);
+    }
 
     const systemMessages = [];
 
@@ -674,66 +682,24 @@ async function processUserMessage(call) {
     }
 
     const modelName = settings?.modelName;
-    const tbEnabled = settings.tokenBudget?.enabled !== false;
-    const wbBudgetRatio = getWorldBookBudgetRatio();
 
-    let worldBookBudget;
-    let systemBudgetOverride;
-    {
-      const rawBudget = computeBudget(modelName);
-      const rawSystemBudget = rawBudget.breakdown.system;
-      worldBookBudget = Math.floor(rawSystemBudget * wbBudgetRatio);
-      systemBudgetOverride = tbEnabled ? rawSystemBudget - worldBookBudget : undefined;
-    }
+    const context = buildChatContext({ character, userMessage: call.userMessage, conversation: conv });
 
-    const budgetResult = fitContextByBudget({
-      modelName,
+    const {
+      finalMessages,
+      fullSystem,
+    } = await buildFinalMessages({
       systemMessages,
       historyMessages,
       userMessage: call.userMessage,
       summary: conv?.summary || '',
-      systemBudgetOverride,
-    });
-
-    const messagesForAPI = [
-      ...budgetResult.systemKept.map(m => ({ role: 'system', content: m.content })),
-      ...budgetResult.historyKept,
-      { role: 'user', content: call.userMessage },
-    ];
-
-    const context = {
+      modelName,
+      settings,
       character,
-      emotionState: character.emotionState,
-      bodyState: character.bodyState,
-      user: {
-        ...(settings.user || { name: '用户' }),
-        message: call.userMessage,
-      },
-      conversation: conv,
-      ...timeCtx,
-    };
-
-    let finalMessages = [];
-    let fullSystem = '';
-    try {
-      const result = await applyInjection(messagesForAPI, context, { worldBookBudget });
-      fullSystem = result
-        .filter(msg => msg.role === 'system')
-        .map(msg => msg.content)
-        .join('\n\n');
-      finalMessages = result.filter(msg => msg.role !== 'system');
-    } catch (e) {
-      console.warn('[通话] 注入器执行失败，使用降级方案:', e);
-      const degradedSystemMsgs = messagesForAPI
-        .filter(msg => msg.role === 'system')
-        .map(msg => msg.content)
-        .filter(c => c && c.trim());
-      fullSystem = [
-        character.systemPrompt || '',
-        ...degradedSystemMsgs,
-      ].filter(Boolean).join('\n\n');
-      finalMessages = messagesForAPI.filter(msg => msg.role !== 'system');
-    }
+      context,
+      mode: 'split',
+      trailingUserMessage: call.userMessage,
+    });
 
     console.log(`\n%c📞 [语音通话] 注入内容 (角色: ${character.name})`, 'font-size:14px;font-weight:bold;color:#6c5ce7;');
     console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color:#6a6a8a;');

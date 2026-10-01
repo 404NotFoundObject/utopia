@@ -2,7 +2,7 @@
 import { getStores, withKeyLock } from '../core/db.js';
 import { getAppState } from '../core/state.js';
 import { generateUUID } from '../core/utils.js';
-import { getGameTime, getTimeContext } from './time.js';
+import { getGameTime } from './time.js';
 import { GroupChatEngine } from './groupChatEngine.js';
 import { sendChatRequest } from '../core/api.js';
 import { syncCharacterState } from './character.js';
@@ -19,16 +19,17 @@ import { buildCrossDayPrompt } from './crossDayAwareness.js';
 import { analyzeAndBuildTransition } from './transitionDecider.js';
 import { SCENE_REGISTRY } from './sceneRegistry.js';
 import { getTempParams } from '../core/runtimeParams.js';
-import { applyInjection } from './injector.js';
 import { buildEmotionPrompt } from './emotionEngine.js';
 import { buildBodyPrompt } from './bodyState.js';
 import {
-  fitContextByBudget,
   systemMsg,
   PRIORITY,
-  computeBudget,
-  getWorldBookBudgetRatio,
 } from './tokenBudget.js';
+import {
+  buildChatContext,
+  buildFinalMessages,
+  applyEngineEffects,
+} from './chatContext.js';
 
 function toFiniteNumber(v) {
   if (v === null || v === undefined) return null;
@@ -343,76 +344,39 @@ ${taskInstruction}
   }
 
   const modelName = settings?.modelName;
-  const tbEnabled = settings.tokenBudget?.enabled !== false;
-  const wbBudgetRatio = getWorldBookBudgetRatio();
 
-  let worldBookBudget;
-  let systemBudgetOverride;
-  {
-    const rawBudget = computeBudget(modelName);
-    const rawSystemBudget = rawBudget.breakdown.system;
-    worldBookBudget = Math.floor(rawSystemBudget * wbBudgetRatio);
-    systemBudgetOverride = tbEnabled ? rawSystemBudget - worldBookBudget : undefined;
-  }
+  const context = buildChatContext({
+    character,
+    userMessage: userMessage || '',
+    conversation: { messages: recentMessages },
+    extra: {
+      group: {
+        id: groupId,
+        name: group.name || '',
+        description: group.description || '',
+        memberCount: charCount,
+        activeLevel: activeLevel,
+        rules: (group.settings && group.settings.rules) || '',
+        members: memberNames,
+      },
+      groupId,
+    },
+  });
 
-  const budgetResult = fitContextByBudget({
-    modelName,
+  const {
+    finalMessages,
+    fullSystem,
+  } = await buildFinalMessages({
     systemMessages,
     historyMessages,
     userMessage: '',
     summary: '',
-    systemBudgetOverride,
-  });
-
-  const messagesForAPI = [
-    ...budgetResult.systemKept.map(m => ({ role: 'system', content: m.content })),
-    ...budgetResult.historyKept,
-  ];
-
-  const timeContext = getTimeContext();
-  const context = {
+    modelName,
+    settings,
     character,
-    emotionState: character.emotionState,
-    bodyState: character.bodyState,
-    user: {
-      ...(settings.user || { name: '用户' }),
-      message: userMessage || '',
-    },
-    group: {
-      id: groupId,
-      name: group.name || '',
-      description: group.description || '',
-      memberCount: charCount,
-      activeLevel: activeLevel,
-      rules: (group.settings && group.settings.rules) || '',
-      members: memberNames,
-    },
-    groupId,
-    conversation: { messages: recentMessages },
-    ...timeContext,
-  };
-
-  let finalMessages = [];
-  let fullSystem = '';
-  try {
-    const result = await applyInjection(messagesForAPI, context, { worldBookBudget });
-    fullSystem = result
-      .filter(msg => msg.role === 'system')
-      .map(msg => msg.content)
-      .join('\n\n');
-    finalMessages = result.filter(msg => msg.role !== 'system');
-  } catch (e) {
-    console.warn('[GroupChat] 注入器执行失败，使用降级方案:', e);
-    const degradedSystemMsgs = messagesForAPI
-      .filter(msg => msg.role === 'system')
-      .map(msg => msg.content)
-      .filter(c => c && c.trim());
-    fullSystem = [
-      character.systemPrompt || '',
-      ...degradedSystemMsgs,
-    ].filter(Boolean).join('\n\n');
-    finalMessages = messagesForAPI.filter(msg => msg.role !== 'system');
-  }
+    context,
+    mode: 'split',
+  });
 
   return { finalMessages, fullSystem };
 }
@@ -813,6 +777,17 @@ export async function generateCharacterReplyStream(groupId, characterId, userMes
     const fresh = refreshCharacterFromState(characterId);
     if (fresh) {
       character = fresh;
+    }
+  }
+
+  // 情感/身体状态更新（审计 P1-6：群聊此前只读取不更新情感）。
+  // 仅当 mentionDepth === 0（用户真实发言触发）时更新；递归传来的角色台词不更新，
+  // 避免「B 的情感被 A 的台词改写」。
+  if (mentionDepth === 0 && userMessage && userMessage.trim()) {
+    try {
+      character = await applyEngineEffects({ character, userMessage });
+    } catch (e) {
+      console.warn('[GroupChat] 情感状态更新失败:', e);
     }
   }
 

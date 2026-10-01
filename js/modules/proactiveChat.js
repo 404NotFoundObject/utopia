@@ -17,14 +17,14 @@ import { buildCrossDayPrompt } from './crossDayAwareness.js';
 import { getConversationPhase, normalizeConvState } from './conversationState.js';
 import { getSceneDef, isSensitive } from './sceneRegistry.js';
 
-import { applyInjection } from './injector.js';
 import {
-  fitContextByBudget,
   systemMsg,
   PRIORITY,
-  computeBudget,
-  getWorldBookBudgetRatio,
 } from './tokenBudget.js';
+import {
+  buildChatContext,
+  buildFinalMessages,
+} from './chatContext.js';
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -243,71 +243,25 @@ export async function generateProactiveMessage(character, extraContext = {}, cus
 - 不要使用"你好"之类过于通用的开场
 - 直接输出你要说的话，不要添加任何前缀或说明`;
 
-  const rawMessages = [
-    ...systemMessages,
-    { role: 'user', content: instruction },
-  ];
-
   const modelName = settings?.modelName;
-  const tbEnabled = settings.tokenBudget?.enabled !== false;
-  const wbBudgetRatio = getWorldBookBudgetRatio();
 
-  let worldBookBudget;
-  let systemBudgetOverride;
-  {
-    const rawBudget = computeBudget(modelName);
-    const rawSystemBudget = rawBudget.breakdown.system;
-    worldBookBudget = Math.floor(rawSystemBudget * wbBudgetRatio);
-    systemBudgetOverride = tbEnabled ? rawSystemBudget - worldBookBudget : undefined;
-  }
+  const context = buildChatContext({ character, userMessage: '', conversation: null });
 
-  const budgetResult = fitContextByBudget({
-    modelName,
+  const {
+    finalMessages,
+    fullSystem,
+  } = await buildFinalMessages({
     systemMessages,
     historyMessages: [],
     userMessage: '',
     summary: '',
-    systemBudgetOverride,
-  });
-
-  const messagesForAPI = [
-    ...budgetResult.systemKept.map(m => ({ role: 'system', content: m.content })),
-    { role: 'user', content: instruction },
-  ];
-
-  const context = {
+    modelName,
+    settings,
     character,
-    emotionState: character.emotionState,
-    bodyState: character.bodyState,
-    user: {
-      ...(settings.user || { name: '用户' }),
-      message: '',
-    },
-    conversation: null,
-    ...timeCtx,
-  };
-
-  let finalMessages = [];
-  let fullSystem = '';
-  try {
-    const result = await applyInjection(messagesForAPI, context, { worldBookBudget });
-    fullSystem = result
-      .filter(msg => msg.role === 'system')
-      .map(msg => msg.content)
-      .join('\n\n');
-    finalMessages = result.filter(msg => msg.role !== 'system');
-  } catch (e) {
-    console.warn('[Proactive] 注入器执行失败，使用降级方案:', e);
-    const degradedSystemMsgs = messagesForAPI
-      .filter(msg => msg.role === 'system')
-      .map(msg => msg.content)
-      .filter(c => c && c.trim());
-    fullSystem = [
-      character.systemPrompt || '',
-      ...degradedSystemMsgs,
-    ].filter(Boolean).join('\n\n');
-    finalMessages = messagesForAPI.filter(msg => msg.role !== 'system');
-  }
+    context,
+    mode: 'split',
+    trailingUserMessage: instruction,
+  });
 
   if (isDebugEnabled()) {
     console.log(`\n%c💬 [开场白/主动消息] 注入内容 (角色: ${character.name})`, 'font-size:14px;font-weight:bold;color:#6c5ce7;');

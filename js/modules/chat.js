@@ -4,7 +4,6 @@ import { getAppState } from '../core/state.js';
 import { generateUUID } from '../core/utils.js';
 import { sendChatRequest } from '../core/api.js';
 import { getCurrentCharacter, syncCharacterState, updateCharacter } from './character.js';
-import { applyInjection } from './injector.js';
 import { showToast } from '../ui/components/toast.js';
 import { getStores } from '../core/db.js';
 import {
@@ -17,17 +16,12 @@ import {
   updateConversationWithLock,
 } from './conversation.js';
 import { searchMemories, addMemory } from './memory.js';
-import { syncTime, getTimeContext, getGameTime } from './time.js';
+import { syncTime, getGameTime } from './time.js';
 import { ensureFirstMessage } from './firstMessage.js';
-import {
-  classifyUserMessage,
-  handleInteraction,
-  buildEmotionPrompt,
-} from './emotionEngine.js';
+import { buildEmotionPrompt } from './emotionEngine.js';
 import {
   tryWakeUp,
   getSleepRefusalMessage,
-  handleBodyEvent,
   buildBodyPrompt,
 } from './bodyState.js';
 import * as chatUI from '../ui/screens/chatUI.js';
@@ -37,13 +31,17 @@ import globalEventBus from '../core/eventBus.js';
 import { analyzeAndBuildTransition, coordinateColdPrompt } from './transitionDecider.js';
 import { buildCrossDayPrompt } from './crossDayAwareness.js';
 import {
-  fitContextByBudget,
   systemMsg,
   PRIORITY,
   formatBudgetReport,
-  computeBudget,
   getWorldBookBudgetRatio,
 } from './tokenBudget.js';
+import {
+  buildChatContext,
+  buildFinalMessages,
+  applyEngineEffects,
+  buildSocialContext,
+} from './chatContext.js';
 
 class SenderState {
   constructor(convId) {
@@ -307,7 +305,6 @@ export async function sendMessage(content) {
     const settings = state.get('settings') || {};
     // 是否启用 LLM 仲裁由 settings.emotionPerception.useLLMArbiter 决定，
     // 分类器内部自行读取，此处无需传参
-    const analysis = await classifyUserMessage(content);
 
     const now = getGameTime();
     const lastInteraction = character.lastInteraction?.gameTime || now;
@@ -328,49 +325,8 @@ export async function sendMessage(content) {
       { skipReload: true }
     );
 
-    if (analysis.type !== 'neutral') {
-      await handleInteraction(character, analysis.type, analysis.intensity);
-    }
-
-    // 情绪事件 → 体感事件。体感引擎只认 praise/criticism/care/funny/intimate/neglect 六种，
-    // 新增的情绪类别按「生理反应最接近」的原则归并：
-    //   gratitude / reassurance 都与「被照顾」的放松感同源 → care
-    //   teasing 是愉悦刺激 → funny
-    //   rejection 的生理损耗接近被否定 → criticism
-    // rival_affection 与 complaint 属关系/认知层面，不产生直接生理反应，故不映射。
-    const bodyEventMap = {
-      'praise': 'praise',
-      'criticism': 'criticism',
-      'care': 'care',
-      'funny': 'funny',
-      'intimate': 'intimate',
-      'neglect': 'neglect',
-      'gratitude': 'care',
-      'reassurance': 'care',
-      'teasing': 'funny',
-      'rejection': 'criticism',
-    };
-    if (bodyEventMap[analysis.type]) {
-      await handleBodyEvent(character, bodyEventMap[analysis.type], analysis.intensity);
-    }
-
-
-    try {
-      const { checkAndApplyInjury } = await import('./injuryEngine.js');
-      const injured = await checkAndApplyInjury(character, content.trim());
-
-      if (injured) {
-        await syncCharacterState(character.id);
-        const appState = getAppState();
-        const charList = appState.get('characters') || [];
-        const latestChar = charList.find(c => c.id === character.id);
-        if (latestChar) {
-          character = latestChar;
-        }
-      }
-    } catch (e) {
-      console.warn('[Chat] 受伤检查失败:', e);
-    }
+    // 情感/身体状态更新与受伤检查（审计 P1-6：抽为共享单元，原逻辑不变）
+    character = await applyEngineEffects({ character, userMessage: content });
 
     const stores = await getStores();
     const convData = await stores.conversations.get(convId);
@@ -468,84 +424,42 @@ export async function sendMessage(content) {
     }
 
     const modelName = settings?.modelName;
-    const tbEnabled = settings.tokenBudget?.enabled !== false;
-    const wbBudgetRatio = getWorldBookBudgetRatio();
 
-    let worldBookBudget;
-    let systemBudgetOverride;
-
-    if (tbEnabled) {
-      const rawBudget = computeBudget(modelName);
-      const rawSystemBudget = rawBudget.breakdown.system;
-      worldBookBudget = Math.floor(rawSystemBudget * wbBudgetRatio);
-      systemBudgetOverride = rawSystemBudget - worldBookBudget;
-    } else {
-      const rawBudget = computeBudget(modelName);
-      worldBookBudget = Math.floor(rawBudget.breakdown.system * wbBudgetRatio);
-      systemBudgetOverride = undefined;
+    // 朋友圈回流（审计 P2-7）：让角色在聊天时「看到」好友近期的动态与评论
+    try {
+      const socialPrompt = await buildSocialContext(character);
+      if (socialPrompt) {
+        systemMessages.push(systemMsg(socialPrompt, 'social', PRIORITY.MEMORY));
+      }
+    } catch (e) {
+      console.warn('[Chat] 朋友圈上下文构建失败:', e);
     }
 
-    const budgetResult = fitContextByBudget({
-      modelName,
+    const context = buildChatContext({ character, userMessage: content, conversation: convData });
+
+    const {
+      finalMessages,
+      worldBookBudget,
+      budgetStats,
+    } = await buildFinalMessages({
       systemMessages,
       historyMessages,
       userMessage: '',
       summary,
-      systemBudgetOverride,
+      modelName,
+      settings,
+      character,
+      context,
+      mode: 'preserve',
     });
 
-    console.log(formatBudgetReport(budgetResult.stats));
+    console.log(formatBudgetReport(budgetStats));
 
     if (typeof window !== 'undefined') {
-      window.__lastBudgetStats = budgetResult.stats;
+      window.__lastBudgetStats = budgetStats;
     }
 
-    console.log(`[Chat] 世界书预算: ${worldBookBudget} tokens (原始系统预算 ${budgetResult.stats.systemBudget + (systemBudgetOverride !== undefined ? worldBookBudget : 0)} × ${wbBudgetRatio})`);
-
-    let messagesForAPI = [
-      ...budgetResult.systemKept.map(m => ({ role: 'system', content: m.content })),
-      ...budgetResult.historyKept,
-    ];
-
-    const timeContext = getTimeContext();
-
-    const context = {
-      character,
-      emotionState: character.emotionState,
-      bodyState: character.bodyState,
-      user: {
-        ...(state.get('settings')?.user || { name: '用户' }),
-        message: content,
-      },
-      conversation: convData,
-      ...timeContext,
-    };
-
-    let finalMessages = [];
-    try {
-      const result = await applyInjection(messagesForAPI, context, { worldBookBudget });
-      console.log('[Chat] 注入后消息数:', result.length);
-      finalMessages = result;
-    } catch (e) {
-      console.warn('[Chat] 注入器执行失败，使用降级方案:', e);
-
-      const degradedSystemMsgs = messagesForAPI
-        .filter(msg => msg.role === 'system')
-        .map(msg => msg.content)
-        .filter(content => content && content.trim());
-
-      const degradedSystem = [
-        character.systemPrompt || '',
-        ...degradedSystemMsgs,
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-
-      finalMessages = [
-        ...(degradedSystem ? [{ role: 'system', content: degradedSystem }] : []),
-        ...messagesForAPI.filter(msg => msg.role !== 'system'),
-      ];
-    }
+    console.log(`[Chat] 世界书预算: ${worldBookBudget} tokens (原始系统预算 ${budgetStats.systemBudget + worldBookBudget} × ${getWorldBookBudgetRatio()})`);
 
     const sender = new SenderState(convId);
     sender.abortController = new AbortController();

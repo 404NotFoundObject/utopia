@@ -53,7 +53,7 @@ tests/
 │   ├── importmap-alias.test.js
 │   ├── core/                # state / utils
 │   ├── lib/                 # api-adapter / event-bus-core
-│   ├── modules/             # tokenBudget / sceneRegistry / profileDefaults / emotionClassifier / characterAdapter
+│   ├── modules/             # tokenBudget / sceneRegistry / profileDefaults / emotionClassifier / characterAdapter / chatContext
 │   ├── ui/                  # 主题预设与视图状态机（微信主题）
 │   ├── pwa.test.js          # PWA 资源完整性（manifest / SW / 接线）
 │   └── utils/               # png
@@ -73,7 +73,7 @@ tests/
     └── wechat-theme.spec.js     # 桌面/移动端按视口自动 skip
 ```
 
-当前规模：**Vitest 21 个文件 / 471 例，E2E 4 个 spec / 30 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，按视口自动跳过不适用用例）。
+当前规模：**Vitest 22 个文件 / 479 例，E2E 4 个 spec / 30 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，按视口自动跳过不适用用例）。
 
 ---
 
