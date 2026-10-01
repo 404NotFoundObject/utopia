@@ -163,6 +163,10 @@ function startWebSpeech(options, language, continuous) {
   if (!recognition) {
     recognition = initSpeechRecognition();
     if (!recognition) {
+      // 不支持语音识别时，必须回调 onError（并标记失败），
+      // 让调用方的 startListeningLoop 能感知并停止无限重启（审计 P2-2）
+      const err = new Error('浏览器不支持语音识别');
+      if (onErrorCallback) onErrorCallback(err.message, err);
       showToast('浏览器不支持语音识别，请使用 Chrome/Edge 等浏览器', 'error');
       return;
     }

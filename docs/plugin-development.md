@@ -282,6 +282,11 @@ export default {
 
 `ui.js` 运行在主线程，用于操作 DOM、注册槽位、绑定热键等。它是**可选的**——如果插件无界面需求，可以省略。
 
+> ⚠️ **信任边界（重要）**
+> `ui.js` 运行在主线程，可以直接访问 `document` / `window` / `localStorage` / `fetch` 以及同源 IndexedDB（`UtopiaDB`）。它**不受 `permissions` 声明约束**——`permissions` 只 gate Worker 侧 `api.*` 的 RPC 调用，无法限制 `ui.js` 直接调用浏览器 API。
+> 因此 **`ui.js` 等同于完全信任代码**：安装来源不明的插件时，其 `ui.js` 有能力读取或篡改你的全部本地数据。请只安装可信来源的插件；如需限制界面操作，请在 `ui.js` 中仅通过 `uiApi.api`（带权限校验的代理）访问应用能力，而不是直接操作全局对象。
+> 同理，Worker 侧的「线程隔离」并非安全沙箱——`fetch` / `WebSocket` / 同源 IndexedDB 均在 Worker 作用域内，插件可绕过 `self.api` 直接打开数据库。
+
 ### 导出契约
 
 ```js

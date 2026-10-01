@@ -589,7 +589,7 @@ export async function handleBodyEvent(character, eventType, intensity = 0.5) {
     case 'criticism':
       state.energy -= 10 * intensity / Math.max(0.5, profile.constitution * 1.5);
       if (Math.random() < 0.3 * intensity * (2 - profile.constitution)) {
-        state.specialStates.push('萎靡');
+        if (!state.specialStates.includes('萎靡')) state.specialStates.push('萎靡');
       }
       break;
     case 'care':
@@ -614,6 +614,11 @@ export async function handleBodyEvent(character, eventType, intensity = 0.5) {
     default:
       break;
   }
+
+  // 事件驱动路径统一 clamp 到 0–100，避免与时间驱动路径不一致导致漂出（审计 P2-12）
+  state.energy = Math.max(0, Math.min(100, state.energy));
+  state.health = Math.max(0, Math.min(100, state.health));
+
   state.lastUpdate = getGameTime();
   await updateCharacter(character.id, { bodyState: state }, { skipReload: true });
 }

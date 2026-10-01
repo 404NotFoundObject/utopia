@@ -12,7 +12,7 @@ import { buildBodyPrompt } from '../../modules/bodyState.js';
 import { getTimeContext, getGameTime } from '../../modules/time.js';
 import { showToast } from '../components/toast.js';
 import { speak, stop as stopTTS, isSpeaking } from '../../services/ttsService.js';
-import { startListening, stopListening, getFinalTranscript, resetTranscript, isCurrentlyListening } from '../../services/sttService.js';
+import { startListening, stopListening, getFinalTranscript, resetTranscript, isCurrentlyListening, isSpeechSupported } from '../../services/sttService.js';
 import globalEventBus from '../../core/eventBus.js';
 
 import { applyInjection } from '../../modules/injector.js';
@@ -470,6 +470,13 @@ async function acceptCall(call) {
 async function startListeningLoop(call) {
   if (!call.isActive || !call.shouldContinue) {
     console.log('[通话] 通话已结束，停止监听循环');
+    return;
+  }
+  // 浏览器不支持语音识别时直接停止，避免 onError 无限重启（审计 P2-2）
+  if (!isSpeechSupported) {
+    console.warn('[通话] 浏览器不支持语音识别，停止监听循环');
+    updateCallStatus(call, CALL_STATE.PROCESSING, '⚠️ 当前浏览器不支持语音识别');
+    call._sttStarting = false;
     return;
   }
   if (call.state === CALL_STATE.PROCESSING) {

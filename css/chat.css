@@ -148,7 +148,7 @@
 }
 #messageInput:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 .send-btn {
   width: 44px;
@@ -161,11 +161,11 @@
   justify-content: center;
   transition: all var(--transition-fast);
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 .send-btn:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.4);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 .send-btn:active:not(:disabled) {
   transform: scale(0.92);
@@ -416,7 +416,7 @@
 
 .code-block .code-copy-btn:hover {
   color: var(--color-primary);
-  background: rgba(108, 92, 231, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .code-block .code-copy-btn.copied {

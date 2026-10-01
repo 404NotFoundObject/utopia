@@ -63,10 +63,10 @@
   border-left: 3px solid transparent;
 }
 .character-item:hover {
-  background: rgba(108, 92, 231, 0.06);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
 }
 .character-item.active {
-  background: rgba(108, 92, 231, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   border-left-color: var(--color-primary);
 }
 .character-item .avatar {
@@ -109,7 +109,7 @@
 }
 .character-item .item-actions .icon-btn:hover {
   color: var(--color-primary);
-  background: rgba(108, 92, 231, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 .character-item .item-actions .delete-btn:hover {
   color: var(--color-danger);
@@ -135,7 +135,7 @@
   color: var(--color-text-secondary);
 }
 .sidebar-btn:hover {
-  background: rgba(108, 92, 231, 0.06);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
   color: var(--color-primary);
 }
 .sidebar-btn i {
@@ -210,7 +210,7 @@
     cursor: pointer;
   }
   .sidebar-footer .sidebar-btn-row .sidebar-btn:hover {
-    background: rgba(108, 92, 231, 0.08);
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
     color: var(--color-primary);
   }
   .sidebar-footer .sidebar-btn-row .sidebar-btn:active {
