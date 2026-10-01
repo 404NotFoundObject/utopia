@@ -29,6 +29,7 @@ const rendererRegistry = new Map();
 
 let observer = null;
 let isStarted = false;
+let fallbackInterval = null;
 
 // ============================================================
 // 槽位注册
@@ -201,8 +202,8 @@ export function startUIRuntime() {
 
   if (typeof MutationObserver === 'undefined') {
     console.warn('[UIRuntime] 当前环境不支持 MutationObserver');
-    // 降级：定期扫描
-    setInterval(() => processNode(document.body), 1000);
+    // 降级：定期扫描（审计 P2-24：记录句柄，供 stopUIRuntime 清理）
+    fallbackInterval = setInterval(() => processNode(document.body), 1000);
     return;
   }
 
@@ -234,6 +235,10 @@ export function stopUIRuntime() {
   if (observer) {
     observer.disconnect();
     observer = null;
+  }
+  if (fallbackInterval) {
+    clearInterval(fallbackInterval);
+    fallbackInterval = null;
   }
   isStarted = false;
 }

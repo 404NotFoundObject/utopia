@@ -1627,8 +1627,11 @@ registerCommand('call', async (args, context) => {
       consoleType: 'error',
     };
   }
+  // 审计 P3-8：关掉身体引擎后，残留的 sleepStatus 不应再挡住通话；
+  // 且「昏厥」在 bodyState 中记为 consciousness，而非 sleepStatus（原判断是死代码）。
+  const bodyStateEnabled = (state.get('settings')?.engineFlags?.bodyState) !== false;
   const sleepStatus = char.bodyState?.sleepStatus;
-  if (sleepStatus === '深睡' || sleepStatus === '浅睡' || sleepStatus === '昏厥') {
+  if (bodyStateEnabled && (sleepStatus === '深睡' || sleepStatus === '浅睡')) {
     return {
       banner: `😴 ${char.name} 正在睡觉，无法通话`,
       console: `😴 ${char.name} 正在睡觉，无法通话`,

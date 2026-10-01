@@ -1,23 +1,32 @@
 // 模态框组件
 import { escapeHtml } from '../../core/utils.js';
 
-const overlay = document.getElementById('modalOverlay');
-const content = document.getElementById('modalContent');
+// 审计 P2-23：不在模块加载期捕获 DOM（壳重建后旧引用会静默失效），
+// 改为每次调用时惰性获取。
+function getOverlay() {
+  return document.getElementById('modalOverlay');
+}
+function getContent() {
+  return document.getElementById('modalContent');
+}
 
 let _overlayClickHandler = null;
 let _onCloseCallback = null;
 
 function _attachOverlayHandler() {
   _detachOverlayHandler();
+  const overlay = getOverlay();
+  if (!overlay) return;
   _overlayClickHandler = (e) => {
-    if (e.target === overlay) closeModal();
+    if (e.target === getOverlay()) closeModal();
   };
   overlay.addEventListener('click', _overlayClickHandler);
 }
 
 function _detachOverlayHandler() {
   if (_overlayClickHandler) {
-    overlay.removeEventListener('click', _overlayClickHandler);
+    const overlay = getOverlay();
+    if (overlay) overlay.removeEventListener('click', _overlayClickHandler);
     _overlayClickHandler = null;
   }
 }
@@ -43,6 +52,10 @@ function _fireOnCloseCallback() {
 export function openModal(htmlContent, onClose) {
   _fireOnCloseCallback();
 
+  const overlay = getOverlay();
+  const content = getContent();
+  if (!overlay || !content) return;
+
   content.innerHTML = htmlContent;
   overlay.classList.remove('hidden');
   _attachOverlayHandler();
@@ -56,7 +69,8 @@ export function openModal(htmlContent, onClose) {
 }
 
 export function closeModal() {
-  overlay.classList.add('hidden');
+  const overlay = getOverlay();
+  if (overlay) overlay.classList.add('hidden');
   _detachOverlayHandler();
   _fireOnCloseCallback();
 }

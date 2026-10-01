@@ -73,7 +73,7 @@ tests/
     └── wechat-theme.spec.js     # 桌面/移动端按视口自动 skip
 ```
 
-当前规模：**Vitest 23 个文件 / 489 例，E2E 4 个 spec / 30 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，按视口自动跳过不适用用例）。
+当前规模：**Vitest 24 个文件 / 508 例，E2E 4 个 spec / 30 例**（chromium 与 mobile-chrome 两个 project 各跑一遍，按视口自动跳过不适用用例）。
 
 ---
 

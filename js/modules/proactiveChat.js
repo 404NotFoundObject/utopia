@@ -58,7 +58,9 @@ export function getEligibleCharacters(characters) {
 
   return characters.filter(char => {
     const sleepStatus = char.bodyState?.sleepStatus;
-    if (sleepStatus === '深睡' || sleepStatus === '浅睡' || sleepStatus === '昏厥') return false;
+    // 审计 P3-8：bodyState 从不产生 sleepStatus==='昏厥'（昏厥记在 consciousness），
+    // 移除死分支，只拦真实睡眠状态。
+    if (sleepStatus === '深睡' || sleepStatus === '浅睡') return false;
 
     const last = char.lastInteraction;
     if (!last) return true;

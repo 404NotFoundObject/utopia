@@ -171,7 +171,7 @@ Worker 隔离、钩子系统（before / after / error）、UI 槽位系统、方
 
 ### 🧪 自动化测试
 
-- **Vitest**：23 个文件 / 489 个用例，覆盖纯逻辑单元、DOM 组件（含 XSS 转义）、存储与引擎集成
+- **Vitest**：24 个文件 / 508 个用例，覆盖纯逻辑单元、DOM 组件（含 XSS 转义）、存储与引擎集成
 - **Playwright E2E**：覆盖应用冷启动、数据库 schema 恢复、情绪识别接线、微信主题，在真实浏览器中验证桌面与移动两个视口
 - 见 [TESTING.md](TESTING.md)
 

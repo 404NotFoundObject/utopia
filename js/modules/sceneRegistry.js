@@ -248,7 +248,12 @@ export const SCENE_REGISTRY = {
  * @returns {Object} 场景定义，若不存在返回 unknown
  */
 export function getSceneDef(type) {
-  return SCENE_REGISTRY[type] || SCENE_REGISTRY.unknown;
+  const def = SCENE_REGISTRY[type] || SCENE_REGISTRY.unknown;
+  // 注入 type 字段，供调用方按类型（而非可变的中文 label）做判断
+  if (def && !def.type) {
+    def.type = type || 'unknown';
+  }
+  return def;
 }
 
 /**

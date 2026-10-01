@@ -242,6 +242,18 @@ function fitSystemMessagesDropLowest(messages, budget) {
       } else {
         dropped.push({ ...msg, tokens, reason: 'no_budget_left_for_undroppable' });
       }
+    } else if (msg.tag === 'memory') {
+      // 审计 P2-19：长期记忆是「一条消息」，超预算时不再整块丢弃，
+      // 而是按条目裁剪保留头部（记忆检索结果已按相关性排序，头部最相关）。
+      const remaining = budget - usedTokens;
+      if (remaining > MIN_TOKENS_PER_MESSAGE) {
+        const truncated = truncateMemoryEntries(msg.content, remaining);
+        const keptTokens = estimateTokens(truncated);
+        kept.push({ ...msg, content: truncated, tokens: keptTokens, truncated: true });
+        usedTokens += keptTokens;
+      } else {
+        dropped.push({ ...msg, tokens, reason: 'over_budget' });
+      }
     } else {
       dropped.push({ ...msg, tokens, reason: 'over_budget' });
     }
@@ -519,6 +531,44 @@ function truncateToTokens(text, maxTokens) {
   }
 
   return text.slice(0, cutPoint) + '...';
+}
+
+/**
+ * 按「条目」裁剪长期记忆，保留头部条目直到逼近预算。
+ * 记忆条目形如 `[1] 您曾问："..."`，以行首 `[数字]` 或换行分隔。
+ * 审计 P2-19：长期记忆是一条消息，超预算时应逐条裁剪而非整块丢弃。
+ */
+export function truncateMemoryEntries(text, maxTokens) {
+  if (!text) return '';
+  if (estimateTokens(text) <= maxTokens) return text;
+
+  // 头部说明行（如「【长期记忆】以下是…」）始终保留
+  const lines = text.split('\n');
+  if (lines.length <= 1) return truncateToTokens(text, maxTokens);
+
+  // 找到第一条「条目」起始行（匹配 `[数字]` 前缀）
+  const firstEntryIdx = lines.findIndex(l => /^\s*\[\d+\]/.test(l));
+  const headerLines = firstEntryIdx > 0 ? lines.slice(0, firstEntryIdx) : [];
+  const headerText = headerLines.join('\n');
+  const headerTokens = estimateTokens(headerText);
+  const entryBudget = Math.max(0, maxTokens - headerTokens);
+
+  // 逐条累加，直到逼近预算
+  let result = headerText;
+  let used = headerTokens;
+  for (let i = firstEntryIdx > 0 ? firstEntryIdx : 0; i < lines.length; i++) {
+    const lineTokens = estimateTokens(lines[i]);
+    if (used + lineTokens > maxTokens) break;
+    result += (result ? '\n' : '') + lines[i];
+    used += lineTokens;
+  }
+
+  // 若一条都没保留（预算极小），退化为 token 级截断
+  if (result === headerText && entryBudget > 0) {
+    return truncateToTokens(text, maxTokens);
+  }
+
+  return result;
 }
 
 // ============================================================

@@ -68,7 +68,7 @@ function toFiniteNumber(v) {
 // ============================================================
 // 模型能力检测
 // ============================================================
-function getModelCapabilities(modelName) {
+export function getModelCapabilities(modelName) {
   const lower = (modelName || '').toLowerCase();
   const caps = {
     temperature: true,
@@ -79,19 +79,28 @@ function getModelCapabilities(modelName) {
     repetition_penalty: true,
   };
 
-  if (/^o[134](?:-|$|\b)/.test(lower)) {
+  // 推理模型：不支持采样参数（temperature/top_p/penalties/top_k）。
+  // 覆盖 OpenAI o 系列、DeepSeek reasoner/r1、Qwen thinking、GLM reasoning、
+  // 以及带版本号/日期后缀的变体（如 o4-mini-2026-xx、deepseek-reasoner-v3.1）。
+  // 审计 P2-14：原硬编码正则只认 o[134] 与 claude-4，漏掉新推理模型 → 发 sampling 参数 → 400。
+  const reasoningPatterns = [
+    /^o[0-9]+(?:[a-z]*)?(?:[-_.][0-9a-z.-]*)*$/i,            // o1/o3/o4/o4-mini/o4-mini-2026-xx-xx
+    /(?:^|[-_.])(?:o1|o3|o4)(?:[-_.]|$)/i,                    // 任意位置带 o1/o3/o4 标识
+    /deepseek[-_.]?(?:reasoner|r1)/i,                          // deepseek-reasoner / deepseek-r1 / deepseek_r1
+    /(?:reasoner|reasoning|thinking|think)/i,                  // 通用推理标识
+    /qwen[0-9.]*[-_.]?(?:qwq|max|thinking)/i,                  // qwen-qwq / qwen-max-thinking
+    /glm[-_.]?[0-9.]*[-_.]?(?:reasoning|thinking)/i,           // glm reasoning/thinking
+    /claude[-_.]?(?:3[-_.]?7|4)/i,                             // claude 3.7+ / claude 4 系列
+    /gpt[-_.]?5/i,                                             // gpt-5（推理模型）
+  ];
+
+  if (reasoningPatterns.some(re => re.test(lower))) {
     caps.temperature = false;
     caps.top_p = false;
     caps.frequency_penalty = false;
     caps.presence_penalty = false;
-    console.log(`[API] 检测到推理模型 "${modelName}"，禁用采样参数（temperature/top_p/penalties）`);
-  }
-
-  if (/claude-4/.test(lower)) {
-    caps.temperature = false;
-    caps.top_p = false;
     caps.top_k = false;
-    console.log(`[API] 检测到 Claude 4 系列 "${modelName}"，禁用 temperature/top_p/top_k`);
+    console.log(`[API] 检测到推理模型 "${modelName}"，禁用采样参数（temperature/top_p/penalties/top_k）`);
   }
 
   return caps;

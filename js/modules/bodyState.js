@@ -520,7 +520,10 @@ export function getWakeChance(character, callCount = 1) {
   let base = 0.3;
   if (state.sleepStatus === '浅睡') base *= 1.8;
   else if (state.sleepStatus === '深睡') base *= 0.4;
-  base += Math.min(callCount, 5) * 0.08;
+  // 审计 P3-9：原「磨到醒」——反复叫从 0.3 爬到 0.7，深睡也几乎会被磨醒。
+  // 改为深睡下 callCount 加成减半，让「深睡难醒」更名副其实，浅睡仍可快速唤醒。
+  const callCountBonus = Math.min(callCount, 5) * 0.08;
+  base += (state.sleepStatus === '深睡' ? callCountBonus * 0.5 : callCountBonus);
   base *= (1 + extraversion * 0.15);
   base *= (1 - neuroticism * 0.1);
   base *= (1 + agreeableness * 0.1);
@@ -791,6 +794,9 @@ export function buildBodyPrompt(character) {
 
   } else if (state.sleepStatus === '深睡') {
     // ---------- 夜间深睡 ----------
+    // 审计 P3-7 说明：此分支在「单聊」路径不可达（单聊发消息前会 tryWakeUp，
+    // 成功→变浅睡，失败→直接 return 拒绝），但在群聊 / 通话 / 自主对话 / 首消息
+    // 等「不经过 tryWakeUp」的路径中可达。保留此分支，勿当作死代码删除。
     let depthHint;
     if (sleepiness > 90 && energy < 20) {
       depthHint = '你睡得很沉，几乎要再次滑入梦境。';

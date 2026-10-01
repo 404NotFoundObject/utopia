@@ -531,16 +531,40 @@ function keywordSearch(query, characterId, limit = 5) {
 async function hybridSearch(characterId, query, limit = 5) {
   const keywordResults = keywordSearch(query, characterId, limit * 2);
   const semanticResults = await searchVectors(query, characterId, limit * 2);
-  const merged = [...keywordResults, ...semanticResults];
-  const seen = new Set();
-  const unique = [];
-  for (const doc of merged) {
-    if (!seen.has(doc.id)) {
-      seen.add(doc.id);
-      unique.push(doc);
-    }
-  }
-  return unique.slice(0, limit);
+
+  // 审计 P2-1：原实现是「拼接」而非「融合」——关键词结果全部排前，
+  // limit=5 时只要关键词 ≥5 条，语义结果 100% 被砍掉。
+  // 改为 RRF（Reciprocal Rank Fusion）：两路结果按各自排名打分累加，
+  // 两路都命中的记忆排最前，同时保证语义结果也有机会进入前 limit。
+  const K = 60;
+  const fused = new Map();
+
+  const accumulate = (results, weight = 1) => {
+    results.forEach((doc, rank) => {
+      const id = doc && doc.id;
+      if (id == null) return;
+      const score = weight * (1 / (K + rank + 1));
+      const existing = fused.get(id);
+      if (existing) {
+        existing.score += score;
+        // 保留字段更全的一份（关键词结果含 includeFields 字段）
+        if (existing.doc.userMessage == null && doc.userMessage != null) {
+          existing.doc = doc;
+        }
+      } else {
+        fused.set(id, { doc, score });
+      }
+    });
+  };
+
+  accumulate(keywordResults);
+  accumulate(semanticResults);
+
+  const merged = [...fused.values()]
+    .sort((a, b) => b.score - a.score)
+    .map(entry => entry.doc);
+
+  return merged.slice(0, limit);
 }
 
 // ============================================================

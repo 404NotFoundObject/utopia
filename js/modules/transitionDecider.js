@@ -559,12 +559,12 @@ function getSpecialRules(strategy, sceneDef, decision) {
   const rules = [];
 
   if (sceneDef.sensitivity === 'high') {
-    if (sceneDef.label === '亲密') {
+    if (sceneDef.type === 'intimate') {
       rules.push(`【亲密场景特殊规则】`);
       rules.push(`绝对不要假装刚才还在进行亲密互动。`);
       rules.push(`不要主动提起上次的亲密细节，除非用户先提。`);
       rules.push(`用日常语气接住用户的新发言。`);
-    } else if (sceneDef.label === '争执') {
+    } else if (sceneDef.type === 'conflict') {
       rules.push(`【冲突场景特殊规则】`);
       rules.push(`争执的情绪会残留。不要假装什么都没发生。`);
       rules.push(`如果用户友好，可以慢慢缓和；如果用户若无其事，可以有点小情绪。`);

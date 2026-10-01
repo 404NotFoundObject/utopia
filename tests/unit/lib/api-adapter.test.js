@@ -85,6 +85,41 @@ describe('lib/api-adapter/adapters · 非流式响应归一', () => {
     expect(req.stream).toBeUndefined();
     expect(req.model).toBeUndefined();
   });
+
+  it('cohere v1 流式 text-generation 映射为 delta', () => {
+    const adapter = createAdapter(cohereConfig);
+    const chunk = adapter.adaptStreamChunk({ event_type: 'text-generation', text: '你好' });
+    expect(chunk.choices[0].delta.content).toBe('你好');
+  });
+
+  it('cohere v2 命名事件 content-delta 映射为 delta（审计 P2-17）', () => {
+    const adapter = createAdapter(cohereConfig);
+    const chunk = adapter.adaptStreamChunk(
+      { type: 'content-delta', delta: { message: { content: { text: '你好' } } } },
+      { event: 'content-delta' }
+    );
+    expect(chunk.choices[0].delta.content).toBe('你好');
+  });
+
+  it('cohere v2 message-end 携带 usage 且无内容 delta', () => {
+    const adapter = createAdapter(cohereConfig);
+    const chunk = adapter.adaptStreamChunk(
+      { type: 'message-end', delta: { usage: { input_tokens: 10, output_tokens: 5 } } },
+      { event: 'message-end' }
+    );
+    expect(chunk.usage).toBeDefined();
+    expect(chunk.choices).toEqual([]);
+  });
+
+  it('cohere v2 tool-call 命名事件透传为 toolCall 块', () => {
+    const adapter = createAdapter(cohereConfig);
+    const chunk = adapter.adaptStreamChunk(
+      { type: 'tool-call-start', id: 'tc1' },
+      { event: 'tool-call-start' }
+    );
+    expect(chunk.toolCall).toBeDefined();
+    expect(chunk.choices).toEqual([]);
+  });
 });
 
 describe('lib/api-adapter/utils · safeJsonParse', () => {

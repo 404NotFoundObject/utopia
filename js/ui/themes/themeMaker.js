@@ -211,11 +211,27 @@ export function openThemeMaker(options = {}) {
 }
 
 function onModalClose() {
+  // 审计 P2-21：关闭时立即中止在途委托（否则 controller 只在「下次打开」时才 abort，
+  // 取消后委托监听仍活在 #modalContent 上）。
+  if (_abortController) {
+    try { _abortController.abort(); } catch (_) {}
+    _abortController = null;
+  }
+
   if (_keepCurrent) {
     // 保存流程：保留当前 :root
     return;
   }
-  // 取消 / 关闭：恢复打开前的主题
+
+  // 取消 / 关闭：恢复打开前的主题。
+  // 先移除编辑期写入的所有变量键（含导入/新增的原主题没有的键），
+  // 再应用原主题——否则「取消时恢复原始 :root」只部分成立。
+  if (_editingTheme && _editingTheme.variables) {
+    for (const key of Object.keys(_editingTheme.variables)) {
+      _root.style.removeProperty(key);
+    }
+  }
+
   if (_originalThemeId) {
     applyTheme(_originalThemeId);
   }

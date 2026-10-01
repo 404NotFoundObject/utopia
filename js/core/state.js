@@ -13,6 +13,8 @@ export function createState(initialState = {}) {
       if (val === undefined || val === null) return undefined;
       val = val[p];
     }
+    // 注意：返回的是「活引用」（非深拷贝）。调用方若需快照请自行复制，
+    // 直接修改返回值会污染全局状态。审计 P2-26 已知此项，属有意设计权衡。
     return val;
   };
 
@@ -88,13 +90,30 @@ export function createState(initialState = {}) {
     if (!listeners.has(path)) listeners.set(path, new Set());
     listeners.get(path).add(callback);
     return () => {
-      listeners.get(path)?.delete(callback);
+      const set = listeners.get(path);
+      if (!set) return;
+      set.delete(callback);
+      // 审计 P2-26：动态路径下空 Set 不清理会无界增长，删空即移除
+      if (set.size === 0) listeners.delete(path);
     };
+  };
+
+  /**
+   * 取消某个路径（或全部）的所有订阅。
+   * 审计 P2-26：原实现缺失 unsubscribeAll，路径动态时无界增长。
+   * @param {string} [path] - 路径；省略则清理全部监听器。
+   */
+  const unsubscribeAll = (path) => {
+    if (path !== undefined) {
+      listeners.delete(path);
+    } else {
+      listeners.clear();
+    }
   };
 
   const subscribeAll = (callback) => subscribe('*', callback);
 
-  return { get, set, subscribe, subscribeAll };
+  return { get, set, subscribe, subscribeAll, unsubscribeAll };
 }
 
 // 全局状态实例（懒加载）

@@ -1,7 +1,11 @@
 // Toast 提示
 import { escapeHtml } from '../../core/utils.js';
 
-const container = document.getElementById('toastContainer');
+// 审计 P2-23：不在模块加载期捕获 DOM（壳重建后旧引用会静默失效），
+// 改为每次调用时惰性获取。
+function getContainer() {
+  return document.getElementById('toastContainer');
+}
 
 /**
  * 显示 Toast 提示
@@ -11,6 +15,9 @@ const container = document.getElementById('toastContainer');
  *   - type 经过白名单校验，防止 class 注入（如 type="foo\" onclick=\"..."）
  */
 export function showToast(message, type = 'info', duration = 3000) {
+  const container = getContainer();
+  if (!container) return;
+
   const toast = document.createElement('div');
 
   // ★ type 白名单校验

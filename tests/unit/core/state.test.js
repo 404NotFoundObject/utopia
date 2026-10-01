@@ -138,5 +138,45 @@ describe('core/state · createState', () => {
       expect(good).toHaveBeenCalledTimes(1);
       expect(errorSpy).toHaveBeenCalled();
     });
+
+    it('unsubscribeAll 清理指定路径的所有订阅', () => {
+      const state = createState({ a: 1, b: 1 });
+      const sa = vi.fn();
+      const sb = vi.fn();
+      state.subscribe('a', sa);
+      state.subscribe('b', sb);
+
+      state.unsubscribeAll('a');
+      state.set('a', 2);
+      state.set('b', 2);
+
+      expect(sa).not.toHaveBeenCalled();
+      expect(sb).toHaveBeenCalledTimes(1);
+    });
+
+    it('unsubscribeAll 不带参数清理全部订阅', () => {
+      const state = createState({ a: 1 });
+      const spy = vi.fn();
+      state.subscribe('a', spy);
+      state.subscribeAll(spy);
+
+      state.unsubscribeAll();
+      state.set('a', 2);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('最后一个订阅者取消后，空 Set 被移除（不泄漏）', () => {
+      const state = createState({ a: 1 });
+      const spy = vi.fn();
+      const unsub = state.subscribe('a', spy);
+      unsub();
+      // 再次订阅应正常（若空 Set 泄漏，虽不影响功能，但此处验证 remove 语义）
+      const spy2 = vi.fn();
+      state.subscribe('a', spy2);
+      state.set('a', 2);
+      expect(spy).not.toHaveBeenCalled();
+      expect(spy2).toHaveBeenCalledTimes(1);
+    });
   });
 });

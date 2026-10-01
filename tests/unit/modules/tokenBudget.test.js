@@ -8,6 +8,7 @@ import {
   getWorldBookBudgetRatio,
   systemMsg,
   PRIORITY,
+  truncateMemoryEntries,
 } from '../../../js/modules/tokenBudget.js';
 
 describe('modules/tokenBudget', () => {
@@ -214,6 +215,43 @@ describe('modules/tokenBudget', () => {
 
     it('允许显式指定优先级', () => {
       expect(systemMsg('x', 't', PRIORITY.IDENTITY).priority).toBe(100);
+    });
+  });
+
+  describe('truncateMemoryEntries', () => {
+    const header = '【长期记忆】以下是您之前与我的相关对话片段，供参考：';
+    const entry = (i) => `[${i}] 您曾问："问题${i}"\n我回答："回答${i}"`;
+
+    it('预算充足时原样返回', () => {
+      const text = `${header}\n${entry(1)}\n${entry(2)}`;
+      expect(truncateMemoryEntries(text, 10000)).toBe(text);
+    });
+
+    it('超预算时保留头部说明与靠前条目，丢弃靠后条目', () => {
+      const text = `${header}\n${entry(1)}\n${entry(2)}\n${entry(3)}\n${entry(4)}\n${entry(5)}`;
+      // 精确预算：头部 + [1] 完整两条 + [2] 的两条，刚好容不下 [3]
+      const budget =
+        estimateTokens(header) +
+        estimateTokens('[1] 您曾问："问题1"') +
+        estimateTokens('我回答："回答1"') +
+        estimateTokens('[2] 您曾问："问题2"') +
+        estimateTokens('我回答："回答2"');
+      const result = truncateMemoryEntries(text, budget);
+
+      expect(result).toContain(header);
+      expect(result).toContain('[1]');
+      expect(result).toContain('[2]');
+      expect(result).not.toContain('[3]');
+    });
+
+    it('预算极小时退化为 token 级截断而非返回空串', () => {
+      const text = `${header}\n${entry(1)}`;
+      const result = truncateMemoryEntries(text, 10);
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('空串安全返回', () => {
+      expect(truncateMemoryEntries('', 100)).toBe('');
     });
   });
 });
