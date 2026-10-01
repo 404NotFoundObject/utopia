@@ -630,7 +630,7 @@ export async function getEnabledRules(context = null) {
   const all = await getAllRules();
   const groups = await getAllGroups();
   const enabledGroupIds = new Set(groups.filter(g => g.enabled).map(g => g.id));
-  return all.filter(r => {
+  const enabled = all.filter(r => {
     if (!r.enabled) return false;
     if (r.groupId && !enabledGroupIds.has(r.groupId)) return false;
     if (r.scope === 'global') return true;
@@ -641,6 +641,68 @@ export async function getEnabledRules(context = null) {
       return r.scope === `group:${context.groupId}`;
     }
     return false;
+  });
+
+  // 组级语义展开：把「规则组」的互斥 / 动态链 / 父子关系映射到组内规则，
+  // 复用注入器既有的规则级 exclusiveGroup + activateRules/deactivateRules 机制，
+  // 使组级承诺（互斥组、规则链）真正生效（审计 P1-2）。
+  return expandGroupSemantics(enabled, groups);
+}
+
+/**
+ * 将规则组的组级语义展开为规则级字段，供注入器消费。
+ *
+ *   - group.exclusiveGroup           → 组内规则的 exclusiveGroup（同组只触发第一条）
+ *   - group.onTrigger.activateGroups → 组内任一规则触发时，激活目标组的所有规则
+ *   - group.onTrigger.deactivateGroups → 同上，停用目标组的所有规则
+ *   - group.parentGroupId            → 子组规则作为父组规则的激活链（父触发 → 子可用）
+ *
+ * 返回展开后的规则列表（不改动 DB 中的原始规则）。
+ */
+export function expandGroupSemantics(rules, groups) {
+  if (!groups || groups.length === 0) return rules;
+
+  const groupById = new Map(groups.map(g => [g.id, g]));
+  const rulesByGroup = new Map();
+  for (const r of rules) {
+    if (r.groupId) {
+      if (!rulesByGroup.has(r.groupId)) rulesByGroup.set(r.groupId, []);
+      rulesByGroup.get(r.groupId).push(r);
+    }
+  }
+
+  const groupRuleIds = (groupId) => (rulesByGroup.get(groupId) || []).map(r => r.id);
+
+  return rules.map(r => {
+    const group = r.groupId ? groupById.get(r.groupId) : null;
+    if (!group) return r;
+
+    const out = { ...r };
+
+    // 组互斥 → 组内规则共享同一互斥标识
+    if (group.exclusiveGroup && !out.exclusiveGroup) {
+      out.exclusiveGroup = group.exclusiveGroup;
+    }
+
+    // 组动态链 → 展开为目标组的规则 id
+    const activateGroups = group.onTrigger?.activateGroups || [];
+    const deactivateGroups = group.onTrigger?.deactivateGroups || [];
+    const extraActivate = activateGroups.flatMap(groupRuleIds);
+    const extraDeactivate = deactivateGroups.flatMap(groupRuleIds);
+
+    // 父子组：父组触发 → 子组规则可被激活
+    const parentRules = group.parentGroupId ? groupRuleIds(group.parentGroupId) : [];
+
+    if (extraActivate.length || parentRules.length || extraDeactivate.length) {
+      const existingActivate = Array.isArray(out.onTrigger?.activateRules) ? out.onTrigger.activateRules : [];
+      const existingDeactivate = Array.isArray(out.onTrigger?.deactivateRules) ? out.onTrigger.deactivateRules : [];
+      out.onTrigger = {
+        activateRules: [...new Set([...existingActivate, ...extraActivate, ...parentRules])],
+        deactivateRules: [...new Set([...existingDeactivate, ...extraDeactivate])],
+      };
+    }
+
+    return out;
   });
 }
 

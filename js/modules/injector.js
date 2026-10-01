@@ -55,7 +55,7 @@ function expandMacros(rules) {
 // ============================================================
 // 基础规则
 // ============================================================
-function getBaseRules() {
+export function getBaseRules() {
   return [
     {
       id: 'consistency_instruction',

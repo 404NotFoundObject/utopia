@@ -96,6 +96,14 @@ function ensureSchema(db, transaction) {
       createdStores++;
     } else {
       store = transaction.objectStore(storeName);
+
+      // keyPath 不匹配的 store：在「迁移前已读取数据」的前提下，删除并按新主键重建
+      const actualKeyPath = store.keyPath === '' || store.keyPath === undefined ? null : store.keyPath;
+      if (actualKeyPath !== schema.keyPath && _pendingMigrations.has(storeName)) {
+        db.deleteObjectStore(storeName);
+        store = db.createObjectStore(storeName, { keyPath: schema.keyPath });
+        _migratedStoreNames.add(storeName);
+      }
     }
 
     for (const idx of schema.indexes || []) {
@@ -116,6 +124,11 @@ function ensureSchema(db, transaction) {
     console.log('[DB] schema 已对齐，无需变更');
   }
 }
+
+// keyPath 不匹配 store 的「升级前读取」数据缓存：storeName -> 旧记录数组
+const _pendingMigrations = new Map();
+// 本轮 upgrade 中已重建主键的 store 集合
+const _migratedStoreNames = new Set();
 
 // ============================================================
 // Schema 探测
@@ -241,6 +254,12 @@ async function ensureSchemaCompatible(db) {
   const first = inspectSchema(db);
 
   if (first.keyPathMismatches.length > 0) {
+    // 记录级迁移（审计 P1-13）：不再直接删整库，而是先读出旧数据，
+    // 触发 upgrade 重建主键，再把数据无损写回。迁移失败才降级报错。
+    const migrated = await migrateKeyPaths(db, first.keyPathMismatches);
+    if (migrated) {
+      return openDB(); // 迁移完成，重新走一次兼容校验
+    }
     db.close();
     throw makeSchemaMismatchError(first.keyPathMismatches);
   }
@@ -277,6 +296,84 @@ async function ensureSchemaCompatible(db) {
 
   console.log('[DB] schema 自动补全完成，原有数据已保留');
   return repaired;
+}
+
+/**
+ * 记录级迁移主键：对每个 keyPath 不匹配的 store，先读出旧数据并缓存在
+ * _pendingMigrations，关闭旧连接，触发 upgrade（onupgradeneeded 里
+ * deleteObjectStore + createObjectStore 重建主键），再写回缓存的数据。
+ *
+ * 仅当「新 keyPath 字段在旧记录中确实存在」时才无损迁移；
+ * 否则返回 false，交由上层按原逻辑报错（提示用户决策）。
+ */
+async function migrateKeyPaths(db, mismatches) {
+  const records = {};
+  let hasData = false;
+  try {
+    for (const m of mismatches) {
+      const all = await new Promise((resolve, reject) => {
+        const tx = db.transaction(m.store, 'readonly');
+        const req = tx.objectStore(m.store).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+
+      // 空库不做「迁移」——keyPath 不匹配仍是结构错误，交由上层按原逻辑报错
+      if (all.length === 0) {
+        console.warn(`[DB] ${m.store} 无数据，keyPath 不匹配仍视为结构错误`);
+        return false;
+      }
+      // 校验新 keyPath 字段存在
+      if (all.some(r => !(m.expected in r))) {
+        console.warn(`[DB] 无法无损迁移 ${m.store}：部分记录缺少 "${m.expected}" 字段`);
+        return false;
+      }
+      records[m.store] = all;
+      hasData = true;
+    }
+  } catch (e) {
+    console.error('[DB] 迁移前读取失败:', e);
+    return false;
+  }
+
+  if (!hasData) return false;
+
+  // 缓存待迁移数据 + 关闭旧连接 + 抬升版本触发 upgrade
+  for (const [storeName, list] of Object.entries(records)) {
+    _pendingMigrations.set(storeName, list);
+  }
+  db.close();
+
+  const targetVersion = db.version + 1;
+  let upgraded;
+  try {
+    upgraded = await openAtVersion(targetVersion);
+  } catch (e) {
+    _pendingMigrations.clear();
+    throw e;
+  }
+
+  // 写回数据
+  try {
+    for (const [storeName, list] of Object.entries(records)) {
+      await new Promise((resolve, reject) => {
+        const tx = upgraded.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        for (const rec of list) store.put(rec);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    _pendingMigrations.clear();
+    console.log(`[DB] 主键迁移完成，共 ${Object.keys(records).length} 张表数据无损保留`);
+    upgraded.close();
+    return true;
+  } catch (e) {
+    console.error('[DB] 迁移后写回失败:', e);
+    _pendingMigrations.clear();
+    upgraded.close();
+    return false;
+  }
 }
 
 export function openDB() {

@@ -18,6 +18,8 @@ export function detectFormat(data, fileName = '') {
     if (data.schema === 'utopia-character/v3.1') return 'utopia-v3.1';
     if (data.schema === 'utopia-character/v3') return 'utopia-v3';
     if (data.data && data.data.name && data.spec === 'chara_card_v3') return 'st-v3';
+    // ST v2 信封：{ spec: 'chara_card_v2', data: {...} }
+    if (data.spec === 'chara_card_v2' && data.data && data.data.name) return 'st-v2';
     if (data.name && data.description && data.personality !== undefined) return 'st-v2';
     if (data.greeting !== undefined && data.definition !== undefined) return 'cai';
     if (data.name) return 'generic';
@@ -103,7 +105,8 @@ export function convertToUtopia(data, format) {
       base = fromSTV3(data);
       break;
     case 'st-v2':
-      base = fromSTV2(data);
+      // 信封形式 { spec, data } 取 data；裸卡直接用 data
+      base = fromSTV2(data.spec === 'chara_card_v2' && data.data ? data.data : data);
       break;
     case 'cai':
       base = fromCAI(data);
@@ -157,6 +160,9 @@ export function convertToUtopia(data, format) {
     // ★ 透传 profile（可能为 null）
     bodyProfile,
     emotionProfile,
+    // ★ 世界书 / 备用开场白透传（ST 卡往返不丢失，审计 P1-7）
+    characterBook: base.characterBook || null,
+    alternateGreetings: base.alternateGreetings || null,
     lastSentMessageCount: 0,
     lastInteraction: { gameTime: now, realTime: Date.now() },
     dialogueExamples: base.dialogueExamples || '',
@@ -204,13 +210,16 @@ function fromSTV2(data) {
     name: data.name || '',
     description: data.description || '',
     firstMessage: data.first_mes || '',
-    personality: data.personality || '',
+    personality: toPersonalityText(data.personality),
     systemPrompt,
     scene: data.scenario || '',
     dialogueExamples: data.mes_example || '',
     avatar: data.avatar || '',
     bodyProfile,
     emotionProfile,
+    // ★ 世界书（character_book）透传，避免静默丢失（审计 P1-7）
+    characterBook: data.character_book ?? null,
+    alternateGreetings: Array.isArray(data.alternate_greetings) ? data.alternate_greetings : null,
   };
 }
 
@@ -238,14 +247,28 @@ function fromSTV3(data) {
     name: d.name || '',
     description: d.description || '',
     firstMessage: d.first_mes || '',
-    personality: d.personality || '',
+    personality: toPersonalityText(d.personality),
     systemPrompt,
     scene: d.scenario || '',
     dialogueExamples: d.mes_example || '',
     avatar: d.avatar || '',
     bodyProfile,
     emotionProfile,
+    // ★ 世界书（character_book）透传，避免静默丢失（审计 P1-7）
+    characterBook: d.character_book ?? null,
+    alternateGreetings: Array.isArray(d.alternate_greetings) ? d.alternate_greetings : null,
   };
+}
+
+/**
+ * 将 ST personality 字段安全转为字符串，避免对象/数组被隐式转成 `[object Object]`。
+ */
+function toPersonalityText(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.join('\n');
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
 }
 
 /**
@@ -346,8 +369,8 @@ function toSTV3(char) {
       creator: '',
       tags: [],
       post_history_instructions: '',
-      alternate_greetings: [],
-      character_book: null,
+      alternate_greetings: char.alternateGreetings || [],
+      character_book: char.characterBook || null,
       world: null,
       extensions: {
         utopia: {
@@ -377,6 +400,8 @@ function toSTV2(char) {
     avatar: char.avatar || '',
     creator: '',
     tags: '',
+    character_book: char.characterBook || null,
+    alternate_greetings: char.alternateGreetings || [],
     utopia: {
       bodyProfile: char.bodyProfile || null,
       emotionProfile: char.emotionProfile || null,

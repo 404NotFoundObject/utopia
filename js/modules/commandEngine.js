@@ -806,6 +806,21 @@ registerCommand('inspect', async (args, context) => {
 
   lines.push('📋 当前生效的注入规则');
   lines.push(`基础规则 (${baseRules.length} 条): ${baseRules.join(', ')}`);
+
+  // 估算基础注入的 token 量（审计 P1-10：基础注入在预算剪裁之后追加，
+  // 不计入 systemBudget，此处单独标注，避免 /inspect 低估真实请求）
+  try {
+    const { getBaseRules } = await import('./injector.js');
+    const { estimateTokens } = await import('./tokenBudget.js');
+    const realBase = getBaseRules();
+    let baseTokens = 0;
+    for (const r of realBase) {
+      baseTokens += estimateTokens(r.content || '') + 4;
+    }
+    lines.push(`  ℹ️ 基础注入估算约 ${baseTokens} tokens（在预算剪裁后追加，未计入下方「系统提示」预算）`);
+  } catch (_) {
+    // 估算失败不影响主流程
+  }
   lines.push('');
 
   const semanticRules = worldBookRules.filter(r => r.type === 'semantic');

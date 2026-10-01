@@ -5,9 +5,10 @@
  * （更早的构建、或同端口下跑过的其他版本）。这种情况下 onupgradeneeded
  * 不会触发，ensureSchema 也不会执行，因此必须由 openDB 主动探测并处置。
  *
- * 本文件覆盖两类场景：
+ * 本文件覆盖三类场景：
  *   1. 仅缺表/缺索引 —— 应当自动补全（自适应修复，无数据损失）
- *   2. keyPath 不一致 —— 无法无损修复，应当抛出明确错误交由上层提示用户重建
+ *   2. keyPath 不一致（空库/字段缺失）—— 无法无损修复，抛出明确错误交由上层提示用户重建
+ *   3. keyPath 不一致（有数据且字段齐全）—— 记录级迁移，读出旧数据重建主键后写回
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { openDB, getStores, deleteDatabase } from '../../js/core/db.js';
@@ -171,6 +172,58 @@ describe('core/db · schema 失配处理', () => {
         characters: { keyPath: 'id' },
         settings: {},                    // 外置主键
         memories: { keyPath: 'id' },
+      });
+
+      await expect(openDB()).rejects.toThrow(/settings/);
+    });
+  });
+
+  describe('keyPath 不一致但有数据（记录级迁移）', () => {
+    it('有数据且字段齐全时，无损迁移到新主键', async () => {
+      // settings 旧库用错误 keyPath 'key'，且已有一条记录 { id: 'app_settings', ... }
+      await seedLegacyDb({
+        characters: { keyPath: 'id' },
+        settings: { keyPath: 'key' },
+        memories: { keyPath: 'id' },
+      });
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 9);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('settings', 'readwrite');
+          tx.objectStore('settings').add({ id: 'app_settings', key: 'app_settings', apiProvider: 'openai' });
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      const db = await openDB();
+      db.close();
+
+      const { settings } = await getStores();
+      const kept = await settings.get('app_settings');
+      expect(kept).toBeDefined();
+      expect(kept.apiProvider).toBe('openai');
+    });
+
+    it('记录缺少新 keyPath 字段时，不迁移并报错', async () => {
+      await seedLegacyDb({
+        characters: { keyPath: 'id' },
+        settings: { keyPath: 'key' },
+        memories: { keyPath: 'id' },
+      });
+      // 记录里没有 id 字段（只有 key），无法映射到新主键
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 9);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('settings', 'readwrite');
+          tx.objectStore('settings').add({ key: 'some_key', apiProvider: 'openai' });
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
       });
 
       await expect(openDB()).rejects.toThrow(/settings/);
