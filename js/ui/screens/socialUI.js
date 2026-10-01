@@ -180,7 +180,7 @@ function renderPostHtml(post) {
   const authorName = getAuthorName(post.authorId, post.authorType);
   const time = new Date(post.timestamp).toLocaleString();
 
-  const commentsHtml = post.comments.map(c => {
+  const commentsHtml = (Array.isArray(post.comments) ? post.comments : []).map(c => {
     const cAuthor = getAuthorName(c.authorId, c.authorType);
     let repliesHtml = '';
     if (c.replies && c.replies.length > 0) {

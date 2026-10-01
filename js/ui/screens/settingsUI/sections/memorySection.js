@@ -59,7 +59,7 @@ export function renderMemorySection(settings, ctx) {
       <div class="setting-row">
         <label>自动下载模型</label>
         ${ctx.toggleHtml('settingsAutoDownload', settings.autoDownloadModels)}
-        <span class="help-text">若本地无模型，启动时自动下载（需联网）</span>
+        <span class="help-text">若本地无模型，启动时自动下载（需联网）。浏览器下载进缓存；如需服务器侧持久化，请运行 <code>node tools/fetch-model.mjs</code> 将 ONNX 落到 lib/models/</span>
       </div>
       <div class="setting-row">
         <label>记忆检索阈值</label>

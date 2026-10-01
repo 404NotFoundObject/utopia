@@ -1,6 +1,7 @@
 // js/modules/social.js - 朋友圈核心逻辑
 import { getStores, withKeyLock } from '../core/db.js';
 import { generateUUID } from '../core/utils.js';
+import { getAppState } from '../core/state.js';
 import { getGameTime, getGameDate } from './time.js';
 import { sendChatRequest } from '../core/api.js';
 import { searchMemories } from './memory.js';
@@ -11,6 +12,89 @@ let _stores = null;
 async function getS() {
   if (!_stores) _stores = await getStores();
   return _stores;
+}
+
+// ---------- 持久化调度（P2-5：评论/回复的延时任务不再依赖内存 setTimeout，关标签页可重建） ----------
+const SOCIAL_SCHEDULE_KEY = 'social_schedule';
+
+async function _readSchedule() {
+  const stores = await getS();
+  const raw = await stores.time_state.get(SOCIAL_SCHEDULE_KEY);
+  return (raw && Array.isArray(raw.tasks)) ? raw : { tasks: [] };
+}
+
+async function _writeSchedule(schedule) {
+  const stores = await getS();
+  // time_state 用 add 创建、update 覆盖（与 time.js 用法一致）
+  const existing = await stores.time_state.get(SOCIAL_SCHEDULE_KEY);
+  if (existing) await stores.time_state.update(SOCIAL_SCHEDULE_KEY, schedule);
+  else await stores.time_state.add(schedule);
+}
+
+async function _removeScheduleTask(taskId) {
+  const schedule = await _readSchedule();
+  schedule.tasks = schedule.tasks.filter(t => t.id !== taskId);
+  await _writeSchedule(schedule);
+}
+
+/**
+ * 调度一个社交延时任务（生成评论 / 生成回复）。任务先持久化到 time_state，
+ * 再在内存里 setTimeout 执行；执行完成后从持久化表移除。这样即使关掉标签页，
+ * 下次启动 rebuildSocialSchedule 也能捡回未完成的任务。
+ */
+function scheduleSocialTask(type, payload, delayMs) {
+  const id = generateUUID();
+  const dueAt = Date.now() + delayMs;
+  _readSchedule().then((schedule) => {
+    schedule.tasks.push({ id, type, payload, dueAt });
+    return _writeSchedule(schedule);
+  }).catch(err => console.warn('[Social] 持久化调度写入失败（降级为纯内存）:', err));
+
+  const run = async () => {
+    try {
+      if (type === 'generateComments') {
+        await generateCommentsForPost(payload.postId);
+      } else if (type === 'generateReply') {
+        await generateReplyForComment(payload.postId, payload.commentId);
+      }
+    } catch (err) {
+      console.error('[Social] 调度任务执行失败:', err);
+    } finally {
+      _removeScheduleTask(id).catch(() => {});
+    }
+  };
+
+  setTimeout(run, delayMs);
+  return id;
+}
+
+/**
+ * 启动时重建社交调度：捡回上次会话遗留的未完成延时任务。
+ * 已到期的立即执行，未到期的按剩余时间补 setTimeout。
+ */
+export async function rebuildSocialSchedule() {
+  const schedule = await _readSchedule().catch(() => ({ tasks: [] }));
+  if (!schedule.tasks.length) return;
+  const now = Date.now();
+  for (const task of schedule.tasks) {
+    if (!task || !task.type || !task.payload) continue;
+    const delay = Math.max(0, (task.dueAt || now) - now);
+    const run = async () => {
+      try {
+        if (task.type === 'generateComments') {
+          await generateCommentsForPost(task.payload.postId);
+        } else if (task.type === 'generateReply') {
+          await generateReplyForComment(task.payload.postId, task.payload.commentId);
+        }
+      } catch (err) {
+        console.error('[Social] 重建调度任务执行失败:', err);
+      } finally {
+        _removeScheduleTask(task.id).catch(() => {});
+      }
+    };
+    setTimeout(run, delay);
+  }
+  console.log(`[Social] 已重建 ${schedule.tasks.length} 个未完成调度任务`);
 }
 
 // ---------- 生成帖子内容（纯生成，不写 DB） ----------
@@ -83,9 +167,7 @@ export async function publishPostByCharacter(character) {
   };
   await stores.posts.add(post);
   console.log('[Social] 帖子已保存:', post.id);
-  setTimeout(() => {
-    generateCommentsForPost(post.id).catch(console.error);
-  }, 2 * 60 * 1000);
+  scheduleSocialTask('generateComments', { postId: post.id }, 2 * 60 * 1000);
   return post;
 }
 
@@ -104,9 +186,7 @@ export async function publishPostByUser(user, content) {
     comments: [],
   };
   await stores.posts.add(post);
-  setTimeout(() => {
-    generateCommentsForPost(post.id).catch(console.error);
-  }, 2 * 60 * 1000);
+  scheduleSocialTask('generateComments', { postId: post.id }, 2 * 60 * 1000);
   return post;
 }
 
@@ -170,9 +250,7 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
       await stores.posts.update(postId, post);
 
       if (post.authorType === 'character') {
-        setTimeout(() => {
-          generateReplyForComment(postId, comment.id).catch(console.error);
-        }, 1 * 60 * 1000);
+        scheduleSocialTask('generateReply', { postId, commentId: comment.id }, 1 * 60 * 1000);
       }
       return;
     }
@@ -272,12 +350,9 @@ export async function generateCommentsForPost(postId) {
     }
 
     if (post.authorType === 'character' && hasNewComment) {
-      // 注意：这里的 setTimeout 是延时执行，不在当前锁窗口内，安全
       for (const comment of post.comments) {
         if (!comment.replies || comment.replies.length === 0) {
-          setTimeout(() => {
-            generateReplyForComment(post.id, comment.id).catch(console.error);
-          }, 3 * 60 * 1000);
+          scheduleSocialTask('generateReply', { postId: post.id, commentId: comment.id }, 3 * 60 * 1000);
         }
       }
     }
@@ -321,9 +396,7 @@ export async function userCommentPost(postId, content, replyToCommentId = null) 
     await stores.posts.update(postId, post);
 
     if (post.authorType === 'character') {
-      setTimeout(() => {
-        generateReplyForComment(postId, comment.id).catch(console.error);
-      }, 1 * 60 * 1000);
+      scheduleSocialTask('generateReply', { postId, commentId: comment.id }, 1 * 60 * 1000);
     }
   });
 }
@@ -395,15 +468,48 @@ export async function deleteCharacterSocialData(characterId) {
 
 // ---------- 定时检查自动发帖（新建，无冲突） ----------
 export async function checkAutoPost() {
+  const settings = getAppState().get('settings');
+  const socialCfg = settings?.social || {};
+  // 开关：默认开启以保持既有行为，但允许用户在设置里关闭
+  if (socialCfg.enabled === false) return;
+
   const stores = await getS();
   const allCharacters = await stores.characters.getAll();
+
+  // 总量/单角色每日上限：基于「当日游戏日期」统计已自动发帖数
+  const today = getGameDate();
+  const isSameDay = (ts) => {
+    try { return new Date(ts).toDateString() === new Date(today).toDateString(); } catch (_) { return false; }
+  };
+  const todayPosts = (await stores.posts.getAll())
+    .filter(p => p.authorType === 'character' && isSameDay(p.timestamp));
+  const totalToday = todayPosts.length;
+  const maxPerDay = toFiniteNumber(socialCfg.maxPostsPerDay) ?? 5;
+  const maxPerChar = toFiniteNumber(socialCfg.maxPostsPerCharacter) ?? 2;
+  if (totalToday >= maxPerDay) return;
+
+  const baseProbability = toFiniteNumber(socialCfg.autoPostProbability) ?? 0.01;
+  const charCounts = new Map();
+  for (const p of todayPosts) {
+    charCounts.set(p.authorId, (charCounts.get(p.authorId) || 0) + 1);
+  }
+
   for (const char of allCharacters) {
     const hour = new Date(getGameTime()).getHours();
     if (hour >= 22 || hour < 6) continue;
+    if ((charCounts.get(char.id) || 0) >= maxPerChar) continue;
     const valence = char.emotionState?.valence || 0;
-    const probability = 0.03 * (1 + valence / 100);
+    const probability = baseProbability * (1 + valence / 100);
     if (Math.random() < probability) {
       await publishPostByCharacter(char);
+      const n = (charCounts.get(char.id) || 0) + 1;
+      charCounts.set(char.id, n);
+      if (totalToday + n >= maxPerDay) break;
     }
   }
+}
+
+function toFiniteNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }

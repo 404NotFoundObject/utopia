@@ -19,6 +19,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:pwa": "node tools/check-pwa.mjs",
+    "fetch:model": "node tools/fetch-model.mjs",
     "check:smoke": "node tools/smoke-full.mjs",
     "check:crud": "node tools/smoke-crud.mjs",
     "check:all": "npm run test && npm run check:pwa && npm run check:smoke && npm run check:crud && npm run test:e2e"

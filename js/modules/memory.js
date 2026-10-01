@@ -326,9 +326,12 @@ export async function initSemanticEngine(modelId) {
     try {
       const { pipeline, env } = await import('/lib/transformers.min.js');
 
+      // 优先读本地（服务器侧 lib/models/）；若本地不存在，则回退到远程模式，
+      // 使「浏览器端 downloadModel 下载到 Cache 的模型」能被复用，
+      // 避免「下载了却加载不了」的割裂（审计 P1-1 的浏览器侧修复）。
       env.localModelPath = '/lib/models/';
-      env.allowRemoteModels = false;
       env.allowLocalModels = true;
+      env.allowRemoteModels = !(await checkLocalModel(modelId));
 
       try {
         if (env.backends?.onnx?.wasm) {
@@ -339,7 +342,7 @@ export async function initSemanticEngine(modelId) {
       const modelName = modelId.split('/')[1] || modelId;
       const dtype = getEffectiveDtype(modelId);
 
-      console.log(`[Memory] 加载模型: ${modelName} (dtype=${dtype}, device=wasm)`);
+      console.log(`[Memory] 加载模型: ${modelName} (dtype=${dtype}, device=wasm, remote=${env.allowRemoteModels})`);
 
       embedder = await withTimeout(
         pipeline('feature-extraction', modelName, {

@@ -198,6 +198,12 @@ export function getDefaultSettings() {
       cooldownGameHours: 24,
       chanceVoice: 0.3,
     },
+    social: {
+      enabled: true,                 // 朋友圈自动发帖总开关
+      autoPostProbability: 0.01,     // 每次轮询每个角色的发帖概率（默认 1%，原 3%）
+      maxPostsPerDay: 5,             // 每日自动发帖总量上限
+      maxPostsPerCharacter: 2,       // 单角色每日自动发帖上限
+    },
     updatedAt: Date.now(),
   };
 }

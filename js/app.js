@@ -6,7 +6,7 @@ import { setChatContainer } from './modules/chat.js';
 import { updateInjectorRules } from './modules/injector.js';
 import { initMemoryIndex } from './modules/memory.js';
 import { initTime, syncTime, flushToDB as flushTimeToDB } from './modules/time.js';
-import { checkAutoPost } from './modules/social.js';
+import { checkAutoPost, rebuildSocialSchedule } from './modules/social.js';
 import globalEventBus from './core/eventBus.js';
 import { checkDatabase, deleteDatabase, getStores } from './core/db.js';
 import { generateUUID } from './core/utils.js';
@@ -1088,6 +1088,9 @@ async function init() {
   registerInterval(() => {
     checkAutoPost().catch(err => console.warn('[Social] 自动发帖失败:', err));
   }, 600000);
+
+  // 重建上次会话遗留的评论/回复延时调度（P2-5）
+  rebuildSocialSchedule().catch(err => console.warn('[Social] 重建调度失败:', err));
 
   registerInterval(() => {
     const groupId = state.get('currentGroupId');
