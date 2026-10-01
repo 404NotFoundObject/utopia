@@ -77,6 +77,9 @@ function showDbErrorDialog(errorMsg, errorCode) {
       <p style="color: var(--color-text-muted); font-size: 0.9rem;">
         点击下方按钮将<strong style="color: var(--color-danger);">删除所有数据</strong>并重建数据库，此操作不可恢复！
       </p>
+      <p style="color: var(--color-warning); font-size: 0.85rem; margin-top: 0.5rem;">
+        注意：若此前触发过自动迁移，部分数据可能已被清空。删除重建前可先导出备份（若备份功能可用）。
+      </p>
       <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
         <button class="btn btn-danger" id="rebuildDbBtn" style="padding: 0.6rem 2rem;">
           🗑️ 删除并重建

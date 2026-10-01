@@ -482,26 +482,29 @@ export async function updateEmotionByTime(character, hours) {
       //   高 decayMultiplier → 情绪平复更快
       // 用一阶线性衰减的解析解 state *= exp(-k)（k = 衰减速率 × 时长），
       // 避免单步欧拉积分在高倍速（hours 大）下系数 >1 导致的符号翻转。
-      const k = EMOTION_DECAY_RATE * hours * decayFactor * decayMultiplier;
+      let k = EMOTION_DECAY_RATE * hours * decayFactor * decayMultiplier;
+      if (!Number.isFinite(k)) k = 0;   // 防非有限 decayMultiplier 把 NaN 写进 state
       state[dim] *= Math.exp(-k);
     }
   }
 
-  const needDecay = NEEDS_DECAY_RATE * hours * (1 - (factors.conscientiousness || 0.5) * 0.5);
+  // 需求消退：同样用解析解渐近趋近 0，避免大 hours 下线性衰减直接砸到 clamp 地板。
+  let needK = NEEDS_DECAY_RATE * hours * (1 - (factors.conscientiousness || 0.5) * 0.5);
+  if (!Number.isFinite(needK)) needK = 0;
   for (let key in state.needs) {
-    state.needs[key] = Math.max(0, state.needs[key] - needDecay * (1 + (key === 'pleasure' ? 0.5 : 0)));
+    const k = needK * (1 + (key === 'pleasure' ? 0.5 : 0));
+    state.needs[key] *= Math.exp(-k);
   }
 
-  // 好感衰减：受 decayMultiplier 反向影响
-  //   高 decayMultiplier（情绪恢复快）→ 好感也恢复快
-  if (state.affection > 0) {
-    state.affection -= AFFECTION_DECAY_RATE * hours
-      * (1 + (1 - agreeableness) * 0.5)
-      / Math.max(0.3, decayMultiplier);
-  } else if (state.affection < 0) {
-    state.affection += AFFECTION_DECAY_RATE * hours * 0.5
-      / Math.max(0.3, decayMultiplier);
-  }
+  // 好感衰减：改用与六维一致的解析解，趋近 0 而非线性跨零翻转。
+  //   高 decayMultiplier（情绪恢复快）→ 好感也恢复快。
+  //   负值（厌恶）用 0.5× 速率消退，保持「讨厌比喜欢消退更慢」的原始意图。
+  const affectionBaseK = AFFECTION_DECAY_RATE * hours
+    * (1 + (1 - agreeableness) * 0.5)
+    / Math.max(0.3, decayMultiplier);
+  let affectionK = Number.isFinite(affectionBaseK) ? affectionBaseK : 0;
+  if (state.affection < 0) affectionK *= 0.5;
+  state.affection *= Math.exp(-affectionK);
 
   for (const dim of dims) {
     state[dim] = Math.max(-100, Math.min(100, state[dim]));

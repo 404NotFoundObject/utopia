@@ -25,10 +25,19 @@ async function _readSchedule() {
 
 async function _writeSchedule(schedule) {
   const stores = await getS();
-  // time_state 用 add 创建、update 覆盖（与 time.js 用法一致）
-  const existing = await stores.time_state.get(SOCIAL_SCHEDULE_KEY);
-  if (existing) await stores.time_state.update(SOCIAL_SCHEDULE_KEY, schedule);
-  else await stores.time_state.add(schedule);
+  // time_state 的 keyPath 是 'id'，而 add() 不注入主键（store.add(data) 无 id 会抛 DataError）。
+  // 统一用 update()（内部 put({...data, id}) 会正确写入主键），add/update 两种情形都覆盖。
+  await stores.time_state.update(SOCIAL_SCHEDULE_KEY, { tasks: schedule.tasks });
+
+  // 写后读回验证：调度持久化失败会表现为「关标签页丢调度」，必须显式上报而非静默吞掉。
+  try {
+    const readBack = await stores.time_state.get(SOCIAL_SCHEDULE_KEY);
+    if (!readBack || !Array.isArray(readBack.tasks)) {
+      console.warn('[Social] 调度写后读回异常：未读到 tasks 数组');
+    }
+  } catch (err) {
+    console.warn('[Social] 调度写后读回验证失败:', err);
+  }
 }
 
 async function _removeScheduleTask(taskId) {

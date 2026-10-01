@@ -145,36 +145,57 @@ describe('core/db · schema 失配处理', () => {
     });
   });
 
-  describe('keyPath 不一致（无法无损修复）', () => {
-    it('抛出明确错误而不是带着坏库继续运行', async () => {
-      // settings 的主键路径与当前代码不符 —— 这正是仓库里 DataError 的成因
+  describe('keyPath 不一致（空的错配 store 无损重建）', () => {
+    it('空的错配 store 无损重建而非报错（A-2 缺陷③）', async () => {
+      // settings 的主键路径与当前代码不符，但 store 为空 → 重建零风险，应自动修复
       await seedLegacyDb({
         characters: { keyPath: 'id' },
         settings: { keyPath: 'key' },
         memories: { keyPath: 'id' },
       });
 
-      await expect(openDB()).rejects.toThrow(/schema|主键|keyPath/i);
+      const db = await openDB();
+      const tx = db.transaction('settings', 'readonly');
+      expect(tx.objectStore('settings').keyPath).toBe('id');
+      db.close();
     });
 
-    it('错误信息中指出具体是哪张表有问题', async () => {
+    it('空的错配 store 重建后不影响其他有数据 store', async () => {
       await seedLegacyDb({
         characters: { keyPath: 'id' },
-        settings: { keyPath: 'key' },
+        settings: { keyPath: 'key' },   // 空 + keyPath 错配
+        memories: { keyPath: 'id' },
+      });
+      // 写入一条 characters 数据，验证迁移不丢它
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 9);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('characters', 'readwrite');
+          tx.objectStore('characters').add({ id: 'c1', name: '角色', createdAt: 1 });
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      const db = await openDB();
+      db.close();
+      const { characters } = await getStores();
+      expect(await characters.get('c1')).toBeDefined();
+    });
+
+    it('不含 keyPath 的旧库（外置主键）空 store 同样被重建', async () => {
+      await seedLegacyDb({
+        characters: { keyPath: 'id' },
+        settings: {},                    // 外置主键（空）
         memories: { keyPath: 'id' },
       });
 
-      await expect(openDB()).rejects.toThrow(/settings/);
-    });
-
-    it('不含 keyPath 的旧库（外置主键）同样被识别', async () => {
-      await seedLegacyDb({
-        characters: { keyPath: 'id' },
-        settings: {},                    // 外置主键
-        memories: { keyPath: 'id' },
-      });
-
-      await expect(openDB()).rejects.toThrow(/settings/);
+      const db = await openDB();
+      const tx = db.transaction('settings', 'readonly');
+      expect(tx.objectStore('settings').keyPath).toBe('id');
+      db.close();
     });
   });
 

@@ -286,7 +286,8 @@ describe('core/db · 集成', () => {
     });
 
     it('表结构不可读时返回 ok=false 并带上错误码', async () => {
-      // 造一个主键结构不兼容的库
+      // 造一个「有数据但缺少新主键字段」的库：keyPath 错配且记录无 id 字段，
+      // 无法无损迁移，openDB 应抛 SchemaMismatchError。
       await deleteDatabase();
       await new Promise((resolve, reject) => {
         const req = indexedDB.open('UtopiaDB', 9);
@@ -294,7 +295,14 @@ describe('core/db · 集成', () => {
           const db = req.result;
           db.createObjectStore('characters', { keyPath: 'not_id' });
         };
-        req.onsuccess = () => { req.result.close(); resolve(); };
+        req.onsuccess = () => {
+          const db = req.result;
+          // 写入一条不含 id 字段的记录（无法映射到新主键）
+          const tx = db.transaction('characters', 'readwrite');
+          tx.objectStore('characters').add({ name: '无id', not_id: 'x' });
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
         req.onerror = () => reject(req.error);
       });
 

@@ -3,7 +3,9 @@ import {
   detectFormat,
   convertToUtopia,
   convertFromUtopia,
+  extractTextChunk,
 } from '../../../js/modules/characterAdapter.js';
+import { makeSTCharaPng } from '../../helpers/fixtures.js';
 
 describe('characterAdapter · 格式检测', () => {
   it('识别 ST v2 信封 { spec: chara_card_v2, data }', () => {
@@ -78,3 +80,57 @@ describe('characterAdapter · 往返保真（P1-7）', () => {
     expect(exported.data.alternate_greetings).toEqual(['开场白A']);
   });
 });
+
+describe('characterAdapter · PNG 端到端解码（A-1）', () => {
+  it('extractTextChunk 对 chara\\0 + base64 载荷返回解码后的 JSON 字符串', async () => {
+    const card = { spec: 'chara_card_v2', data: { name: '凌川', description: '测试' } };
+    const pngBlob = makeSTCharaPng(JSON.stringify(card));
+    const buf = await pngBlob.arrayBuffer();
+    const text = extractTextChunk(buf);
+    // 必须是解码后的 JSON（可 JSON.parse），而不是 base64 字符串
+    expect(text.startsWith('{')).toBe(true);
+    const parsed = JSON.parse(text);
+    expect(parsed.spec).toBe('chara_card_v2');
+    expect(parsed.data.name).toBe('凌川');
+  });
+
+  it('chara 空格 + 原始 JSON 载荷不 base64 解码，直接返回原文', async () => {
+    const json = JSON.stringify({ name: '小兰', description: '历史明文' });
+    const textData = new TextEncoder().encode('chara ' + json);
+    // 手工拼一个最小 tEXt 块所在的 ArrayBuffer 太繁琐，这里直接测 decode 语义：
+    // 构造一个带 chara 空格 tEXt 的 PNG 用 makeSTCharaPng 变体不可行，改用直接构造
+    // —— 通过公开 extractTextChunk 走真实字节更可靠，下面用内联构造
+    const buf = makePngWithText(new TextEncoder().encode('chara ' + json));
+    const text = extractTextChunk(buf);
+    expect(text).toBe(json);
+    expect(JSON.parse(text).name).toBe('小兰');
+  });
+
+  it('裸 JSON（无 chara 前缀）直接返回原文', async () => {
+    const json = JSON.stringify({ name: '裸JSON' });
+    const buf = makePngWithText(new TextEncoder().encode(json));
+    const text = extractTextChunk(buf);
+    expect(text).toBe(json);
+  });
+});
+
+// 内联构造：在最小 PNG 的 IHDR 后插入指定 tEXt 数据，返回 ArrayBuffer
+function makePngWithText(textBytes) {
+  const base = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  const bin = atob(base);
+  const baseBytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) baseBytes[i] = bin.charCodeAt(i);
+  const insertPos = 8 + 25; // IHDR 结束
+  const chunkLen = 4 + 4 + textBytes.length + 4;
+  const out = new Uint8Array(baseBytes.length + chunkLen);
+  out.set(baseBytes.subarray(0, insertPos), 0);
+  const view = new DataView(out.buffer);
+  view.setUint32(insertPos, textBytes.length);
+  out[insertPos + 4] = 't'.charCodeAt(0);
+  out[insertPos + 5] = 'E'.charCodeAt(0);
+  out[insertPos + 6] = 'X'.charCodeAt(0);
+  out[insertPos + 7] = 't'.charCodeAt(0);
+  out.set(textBytes, insertPos + 8);
+  out.set(baseBytes.subarray(insertPos), insertPos + 8 + textBytes.length + 4);
+  return out.buffer;
+}

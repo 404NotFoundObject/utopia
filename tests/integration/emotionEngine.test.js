@@ -307,6 +307,28 @@ describe('modules/emotionEngine · 集成', () => {
       expect(Math.abs(char.emotionState.arousal)).toBeLessThan(80);
     });
 
+    it('affection 在大 hours 下不符号翻转（A-4）', async () => {
+      const char = await seedCharacter();
+      // 小的正 affection：旧线性欧拉在 hours > ~1600 时会翻负
+      char.emotionState.affection = 2;
+
+      await updateEmotionByTime(char, 576);
+
+      // 解析解向 0 渐近收敛，永远不跨过零点
+      expect(char.emotionState.affection).toBeGreaterThanOrEqual(0);
+      expect(char.emotionState.affection).toBeLessThan(2);
+    });
+
+    it('affection 负值（厌恶）也向 0 收敛，不跨零', async () => {
+      const char = await seedCharacter();
+      char.emotionState.affection = -5;
+
+      await updateEmotionByTime(char, 576);
+
+      expect(char.emotionState.affection).toBeLessThanOrEqual(0);
+      expect(char.emotionState.affection).toBeGreaterThan(-5);
+    });
+
     it('时间跨度为 0 时不产生变化', async () => {
       const char = await seedCharacter();
       const before = { ...char.emotionState };

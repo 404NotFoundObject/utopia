@@ -114,6 +114,21 @@ function ensureSchema(db, transaction) {
     }
   }
 
+  // ★ 审计 A-2：主键迁移的写回必须与 deleteObjectStore/createObjectStore 处于
+  // 同一个 versionchange 事务内。此前是在 upgrade 完成后再开独立 readwrite 事务写回，
+  // 两阶段之间无原子性——写回失败时旧数据已随 deleteObjectStore 消失，却提示「删除并重建」。
+  // 现在在 onupgradeneeded 的同一事务里直接把缓存数据 put 回去：
+  //   - 成功：结构 + 数据一步到位，事务原子提交
+  //   - 失败：整个 versionchange 事务回滚，旧 store 及其数据原样保留，无数据丢失
+  for (const storeName of _migratedStoreNames) {
+    const records = _pendingMigrations.get(storeName);
+    if (!records) continue;
+    const s = transaction.objectStore(storeName);
+    for (const rec of records) {
+      s.put(rec);
+    }
+  }
+
   if (createdStores > 0) {
     console.log(`[DB] 创建了 ${createdStores} 个 store`);
   }
@@ -308,7 +323,6 @@ async function ensureSchemaCompatible(db) {
  */
 async function migrateKeyPaths(db, mismatches) {
   const records = {};
-  let hasData = false;
   try {
     for (const m of mismatches) {
       const all = await new Promise((resolve, reject) => {
@@ -318,27 +332,25 @@ async function migrateKeyPaths(db, mismatches) {
         req.onerror = () => reject(req.error);
       });
 
-      // 空库不做「迁移」——keyPath 不匹配仍是结构错误，交由上层按原逻辑报错
+      // ★ 审计 A-2 缺陷③：空的错配 store 同样应无损重建（重建是零风险的），
+      // 不再因「无数据」而走报错路径。
       if (all.length === 0) {
-        console.warn(`[DB] ${m.store} 无数据，keyPath 不匹配仍视为结构错误`);
-        return false;
+        records[m.store] = [];
+        continue;
       }
-      // 校验新 keyPath 字段存在
-      if (all.some(r => !(m.expected in r))) {
-        console.warn(`[DB] 无法无损迁移 ${m.store}：部分记录缺少 "${m.expected}" 字段`);
+      // 校验新 keyPath 字段确实存在且非空（null/undefined 无法作为主键，put 会抛 DataError）
+      if (all.some(r => !(m.expected in r) || r[m.expected] === null || r[m.expected] === undefined)) {
+        console.warn(`[DB] 无法无损迁移 ${m.store}：部分记录缺少或为空的 "${m.expected}" 字段`);
         return false;
       }
       records[m.store] = all;
-      hasData = true;
     }
   } catch (e) {
     console.error('[DB] 迁移前读取失败:', e);
     return false;
   }
 
-  if (!hasData) return false;
-
-  // 缓存待迁移数据 + 关闭旧连接 + 抬升版本触发 upgrade
+  // 缓存待迁移数据（含空 store，用于重建后写回空集）+ 关闭旧连接 + 抬升版本触发 upgrade
   for (const [storeName, list] of Object.entries(records)) {
     _pendingMigrations.set(storeName, list);
   }
@@ -353,27 +365,13 @@ async function migrateKeyPaths(db, mismatches) {
     throw e;
   }
 
-  // 写回数据
-  try {
-    for (const [storeName, list] of Object.entries(records)) {
-      await new Promise((resolve, reject) => {
-        const tx = upgraded.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        for (const rec of list) store.put(rec);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    }
-    _pendingMigrations.clear();
-    console.log(`[DB] 主键迁移完成，共 ${Object.keys(records).length} 张表数据无损保留`);
-    upgraded.close();
-    return true;
-  } catch (e) {
-    console.error('[DB] 迁移后写回失败:', e);
-    _pendingMigrations.clear();
-    upgraded.close();
-    return false;
-  }
+  // ★ 审计 A-2：写回已移到 ensureSchema（onupgradeneeded 的同一 versionchange 事务内），
+  // 此处不再有独立的写回阶段。upgrade 成功即意味着结构 + 数据已原子提交。
+  _pendingMigrations.clear();
+  _migratedStoreNames.clear();
+  console.log(`[DB] 主键迁移完成，共 ${Object.keys(records).length} 张表数据无损保留`);
+  upgraded.close();
+  return true;
 }
 
 export function openDB() {
