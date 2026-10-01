@@ -50,7 +50,16 @@ describe('core/api · getModelCapabilities（审计 P2-14）', () => {
 
   it('Qwen qwq / GLM reasoning 禁用采样参数', () => {
     expect(getModelCapabilities('qwen-qwq').temperature).toBe(false);
+    expect(getModelCapabilities('qwq-32b').temperature).toBe(false);
     expect(getModelCapabilities('glm-4-reasoning').temperature).toBe(false);
+  });
+
+  it('qwen-max 等非推理模型不误判（保持采样参数）', () => {
+    // 回归：原正则 qwen[0-9.]*[-_.]?(?:qwq|max|thinking) 会误伤 qwen-max /
+    // qwen2.5-max（它们接受 temperature），导致采样参数被静默剥离、文风改变。
+    for (const m of ['qwen-max', 'qwen2.5-max', 'qwen-plus', 'qwen-turbo']) {
+      expect(getModelCapabilities(m).temperature, m).toBe(true);
+    }
   });
 
   it('claude 3.7 / 4 系列禁用采样参数', () => {

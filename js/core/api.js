@@ -88,7 +88,8 @@ export function getModelCapabilities(modelName) {
     /(?:^|[-_.])(?:o1|o3|o4)(?:[-_.]|$)/i,                    // 任意位置带 o1/o3/o4 标识
     /deepseek[-_.]?(?:reasoner|r1)/i,                          // deepseek-reasoner / deepseek-r1 / deepseek_r1
     /(?:reasoner|reasoning|thinking|think)/i,                  // 通用推理标识
-    /qwen[0-9.]*[-_.]?(?:qwq|max|thinking)/i,                  // qwen-qwq / qwen-max-thinking
+    /(?:^|[-_.])qwq(?:[-_.]|[0-9]|$)/i,                        // qwq 系列（含无 qwen 前缀的 qwq / qwq-32b）
+    /qwen[0-9.]*[-_.]?(?:qwq|thinking)/i,                      // qwen-qwq / qwen*-thinking
     /glm[-_.]?[0-9.]*[-_.]?(?:reasoning|thinking)/i,           // glm reasoning/thinking
     /claude[-_.]?(?:3[-_.]?7|4)/i,                             // claude 3.7+ / claude 4 系列
     /gpt[-_.]?5/i,                                             // gpt-5（推理模型）
