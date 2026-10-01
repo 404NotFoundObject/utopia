@@ -2,7 +2,7 @@
 import { getStores } from '../core/db.js';
 import { getAppState } from '../core/state.js';
 import { sendChatRequest } from '../core/api.js';
-import { getGameTime } from './time.js';
+import { calculateActiveLevel } from './groupActivity.js';
 import { syncCharacterState } from './character.js';
 import { getTempParams } from '../core/runtimeParams.js';
 import { extractMentionNames } from './mentionUtils.js';
@@ -362,21 +362,6 @@ ${otherNames.length > 0 ? `- 其他成员：${otherNames.join('、')}。可以 @
   } catch (e) {
     console.warn('[GroupEngine] 自主发言生成失败:', e);
   }
-}
-
-function calculateActiveLevel(members) {
-  if (!members || members.length === 0) return '正常';
-  const now = getGameTime();
-  const activeThreshold = 5 * 60 * 1000;
-  const activeCount = members.filter(m => {
-    const lastActive = m.lastActiveAt || 0;
-    return now - lastActive < activeThreshold;
-  }).length;
-  const ratio = activeCount / members.length;
-  if (ratio > 0.7) return '活跃';
-  if (ratio > 0.4) return '正常';
-  if (ratio > 0.2) return '低活跃';
-  return '冷清';
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

@@ -2,7 +2,7 @@
 // 增强版：添加重试机制、音色分组、有效性检查
 
 import { getAppState } from '../core/state.js';
-import { showToast } from '../ui/components/toast.js';
+// 审计 P3-6：showToast 原在此 import 但从未使用，已移除。
 
 // ---------- 配置 ----------
 const TTS_MAX_RETRIES = 3;
@@ -17,7 +17,7 @@ let currentUtterance = null;
 let currentAudioContext = null;
 let currentAudioSource = null;
 let isPlaying = false;
-let onEndCallbacks = [];
+// 审计 P3-6：onEndCallbacks 原为死变量（仅声明、从未 push/读取），已移除。
 
 // 审计 P2-3：追踪在途的 Kokoro fetch 与 Web Speech 重试 timer，
 // 使 stop() 能真正取消尚未完成的合成/重试，而非等它返回后再播放。

@@ -321,16 +321,19 @@ ul, ol {
 }
 
 /* ============================================================
-   全局过渡增强（所有可变化属性平滑过渡）
+   全局过渡（仅主题切换相关的颜色类属性）
+   ============================================================
+   审计 P3-3：原实现给 * 挂了 transform / opacity / background-image 等
+   重属性过渡，流式输出时文字节点与气泡持续参与过渡（移动端掉帧），且
+   transform 会与微交互 scale 叠加、与 [data-theme] 的过渡重复。
+   这里只保留主题切换真正需要的 background-color / color / border-color /
+   box-shadow，其余重属性交由各组件自带的精细过渡处理。
    ============================================================ */
 * {
   transition: background-color var(--transition-base),
               color var(--transition-base),
               border-color var(--transition-base),
-              box-shadow var(--transition-base),
-              opacity var(--transition-base),
-              transform var(--transition-base),
-              background-image var(--transition-base);
+              box-shadow var(--transition-base);
 }
 
 /* ============================================================

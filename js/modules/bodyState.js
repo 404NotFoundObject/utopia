@@ -15,8 +15,7 @@ const ENERGY_DECAY_RATE = 2;
 const SLEEPINESS_INCREASE_RATE = 3;
 const HEALTH_DECAY_RATE = 0.5;
 const RECOVERY_RATE_SLEEP = 8;
-const RECOVERY_RATE_REST = 3;
-const MIN_SLEEP_HOURS = 6;
+// 审计 P3-6：RECOVERY_RATE_REST / MIN_SLEEP_HOURS 为死常量（仅声明、从未读取），已删除。
 
 // ============================================================
 // 引擎开关
@@ -152,16 +151,20 @@ export function getInitialBodyState(gameTime, personality) {
 }
 
 // ---------- 获取当前时段 ----------
+// 审计 P3-5：清晨边界与 time.js 的 getPeriod 统一为 5–8（原为 6–8），
+// 消除「5:00–6:00 时段划分不一致」的漂移。
+// 注：本模块沿用「午间」命名（区别于 time.js 的「中午」），因 bodyState
+// 内部多处字符串判断依赖「午间」，二者各自自洽，仅此处边界需对齐。
 function getTimePeriod() {
   const date = getGameDate();
   const hour = date.getHours();
-  if (hour >= 6 && hour < 8) return '清晨';
+  if (hour >= 5 && hour < 8) return '清晨';
   if (hour >= 8 && hour < 12) return '上午';
   if (hour >= 12 && hour < 14) return '午间';
   if (hour >= 14 && hour < 18) return '下午';
   if (hour >= 18 && hour < 20) return '傍晚';
   if (hour >= 20 && hour < 23) return '夜晚';
-  if (hour >= 23 || hour < 6) return '深夜';
+  if (hour >= 23 || hour < 5) return '深夜';
   return '其他';
 }
 

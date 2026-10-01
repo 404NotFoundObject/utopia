@@ -86,22 +86,88 @@ async function fetchNetworkTime() {
 // ============================================================
 // ★ 核心：从存储状态做离线推进（基于本地时间）
 // ============================================================
+
+/**
+ * 分段积分：把一段真实时间按速度变更历史拆成多段累加游戏时长。
+ *
+ * 审计 P2-13：原实现用关闭时的单一 `state.speed` 乘整段离线时长，丢失了
+ * 用户在离线期间对倍速的修改（例如关闭时 1x、重开前已改 48x → 整段按 48x 推进）。
+ * 这里改为按 `speedHistory`（按时间升序）分段：每段用「该时段生效的速度」× 该段时长。
+ *
+ * @param {number} fromReal - 段起始真实时间戳（ms）
+ * @param {number} toReal   - 段结束真实时间戳（ms）
+ * @param {Array<{speed:number, at:number}>} speedHistory - 速度变更历史，`at` 为真实时间戳，升序
+ * @param {number} currentSpeed - 当前速度（`fromReal` 起、直到第一条变更前生效的速度）
+ * @returns {number} 推进的游戏时长（ms）
+ */
+export function computeSegmentedAdvance(fromReal, toReal, speedHistory = [], currentSpeed = 1) {
+  if (toReal <= fromReal) return 0;
+
+  // 只取落在 (fromReal, toReal] 内的变更点，并按时间升序
+  const changes = (speedHistory || [])
+    .filter(c => c && c.at > fromReal && c.at <= toReal)
+    .sort((a, b) => a.at - b.at);
+
+  let advance = 0;
+  let cursor = fromReal;
+  let speed = currentSpeed;
+
+  for (const change of changes) {
+    advance += (change.at - cursor) * speed;
+    cursor = change.at;
+    // 脏数据兜底：speed 缺失/非法时保持上一段速度，避免 NaN 污染 gameTime
+    const next = change.speed;
+    if (typeof next === 'number' && Number.isFinite(next) && next > 0) {
+      speed = next;
+    }
+  }
+  advance += (toReal - cursor) * speed;
+  return advance;
+}
+
+/**
+ * 在速度变更前把「旧速度段的结束时间」记入历史，供后续分段积分使用。
+ * 时间戳基于真实时间；`state.speedHistory` 会被裁剪到最近 N 条，避免无限增长。
+ */
+function recordSpeedChange(state) {
+  const now = Date.now();
+  if (!Array.isArray(state.speedHistory)) state.speedHistory = [];
+  state.speedHistory.push({ speed: state.speed, at: now });
+  // 只保留最近 32 条变更，足够覆盖一次长离线内的频繁调速
+  if (state.speedHistory.length > 32) {
+    state.speedHistory = state.speedHistory.slice(-32);
+  }
+  return state;
+}
+
+/**
+ * 推进后清理已过期的速度历史（早于当前真实时间的条目无意义，且会污染下次积分）。
+ */
+function pruneSpeedHistory(state, cutoffReal) {
+  if (Array.isArray(state.speedHistory)) {
+    state.speedHistory = state.speedHistory.filter(c => c && c.at > cutoffReal);
+  }
+  return state;
+}
+
 function applyOfflineAdvance(state, reason = 'init') {
   const localNow = Date.now();
   const localLast = state.localRealTime || state.realTime || localNow;
   const offlineDelta = Math.max(0, localNow - localLast);
 
   if (offlineDelta > 1000 && !state.paused) {   // 至少 1 秒才算
-    const gameAdvance = offlineDelta * state.speed;
+    // 分段积分：速度按离线期间的变更历史分段，而非用单一当前速度乘整段
+    const gameAdvance = computeSegmentedAdvance(localLast, localNow, state.speedHistory, state.speed);
     state.gameTime += gameAdvance;
     const minutes = (offlineDelta / 1000 / 60).toFixed(1);
     const gameMinutes = (gameAdvance / 1000 / 60).toFixed(1);
-    console.log(`[Time] 离线推进 (${reason})：现实 ${minutes} 分钟 × ${state.speed}x = 游戏 ${gameMinutes} 分钟`);
+    console.log(`[Time] 离线推进 (${reason})：现实 ${minutes} 分钟 × 分段倍速 = 游戏 ${gameMinutes} 分钟`);
   }
 
   state.localRealTime = localNow;
   state.realTime = localNow;
   state.lastUpdate = localNow;
+  pruneSpeedHistory(state, localNow);
   return state;
 }
 
@@ -170,6 +236,7 @@ export async function initTime() {
       localRealTime: now,
       networkRealTime: null,
       speed: DEFAULT_SPEED,
+      speedHistory: [],
       paused: false,
       lastUpdate: now,
     };
@@ -266,11 +333,12 @@ export async function syncTime() {
   const networkNow = await fetchNetworkTime();
 
   if (networkNow === null) {
-    // ★ 网络时间失败时，用本地时间推进
+    // ★ 网络时间失败时，用本地时间推进（分段倍速）
     if (localDelta > 1000 && !timeState.paused) {
-      timeState.gameTime += localDelta * timeState.speed;
+      const gameAdvance = computeSegmentedAdvance(localLast, localNow, timeState.speedHistory, timeState.speed);
+      timeState.gameTime += gameAdvance;
       const minutes = (localDelta / 1000 / 60).toFixed(1);
-      console.log(`[Time] 网络时间失败，仅用本地时间推进 ${minutes} 分钟 (x${timeState.speed})`);
+      console.log(`[Time] 网络时间失败，仅用本地时间推进 ${minutes} 分钟（分段倍速）`);
     }
   } else {
     // 网络时间成功：用网络时间差校准（更精确）
@@ -284,9 +352,10 @@ export async function syncTime() {
     }
 
     if (effectiveDelta > 1000 && !timeState.paused) {
-      timeState.gameTime += effectiveDelta * timeState.speed;
+      const gameAdvance = computeSegmentedAdvance(localLast, localNow, timeState.speedHistory, timeState.speed);
+      timeState.gameTime += gameAdvance;
       const minutes = (effectiveDelta / 1000 / 60).toFixed(1);
-      console.log(`[Time] 网络同步推进 ${minutes} 分钟 (x${timeState.speed})`);
+      console.log(`[Time] 网络同步推进 ${minutes} 分钟（分段倍速）`);
     }
 
     timeState.networkRealTime = networkNow;
@@ -295,6 +364,7 @@ export async function syncTime() {
   timeState.localRealTime = localNow;
   timeState.realTime = localNow;
   timeState.lastUpdate = localNow;
+  pruneSpeedHistory(timeState, localNow);
   await stores.time_state.update(TIME_STATE_ID, timeState);
 
   cachedGameTime = timeState.gameTime;
@@ -345,6 +415,10 @@ export async function setTimeSpeed(speed) {
     throw new Error(`时间流速必须在 ${MIN_SPEED} 到 ${MAX_SPEED} 之间`);
   }
   await syncTime();
+  // 审计 P2-13：记录「旧速度段的结束时间」，供离线/同步推进做分段积分
+  if (speed !== timeState.speed) {
+    recordSpeedChange(timeState);
+  }
   timeState.speed = speed;
   cachedSpeed = speed;
   await stores.time_state.update(TIME_STATE_ID, timeState);

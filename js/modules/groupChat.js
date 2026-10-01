@@ -3,6 +3,7 @@ import { getStores, withKeyLock } from '../core/db.js';
 import { getAppState } from '../core/state.js';
 import { generateUUID } from '../core/utils.js';
 import { getGameTime } from './time.js';
+import { calculateActiveLevel } from './groupActivity.js';
 import { GroupChatEngine } from './groupChatEngine.js';
 import { sendChatRequest } from '../core/api.js';
 import { syncCharacterState } from './character.js';
@@ -80,21 +81,6 @@ const _summaryLocks = new Set();
 /**
  * 计算群组活跃度
  */
-function calculateActiveLevel(members) {
-  if (!members || members.length === 0) return '正常';
-  const now = getGameTime();
-  const activeThreshold = 5 * 60 * 1000;
-  const activeCount = members.filter(m => {
-    const lastActive = m.lastActiveAt || 0;
-    return now - lastActive < activeThreshold;
-  }).length;
-  const ratio = activeCount / members.length;
-  if (ratio > 0.7) return '活跃';
-  if (ratio > 0.4) return '正常';
-  if (ratio > 0.2) return '低活跃';
-  return '冷清';
-}
-
 function getConversationStateSettings() {
   const settings = getAppState().get('settings') || {};
   const cs = settings.conversationState || {};
