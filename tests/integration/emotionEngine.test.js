@@ -285,9 +285,26 @@ describe('modules/emotionEngine · 集成', () => {
       await updateEmotionByTime(char, 10);
 
       // decayFactor = 1 - 0.5 * 0.3 = 0.85；decayMultiplier = 1.0
-      // 新值 = 旧值 + (0 - 旧值) * 0.02 * 10 * 0.85
-      const expected = before + (0 - before) * 0.02 * 10 * 0.85;
+      // 一阶线性衰减解析解：新值 = 旧值 * exp(-0.02 * 10 * 0.85)
+      const k = 0.02 * 10 * 0.85;
+      const expected = before * Math.exp(-k);
       expect(char.emotionState.valence).toBeCloseTo(expected, 6);
+    });
+
+    it('高倍速（大 hours）下不符号翻转，收敛到 0', async () => {
+      const char = await seedCharacter();
+      // 给一个明确的非零值，确保可观察
+      char.emotionState.valence = 80;
+      char.emotionState.arousal = -80;
+
+      // 8x 倍速关闭 3 天 ≈ 576 游戏小时，旧实现单步欧拉系数 ≈ 9.8 会翻转符号
+      await updateEmotionByTime(char, 576);
+
+      // 解析解永远向 0 收敛，绝不跨过零点
+      expect(char.emotionState.valence).toBeGreaterThanOrEqual(0);
+      expect(char.emotionState.arousal).toBeLessThanOrEqual(0);
+      expect(Math.abs(char.emotionState.valence)).toBeLessThan(80);
+      expect(Math.abs(char.emotionState.arousal)).toBeLessThan(80);
     });
 
     it('时间跨度为 0 时不产生变化', async () => {

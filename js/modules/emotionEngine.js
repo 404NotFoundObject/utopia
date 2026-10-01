@@ -480,9 +480,10 @@ export async function updateEmotionByTime(character, hours) {
     if (state[dim] !== undefined) {
       // ★ 衰减速率乘以 decayMultiplier
       //   高 decayMultiplier → 情绪平复更快
-      state[dim] += (0 - state[dim]) * EMOTION_DECAY_RATE * hours
-        * decayFactor
-        * decayMultiplier;
+      // 用一阶线性衰减的解析解 state *= exp(-k)（k = 衰减速率 × 时长），
+      // 避免单步欧拉积分在高倍速（hours 大）下系数 >1 导致的符号翻转。
+      const k = EMOTION_DECAY_RATE * hours * decayFactor * decayMultiplier;
+      state[dim] *= Math.exp(-k);
     }
   }
 

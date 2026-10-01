@@ -567,6 +567,7 @@ export async function testSemanticMatch(text, context = null) {
   const currentModel = getCurrentVectorModelId();
   const settings = getAppState().get('settings') || {};
   const globalThreshold = toFiniteNumber(settings.worldBookSemantic?.threshold) ?? DEFAULT_SEMANTIC_THRESHOLD;
+  const globalTopK = toFiniteNumber(settings.worldBookSemantic?.topK) ?? 5;
 
   const scores = [];
   for (const rule of semanticRules) {
@@ -586,10 +587,18 @@ export async function testSemanticMatch(text, context = null) {
       score: sim,
       semanticQuery: rule.semanticQuery,
       threshold: threshold,
+      // 与生产 matchSemanticRules 一致：仅阈值以上才可能被注入
+      aboveThreshold: sim >= threshold,
     });
   }
 
   scores.sort((a, b) => b.score - a.score);
+  // 对齐生产 topK 截断：只有前 globalTopK 个且超过阈值的规则会真正注入
+  let injectBudget = globalTopK;
+  for (const item of scores) {
+    item.wouldInject = item.aboveThreshold && injectBudget > 0;
+    if (item.wouldInject) injectBudget -= 1;
+  }
   return scores;
 }
 

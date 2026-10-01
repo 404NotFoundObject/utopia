@@ -78,6 +78,8 @@
   --radius-xl: 16px;
   --radius-2xl: 24px;
   --radius-full: 9999px;
+  /* 圆形控件专用：固定 50%，不随主题的 --radius-full 覆盖而变方 */
+  --radius-circle: 50%;
 
   /* ---- 间距 ---- */
   --spacing-xs: 0.25rem;
@@ -296,7 +298,7 @@ input, textarea, select {
 }
 input:focus, textarea:focus, select:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 textarea {
   resize: vertical;

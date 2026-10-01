@@ -252,7 +252,7 @@ export function renderMarkdownStream(text, isComplete = false) {
 // 代码块复制按钮的事件委托
 // ============================================================
 
-let copyHandlerAttached = false;
+const boundContainers = new WeakSet();
 
 /**
  * 初始化代码块复制按钮的事件委托
@@ -260,11 +260,14 @@ let copyHandlerAttached = false;
  * 应在应用启动时调用一次。之后所有动态插入的代码块，
  * 只要在指定容器内，点击复制按钮都会自动生效。
  *
+ * 每个容器只绑定一次（WeakSet 去重）；若容器被替换（如 #chatMessages 重建），
+ * 新容器会被重新绑定，避免复制功能静默失效。
+ *
  * @param {HTMLElement} container - 事件委托的根容器（如 #chatMessages）
  */
 export function initCodeCopyHandler(container) {
-  if (copyHandlerAttached || !container) return;
-  copyHandlerAttached = true;
+  if (!container || boundContainers.has(container)) return;
+  boundContainers.add(container);
 
   container.addEventListener('click', async (e) => {
     const btn = e.target.closest('.code-copy-btn');

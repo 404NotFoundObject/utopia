@@ -271,6 +271,7 @@ export function createUiApi(pluginId, manifest) {
     // 通用模块加载器（绕过 Blob URL 限制）
     // ============================================================
     loadModule: async (path) => {
+      requirePermission('ui:inject');
       if (typeof path !== 'string' || !path) {
         throw new Error('loadModule: path 必须是非空字符串');
       }
