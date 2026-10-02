@@ -15,7 +15,7 @@ vi.mock('../../../js/core/runtimeParams.js', () => ({
   getEffectiveParams: vi.fn(() => ({})),
 }));
 
-import { getModelCapabilities } from '../../../js/core/api.js';
+import { getModelCapabilities, buildGoogleStreamUrl } from '../../../js/core/api.js';
 
 describe('core/api · getModelCapabilities（审计 P2-14）', () => {
   it('普通模型保留全部采样参数', () => {
@@ -73,5 +73,25 @@ describe('core/api · getModelCapabilities（审计 P2-14）', () => {
 
   it('大小写不敏感', () => {
     expect(getModelCapabilities('DeepSeek-R1').temperature).toBe(false);
+  });
+});
+
+describe('core/api · buildGoogleStreamUrl（审计 B-2）', () => {
+  it('标准 generateContent URL 替换为 streamGenerateContent 并补 alt=sse', () => {
+    const out = buildGoogleStreamUrl('https://generativelanguage.googleapis.com/v1beta/models/x:generateContent');
+    expect(out).toContain(':streamGenerateContent');
+    expect(out).toContain('alt=sse');
+  });
+
+  it('自定义 baseUrl 已含 :streamGenerateContent 仍补 alt=sse（回归核心）', () => {
+    const out = buildGoogleStreamUrl('https://custom.example.com/v1/models/x:streamGenerateContent');
+    expect(out).toContain('alt=sse');
+    expect(out).toContain(':streamGenerateContent');
+  });
+
+  it('已带 alt= 参数时不再重复追加', () => {
+    const out = buildGoogleStreamUrl('https://example.com/x:generateContent?alt=json');
+    expect(out).toBe('https://example.com/x:streamGenerateContent?alt=json');
+    expect((out.match(/alt=/g) || []).length).toBe(1);
   });
 });

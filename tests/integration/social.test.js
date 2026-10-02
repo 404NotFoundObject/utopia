@@ -7,14 +7,13 @@
  *
  * 本测试验证：publishPostByUser 触发调度后，调度能真正写入并读回。
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getStores, deleteDatabase } from '../../js/core/db.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getStores } from '../../js/core/db.js';
 import { getAppState } from '../../js/core/state.js';
-import { publishPostByUser } from '../../js/modules/social.js';
+import { publishPostByUser, checkAutoPost } from '../../js/modules/social.js';
 
 describe('modules/social · 调度持久化（A-3）', () => {
   beforeEach(async () => {
-    await deleteDatabase();
     getAppState().set('settings', {});
   });
 
@@ -32,5 +31,52 @@ describe('modules/social · 调度持久化（A-3）', () => {
     // 至少包含一条针对该动态的 generateComments 任务
     const related = schedule.tasks.filter(t => t.type === 'generateComments' && t.payload.postId === post.id);
     expect(related.length).toBeGreaterThan(0);
+  });
+});
+
+describe('modules/social · 自动发帖全局每日上限（B-4）', () => {
+  it('多角色场景下全局当日发帖总数不超过 maxPerDay', async () => {
+    // 关闭随机性：概率恒 1，确保每个符合条件的角色都会尝试发帖
+    getAppState().set('settings', {
+      social: {
+        enabled: true,
+        maxPostsPerDay: 2,
+        maxPostsPerCharacter: 10,
+        autoPostProbability: 1,
+      },
+    });
+
+    // 预置 4 个角色（各自都能触发发帖），用唯一 ID 避免与其它用例污染
+    const stores = await getStores();
+    const uniq = `b4-${Date.now()}-`;
+    const fullEmotion = {
+      valence: 0, arousal: 0, dominance: 0, attention: 0, surprise: 0, energy: 0,
+      needs: { safety: 70, esteem: 60, belonging: 50, autonomy: 50, pleasure: 50 },
+      affection: 0, trust: 0, intimacy: 0, lastUpdate: 0,
+    };
+    const characters = [
+      { id: `${uniq}1`, name: 'A', emotionState: { ...fullEmotion } },
+      { id: `${uniq}2`, name: 'B', emotionState: { ...fullEmotion } },
+      { id: `${uniq}3`, name: 'C', emotionState: { ...fullEmotion } },
+      { id: `${uniq}4`, name: 'D', emotionState: { ...fullEmotion } },
+    ];
+    for (const c of characters) await stores.characters.add(c);
+
+    // 拦截 AI 生成，避免真实网络请求（publishPostByCharacter 内部会调 generatePostContent）
+    const api = await import('../../js/core/api.js');
+    const genSpy = vi.spyOn(api, 'sendChatRequest').mockResolvedValue({ content: '测试动态内容' });
+
+    // 把游戏时间固定在白天（6-22 点之间），避免夜间跳过
+    const time = await import('../../js/modules/time.js');
+    vi.spyOn(time, 'getGameTime').mockReturnValue(new Date('2026-10-02T10:00:00').getTime());
+
+    await checkAutoPost();
+
+    // 全局上限 2：即使 4 个角色都可发帖，最终帖子数也不得超过 2
+    const posts = await stores.posts.getAll();
+    const charPosts = posts.filter(p => p.authorType === 'character' && p.authorId.startsWith(uniq));
+    expect(charPosts.length).toBeLessThanOrEqual(2);
+
+    genSpy.mockRestore();
   });
 });

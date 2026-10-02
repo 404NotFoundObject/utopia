@@ -6,6 +6,7 @@ import { sendChatRequest } from '../core/api.js';
 import { updateCharacter } from './character.js';
 import { addMessageToConversation, ensureConversation } from './conversation.js';
 import { buildEmotionPrompt } from './emotionEngine.js';
+import { handleInteraction } from './emotionEngine.js';
 import { buildBodyPrompt } from './bodyState.js';
 import { generateUUID } from '../core/utils.js';
 import { showBanner } from '../ui/components/banner.js';
@@ -24,6 +25,7 @@ import {
 import {
   buildChatContext,
   buildFinalMessages,
+  buildSocialContext,
 } from './chatContext.js';
 
 const DEFAULT_CONFIG = {
@@ -238,6 +240,17 @@ export async function generateProactiveMessage(character, extraContext = {}, cus
     systemMessages.push(systemMsg(`【最近对话摘要】${summary}`, 'summary', PRIORITY.SUMMARY));
   }
 
+  // 朋友圈回流（审计 B-5）：主动对话时角色也应能「看到」好友动态与评论，
+  // 让主动发言能自然地提及最近的朋友圈内容
+  try {
+    const socialPrompt = await buildSocialContext(character);
+    if (socialPrompt) {
+      systemMessages.push(systemMsg(socialPrompt, 'social', PRIORITY.SOCIAL));
+    }
+  } catch (e) {
+    console.warn('[Proactive] 朋友圈上下文构建失败:', e);
+  }
+
   const instruction = customPrompt || `现在请主动给用户发一条消息。要求：
 - 结合你的性格、当前情感状态、身体状态，以及你们最近的互动
 - 10-40 字，语言自然，符合人设
@@ -344,6 +357,15 @@ export async function insertProactiveMessage(character, content, convId, options
     isVoice: isVoice,
   };
   await addMessageToConversation(conv.id, msg);
+
+  // 情感回路闭合（审计 B-6）：角色主动发言后做一次轻微的「主动分享」情感演化。
+  // 与单聊/群聊的 applyEngineEffects（响应用户输入）不同，这里没有用户输入可分类，
+  // 用专门的 proactive_share 事件模拟「分享欲得到满足」的微小正向波动。
+  try {
+    await handleInteraction(character, 'proactive_share', 0.3);
+  } catch (e) {
+    console.warn('[Proactive] 主动分享情感更新失败:', e);
+  }
 
   if (!silent && !isVoice) {
     await updateCharacter(character.id, {

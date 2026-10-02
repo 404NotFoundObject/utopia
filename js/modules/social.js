@@ -7,6 +7,7 @@ import { sendChatRequest } from '../core/api.js';
 import { searchMemories } from './memory.js';
 import { getEmotionLabel } from './emotionEngine.js';
 import { getBodyDescription } from './bodyState.js';
+import { buildPersonaSystemMessage } from './proactiveChat.js';
 
 let _stores = null;
 async function getS() {
@@ -118,15 +119,18 @@ export async function generatePostContent(character, retries = 2) {
     const body = getBodyDescription(character);
     const time = getGameDate().toLocaleString();
 
-    const prompt = `你是角色“${character.name}”，请根据以下信息，生成一条朋友圈动态（约20-50字），风格符合你的人设：
+    const prompt = `请以你的角色身份，发布一条朋友圈动态（约20-50字），内容应符合你的人设与当前状态：
 - 当前情绪：${emotion}
 - 身体状态：${body}
 - 当前时间：${time}
 - 近期记忆：${memoryText}
-- 人设：${character.personality}
 直接输出动态内容，不要添加任何前缀或解释。`;
 
-    const fallbackPrompt = `请扮演角色“${character.name}”，说一句符合他/她人设的朋友圈动态（20-50字）。直接输出内容。`;
+    const fallbackPrompt = `请以你的角色身份，发一句符合人设的朋友圈动态（20-50字）。直接输出内容。`;
+
+    // 角色人设来自 buildPersonaSystemMessage（名称/描述/性格/关系/称呼/性别/系统提示），
+    // 作为 systemPrompt 注入，避免只用可能为空的 character.personality 字段导致泛泛文案。
+    const systemPrompt = buildPersonaSystemMessage(character);
 
     for (let attempt = 0; attempt < retries; attempt++) {
       const currentPrompt = attempt === 0 ? prompt : fallbackPrompt;
@@ -135,7 +139,7 @@ export async function generatePostContent(character, retries = 2) {
       try {
         const response = await sendChatRequest({
           messages: [{ role: 'user', content: currentPrompt }],
-          systemPrompt: '你是一个社交媒体内容生成助手。',
+          systemPrompt,
           temperature: 0.8,
           maxTokens: maxTokens,
           stream: false,
@@ -176,6 +180,16 @@ export async function publishPostByCharacter(character) {
   };
   await stores.posts.add(post);
   console.log('[Social] 帖子已保存:', post.id);
+
+  // 情感回路闭合（审计 B-6）：角色发帖是自主动作，做一次轻微的「主动分享」情感演化。
+  // 朋友圈是角色之间的社交（非与用户互动），影响用更低的强度，避免喧宾夺主。
+  try {
+    const { handleInteraction } = await import('./emotionEngine.js');
+    await handleInteraction(character, 'proactive_share', 0.2);
+  } catch (e) {
+    console.warn('[Social] 发帖情感更新失败:', e);
+  }
+
   scheduleSocialTask('generateComments', { postId: post.id }, 2 * 60 * 1000);
   return post;
 }
@@ -204,15 +218,16 @@ export async function generateComment(character, post) {
   const stores = await getS();
   const author = post.authorType === 'character' ? await stores.characters.get(post.authorId) : null;
   const authorName = author ? author.name : '用户';
-  const prompt = `你是角色“${character.name}”，请对好友“${authorName}”的动态发表一条评论（约10-30字），符合你的人设和当前状态。
+  const prompt = `请以你的角色身份，对好友“${authorName}”的这条动态发表一条评论（约10-30字），内容应符合你的人设与当前状态。
 动态内容：${post.content}
 你的情绪：${getEmotionLabel(character.emotionState)}
 你的状态：${getBodyDescription(character)}
 直接输出评论内容，不要添加任何前缀。`;
+  const systemPrompt = buildPersonaSystemMessage(character);
   try {
     const response = await sendChatRequest({
       messages: [{ role: 'user', content: prompt }],
-      systemPrompt: '你是一个社交媒体评论助手。',
+      systemPrompt,
       temperature: 0.7,
       maxTokens: 150,
       stream: false,
@@ -265,14 +280,16 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
     }
 
     // ---------- AI 生成回复 ----------
-    const prompt = `你是角色“${author.name}”，请回复好友“${commentAuthorName}”对你动态的评论（约10-30字），符合你的人设和当前状态。
+    const prompt = `请以你的角色身份，回复好友“${commentAuthorName}”对你动态的评论（约10-30字），内容应符合你的人设和当前状态。
 动态内容：${post.content}
 评论内容：${comment.content}
 你的情绪：${getEmotionLabel(author.emotionState)}
 你的状态：${getBodyDescription(author)}
 直接输出回复内容，不要添加任何前缀。`;
 
-    const fallbackPrompt = `请扮演角色“${author.name}”，回复好友“${commentAuthorName}”的评论（10-30字）。直接输出回复内容。`;
+    const fallbackPrompt = `请以你的角色身份，回复好友“${commentAuthorName}”的评论（10-30字）。直接输出回复内容。`;
+
+    const systemPrompt = buildPersonaSystemMessage(author);
 
     for (let attempt = 0; attempt < retries; attempt++) {
       const currentPrompt = attempt === 0 ? prompt : fallbackPrompt;
@@ -281,7 +298,7 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
       try {
         const response = await sendChatRequest({
           messages: [{ role: 'user', content: currentPrompt }],
-          systemPrompt: '你是一个社交媒体回复助手。',
+          systemPrompt,
           temperature: attempt === 0 ? 0.7 : 0.9,
           maxTokens: maxTokens,
           stream: false,
@@ -338,7 +355,11 @@ export async function generateCommentsForPost(postId) {
 
     const allCharacters = await stores.characters.getAll();
     let candidates = allCharacters.filter(c => c.id !== post.authorId);
-    const num = Math.floor(Math.random() * 3);
+    // 审计修复：候选为空（例如只有 1 个角色时）直接返回，避免空评论
+    if (candidates.length === 0) return;
+    // 评论数 1~2 个（旧实现 num=Math.floor(Math.random()*3) 有 1/3 概率为 0，
+    // 导致角色从不对帖子评论）。改为至少 1 个，最多不超过候选数。
+    const num = Math.min(candidates.length, 1 + Math.floor(Math.random() * 2));
     const selected = candidates.sort(() => Math.random() - 0.5).slice(0, num);
 
     let hasNewComment = false;
@@ -503,7 +524,12 @@ export async function checkAutoPost() {
     charCounts.set(p.authorId, (charCounts.get(p.authorId) || 0) + 1);
   }
 
+  // 全局当日总数（跨角色累加），随每次发帖递增。审计 B-4：旧实现用
+  // `totalToday + n`（n 是单角色计数）判断上限，多角色时各自越过 maxPerDay。
+  let globalToday = totalToday;
+
   for (const char of allCharacters) {
+    if (globalToday >= maxPerDay) break;
     const hour = new Date(getGameTime()).getHours();
     if (hour >= 22 || hour < 6) continue;
     if ((charCounts.get(char.id) || 0) >= maxPerChar) continue;
@@ -511,9 +537,8 @@ export async function checkAutoPost() {
     const probability = baseProbability * (1 + valence / 100);
     if (Math.random() < probability) {
       await publishPostByCharacter(char);
-      const n = (charCounts.get(char.id) || 0) + 1;
-      charCounts.set(char.id, n);
-      if (totalToday + n >= maxPerDay) break;
+      charCounts.set(char.id, (charCounts.get(char.id) || 0) + 1);
+      globalToday += 1;
     }
   }
 }

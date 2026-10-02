@@ -40,6 +40,20 @@ describe('lib/api-adapter/sse-parser', () => {
     expect(JSON.parse(events[0].data)).toEqual({ a: 1 });
   });
 
+  it('两个 CRLF 分隔的事件分别产出 2 条（审计 B-1：边界分发而非 EOF 倾倒）', async () => {
+    // 关键：必须两个事件都在流中间用空行分隔，而非依赖流结束时的兜底 flush
+    const events = await collect(bytesOf('data: {"a":1}\r\n\r\ndata: {"b":2}\r\n\r\n'));
+    expect(events).toHaveLength(2);
+    expect(JSON.parse(events[0].data)).toEqual({ a: 1 });
+    expect(JSON.parse(events[1].data)).toEqual({ b: 2 });
+  });
+
+  it('裸 CR 换行也能正确分发事件', async () => {
+    const events = await collect(bytesOf('data: {"a":1}\r\r'));
+    expect(events).toHaveLength(1);
+    expect(JSON.parse(events[0].data)).toEqual({ a: 1 });
+  });
+
   it('多行 data 以换行拼接，且各行均剥 CR', async () => {
     const events = await collect(bytesOf('data: line1\r\ndata: line2\r\n\r\n'));
     expect(events).toHaveLength(1);
@@ -70,13 +84,52 @@ describe('lib/api-adapter/adapters · 非流式响应归一', () => {
     expect(std.candidates).toBeUndefined();
   });
 
-  it('cohere 响应 text.choices 提升为顶层 choices', () => {
+  it('cohere v2 响应不含 text 字段时不清空 choices，text 字段被删除', () => {
     const adapter = createAdapter(cohereConfig);
-    const vendorResp = { text: '你好', meta: null };
+    // v2 非流式响应文本在 message.content，不存在顶层 text 字段
+    const std = adapter.adaptResponse({ message: { content: [{ type: 'text', text: '你好' }] } });
+    expect(std.text).toBeUndefined();
+    expect(std.choices[0].message.content).toBe('你好');
+  });
+
+  it('cohere v2 非流式响应 message.content[0].text 提升为 choices（审计 B-3）', () => {
+    const adapter = createAdapter(cohereConfig);
+    const vendorResp = {
+      message: { content: [{ type: 'text', text: '你好' }] },
+      meta: null,
+    };
     const std = adapter.adaptResponse(vendorResp);
     expect(Array.isArray(std.choices)).toBe(true);
     expect(std.choices[0].message.content).toBe('你好');
     expect(std.text).toBeUndefined();
+  });
+
+  it('cohere v2 请求体为单一 messages 数组（审计 B-3：不再产出 preamble/chat_history）', () => {
+    const adapter = createAdapter(cohereConfig);
+    const req = adapter.adaptRequest({
+      model: 'command-r-plus',
+      messages: [
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello' },
+        { role: 'user', content: 'count to three' },
+      ],
+    });
+    // v2 只应有单一 messages 数组，角色 system/user/assistant 直映射
+    expect(req.messages).toEqual([
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' },
+      { role: 'user', content: 'count to three' },
+    ]);
+    // 不应再出现 v1 的 preamble / chat_history / message 三字段
+    expect(req.preamble).toBeUndefined();
+    expect(req.chat_history).toBeUndefined();
+    expect(req.message).toBeUndefined();
+  });
+
+  it('cohere v2 baseUrl 指向 /v2/chat', () => {
+    expect(cohereConfig.baseUrl).toBe('https://api.cohere.ai/v2/chat');
   });
 
   it('google 请求体剔除 stream 字段', () => {

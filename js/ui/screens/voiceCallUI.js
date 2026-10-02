@@ -23,6 +23,7 @@ import {
   buildChatContext,
   buildFinalMessages,
   applyEngineEffects,
+  buildSocialContext,
 } from '../../modules/chatContext.js';
 
 let currentCall = null;
@@ -663,6 +664,16 @@ async function processUserMessage(call) {
     }
     if (memoryContext.length > 0) {
       systemMessages.push(systemMsg(memoryContext.join('\n\n'), 'memory', PRIORITY.MEMORY));
+    }
+
+    // 朋友圈回流（审计 B-5）：通话角色同样应能「看到」好友动态与评论
+    try {
+      const socialPrompt = await buildSocialContext(character);
+      if (socialPrompt) {
+        systemMessages.push(systemMsg(socialPrompt, 'social', PRIORITY.SOCIAL));
+      }
+    } catch (e) {
+      console.warn('[VoiceCall] 朋友圈上下文构建失败:', e);
     }
 
     const historyMessages = [];

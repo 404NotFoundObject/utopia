@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.1-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.2-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,10 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.2
+
+数据库主键错配迁移改为同一 versionchange 事务内原子写回、失败回滚不丢数据；SillyTavern PNG 卡端到端断链与中文 base64 乱码修复；情感衰减高倍速符号翻转改解析解；朋友圈社交内容生成由写死的通用助手改为注入完整角色人设（发帖/评论/回复不再是预设文案）、评论数随机到 0 不再导致角色从不评论、全局每日上限计数改跨角色累加、调度持久化改用主键写入；SSE CRLF 事件边界、Google 流式 `alt=sse`、Cohere v2 迁移；朋友圈回流接入群聊/通话/自主对话、情感回路三路径闭合。详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.1
 

@@ -30,6 +30,7 @@ import {
   buildChatContext,
   buildFinalMessages,
   applyEngineEffects,
+  buildSocialContext,
 } from './chatContext.js';
 
 function toFiniteNumber(v) {
@@ -301,6 +302,17 @@ ${taskInstruction}
 
   if (group.summary) {
     systemMessages.push(systemMsg(`【群聊摘要】${group.summary}`, 'summary', PRIORITY.SUMMARY));
+  }
+
+  // 朋友圈回流（审计 B-5）：群聊角色同样应能「看到」好友动态与评论。
+  // 群聊同步路径 generateCharacterReplySync 复用本函数，因此一并获得回流。
+  try {
+    const socialPrompt = await buildSocialContext(character);
+    if (socialPrompt) {
+      systemMessages.push(systemMsg(socialPrompt, 'social', PRIORITY.SOCIAL));
+    }
+  } catch (e) {
+    console.warn('[GroupChat] 朋友圈上下文构建失败:', e);
   }
 
   try {
@@ -923,6 +935,16 @@ export async function generateCharacterReplySync(groupId, characterId, userMessa
     const fresh = refreshCharacterFromState(characterId);
     if (fresh) {
       character = fresh;
+    }
+  }
+
+  // 情感/身体状态更新（审计 B-6）：同步路径此前漏了 applyEngineEffects，
+  // 与流式路径 generateCharacterReplyStream 的 mentionDepth===0 行为对齐。
+  if (userMessage && userMessage.trim()) {
+    try {
+      character = await applyEngineEffects({ character, userMessage });
+    } catch (e) {
+      console.warn('[GroupChat] 同步路径情感状态更新失败:', e);
     }
   }
 

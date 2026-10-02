@@ -215,6 +215,26 @@ function extractTextContent(content) {
 // ============================================================
 // 统一请求入口
 // ============================================================
+
+/**
+ * 构造 Google Gemini 流式请求 URL。
+ *
+ * 审计 B-2：旧实现把 alt=sse 嵌在 `if (replaced !== finalUrl)` 内，导致
+ * 自定义 baseUrl 已含 :streamGenerateContent、或已带 alt= 时跳过 alt=sse，
+ * Gemini 会返回 JSON 数组（无 data: 行）→ 零事件 → 空回复。
+ * 现在两步都无条件执行：先替换方法名（若存在），再补 alt=sse（若尚未存在）。
+ *
+ * @param {string} url 原始 URL
+ * @returns {string} 流式 URL
+ */
+export function buildGoogleStreamUrl(url) {
+  let out = url.replace(':generateContent', ':streamGenerateContent');
+  if (!out.includes('alt=')) {
+    out += (out.includes('?') ? '&' : '?') + 'alt=sse';
+  }
+  return out;
+}
+
 export async function sendChatRequest(params) {
   const {
     messages,
@@ -319,13 +339,7 @@ export async function sendChatRequest(params) {
     headers['anthropic-dangerous-direct-browser-access'] = 'true';
   } else if (provider === 'google') {
     if (stream) {
-      const replaced = finalUrl.replace(':generateContent', ':streamGenerateContent');
-      if (replaced !== finalUrl) {
-        finalUrl = replaced;
-        if (!finalUrl.includes('alt=')) {
-          finalUrl += (finalUrl.includes('?') ? '&' : '?') + 'alt=sse';
-        }
-      }
+      finalUrl = buildGoogleStreamUrl(finalUrl);
     }
     if (finalUrl.includes('?')) {
       finalUrl += `&key=${apiKey}`;

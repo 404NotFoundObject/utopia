@@ -437,6 +437,24 @@ describe('modules/emotionEngine · 集成', () => {
       const char = await seedCharacter();
       await expect(handleInteraction(char, 'not-an-event', 0.5)).resolves.toBeUndefined();
     });
+
+    it('proactive_share 轻微提升愉悦与归属，量级弱于 praise（审计 B-6）', async () => {
+      const byShare = await seedCharacter();
+      const shareBefore = byShare.emotionState.valence;
+      const shareBelongingBefore = byShare.emotionState.needs.belonging;
+      await handleInteraction(byShare, 'proactive_share', 1);
+
+      const byPraise = await seedCharacter();
+      const praiseBefore = byPraise.emotionState.valence;
+      await handleInteraction(byPraise, 'praise', 1);
+
+      // 主动分享是轻微正向：愉悦与归属都上升，但幅度弱于「被夸奖」
+      expect(byShare.emotionState.valence).toBeGreaterThan(shareBefore);
+      expect(byShare.emotionState.needs.belonging).toBeGreaterThan(shareBelongingBefore);
+      const shareDelta = byShare.emotionState.valence - shareBefore;
+      const praiseDelta = byPraise.emotionState.valence - praiseBefore;
+      expect(shareDelta).toBeLessThan(praiseDelta);
+    });
   });
 
   describe('引擎开关', () => {

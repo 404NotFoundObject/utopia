@@ -99,6 +99,8 @@ export const PRIORITY = {
   WORLDBOOK: 50,
   MEMORY: 45,
   EXAMPLES: 40,
+  // 朋友圈回流：比记忆更低，预算紧张时最先被裁剪（审计 B-5：不再与长期记忆抢预算）
+  SOCIAL: 38,
   SUMMARY: 35,
 };
 

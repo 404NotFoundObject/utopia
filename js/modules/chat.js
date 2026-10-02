@@ -429,7 +429,7 @@ export async function sendMessage(content) {
     try {
       const socialPrompt = await buildSocialContext(character);
       if (socialPrompt) {
-        systemMessages.push(systemMsg(socialPrompt, 'social', PRIORITY.MEMORY));
+        systemMessages.push(systemMsg(socialPrompt, 'social', PRIORITY.SOCIAL));
       }
     } catch (e) {
       console.warn('[Chat] 朋友圈上下文构建失败:', e);
