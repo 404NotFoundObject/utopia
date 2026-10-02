@@ -150,7 +150,9 @@ export function renderHelpModal() {
         <h3>🧠 三大引擎控制</h3>
         <ul>
           <li><strong>情感引擎</strong>：六维情绪模型 + 五类需求 + 三类关系。</li>
-          <li><strong>身体状态引擎</strong>：精力、睡意、健康、意识、睡眠周期、疾病、受伤。</li>
+          <li><strong>身体状态引擎</strong>：精力、睡意、健康、意识、睡眠周期、睡眠债、疾病、受伤。</li>
+          <li><strong>睡眠债</strong><span class="new-badge">v3.9.3</span>：清醒持续累积缺觉、睡眠按质量偿还；欠债会放大困意与疲劳、加快健康衰减，欠太多还可能病倒。</li>
+          <li><strong>梦境生成</strong><span class="new-badge">v3.9.3</span>：可选开关（默认关闭），角色睡醒时生成一段梦境并注入提示词，每日每角色一次。</li>
           <li><strong>时间系统</strong>：游戏时间流逝和离线计算。</li>
           <li class="note">⚠️ 三个引擎可以独立开关。全部开启时形成闭环。关闭引擎可能导致角色互动失去真实感。</li>
         </ul>
@@ -848,7 +850,8 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
         </ul>
 
         <h3>🏃 身体状态引擎</h3>
-        <p>模拟角色的精力、睡意、健康、意识状态、睡眠周期、疾病、受伤，受时间和情感双重影响。可通过 <code>/wake</code> 命令唤醒睡眠中的角色。</p>
+        <p>模拟角色的精力、睡意、健康、意识状态、睡眠周期、<strong>睡眠债</strong>、疾病、受伤，受时间和情感双重影响。可通过 <code>/wake</code> 命令唤醒睡眠中的角色。</p>
+        <p><strong>睡眠债</strong>：清醒时按「每日睡眠需求 ÷ 24」持续累积，睡眠时按「时长 × 睡眠质量」偿还（午休按 80% 效率）。债务会放大困意与疲劳、加快健康衰减；欠债超过每日需求的 1.5 倍后，即使健康值正常也可能病倒。用 <code>/status</code> 查看当前债务。</p>
 
         <h4>三大子系统</h4>
         <div class="table-scroll-wrapper">
@@ -867,8 +870,13 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
               </tr>
               <tr>
                 <td><strong>疾病</strong></td>
-                <td>健康 &lt; 50 时按概率触发</td>
+                <td>健康 &lt; 50 时按概率触发；睡眠债过重时独立触发</td>
                 <td><code>illnessResistance</code> · <code>recoverySpeed</code></td>
+              </tr>
+              <tr>
+                <td><strong>睡眠债</strong><span class="new-badge">v3.9.3</span></td>
+                <td>清醒累积 / 睡眠偿还，上限为每日需求 × 3</td>
+                <td><code>sleepNeedHours</code> · <code>sleepQuality</code></td>
               </tr>
               <tr>
                 <td><strong>受伤</strong><span class="new-badge">v3.7</span></td>

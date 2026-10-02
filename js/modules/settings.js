@@ -113,6 +113,12 @@ export function getDefaultSettings() {
       bodyState: true,
       time: true,
     },
+    // 梦境生成（审计 P3-6）：角色睡醒时用 AI 生成一段梦境写入 dreamContent。
+    // 默认关闭——开启后每次睡醒会消耗一次 API 调用。
+    dreamGeneration: {
+      enabled: false,
+      maxPerDay: 1,
+    },
     // 情绪感知（识别层）配置。识别分三层：规则层 → 语义层 → LLM 仲裁。
     // 规则层永远启用；语义层复用记忆引擎已加载的本地向量模型，不需要额外下载。
     emotionPerception: {

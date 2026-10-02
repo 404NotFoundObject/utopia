@@ -80,6 +80,8 @@ async function handleSave(modalContent, ctx) {
   const engineEmotion = q('#settingsEngineEmotion')?.checked ?? true;
   const engineBody = q('#settingsEngineBody')?.checked ?? true;
   const engineTime = q('#settingsEngineTime')?.checked ?? true;
+  // 审计 P3-6：梦境生成开关（默认关闭）
+  const dreamGenerationEnabled = q('#settingsDreamGeneration')?.checked ?? false;
 
   // ---- 情绪识别 ----
   const emotionSemanticMode = q('#settingsEmotionSemanticMode')?.value || 'auto';
@@ -215,6 +217,11 @@ async function handleSave(modalContent, ctx) {
       emotion: engineEmotion,
       bodyState: engineBody,
       time: engineTime,
+    };
+    // 每日上限暂无 UI，保持默认 1（与 settings.js 默认值一致）
+    payload.dreamGeneration = {
+      enabled: dreamGenerationEnabled,
+      maxPerDay: 1,
     };
   }
 

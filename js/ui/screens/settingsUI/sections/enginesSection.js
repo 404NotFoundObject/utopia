@@ -14,6 +14,8 @@ export function renderEnginesSection(settings, ctx) {
   const engineEmotion = engineFlags.emotion !== false;
   const engineBody = engineFlags.bodyState !== false;
   const engineTime = engineFlags.time !== false;
+  // 审计 P3-6：梦境生成默认关闭，开启后每次睡醒消耗一次 AI 调用
+  const dreamEnabled = settings.dreamGeneration?.enabled === true;
 
   const perception = settings.emotionPerception || {};
   const semanticMode = ['off', 'auto', 'always'].includes(perception.semanticMode)
@@ -42,6 +44,14 @@ export function renderEnginesSection(settings, ctx) {
         <label>时间系统</label>
         ${ctx.toggleHtml('settingsEngineTime', engineTime)}
         <span class="help-text">控制游戏时间的流逝和离线计算</span>
+      </div>
+      <div class="setting-row">
+        <label>梦境生成</label>
+        ${ctx.toggleHtml('settingsDreamGeneration', dreamEnabled)}
+        <span class="help-text">
+          角色睡醒时用 AI 生成一段梦境（每日每角色 1 次，会消耗 API 调用）。
+          关闭时不做任何调用，<code>dreamContent</code> 保持为空。
+        </span>
       </div>
     </div>
 

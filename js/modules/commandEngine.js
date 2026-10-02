@@ -194,6 +194,11 @@ registerCommand('print', async (args, context) => {
       }
       if (char.bodyState) {
         lines.push(`⚡ 精力:${Math.round(char.bodyState.energy)} 睡意:${Math.round(char.bodyState.sleepiness)} 健康:${Math.round(char.bodyState.health)}`);
+        // 审计 P3-6：睡眠债与当日睡眠此前无任何展示入口
+        const debt = Number(char.bodyState.sleepDebtHours);
+        if (Number.isFinite(debt) && debt >= 0.5) {
+          lines.push(`😪 睡眠债: ${debt.toFixed(1)}h（今日已睡 ${(Number(char.bodyState.totalSleepHours) || 0).toFixed(1)}h）`);
+        }
         if (char.bodyState.sleepStatus !== '清醒') {
           lines.push(`😴 睡眠: ${char.bodyState.sleepStatus}`);
         }

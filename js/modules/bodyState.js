@@ -9,6 +9,7 @@ import {
   getBodyProfile,
   getCircadianMultiplier,
 } from './profileDefaults.js';
+import { sendChatRequest } from '../core/api.js';
 
 // ---------- 常量（基础速率，被 profile 因子缩放） ----------
 const ENERGY_DECAY_RATE = 2;
@@ -16,6 +17,20 @@ const SLEEPINESS_INCREASE_RATE = 3;
 const HEALTH_DECAY_RATE = 0.5;
 const RECOVERY_RATE_SLEEP = 8;
 // 审计 P3-6：RECOVERY_RATE_REST / MIN_SLEEP_HOURS 为死常量（仅声明、从未读取），已删除。
+
+// ---------- 睡眠债（审计 P3-6 / P3-8） ----------
+// 睡眠债以「小时」计量：清醒时把每日睡眠需求摊到 24 小时持续累积，
+// 睡眠时按实际睡眠时长 × 睡眠质量偿还，永不为负。
+// 在此之前代码里没有任何「没睡够」的概念：生病只看 health < 50，
+// 熬几个通宵也不会有事，FAQ「长期不睡会生病」是与代码不符的空头承诺。
+const SLEEP_DEBT_MAX_FACTOR = 3;      // 债务上限 = 每日需求 × 3（睡再多债也不会一次还清）
+const SLEEP_DEBT_SICK_THRESHOLD = 1.5; // 债务 / 每日需求 ≥ 1.5 时开始独立判定生病
+const SLEEP_DEBT_SICK_RATE = 0.006;    // 睡眠债致病的每小时基础概率
+const NAP_REPAY_FACTOR = 0.8;          // 午休的还债效率低于夜间睡眠
+const SLEEP_DEBT_SLEEPINESS_GAIN = 0.4; // 债务对睡意增速的加成系数
+const SLEEP_DEBT_ENERGY_GAIN = 0.25;    // 债务对清醒时精力消耗的加成系数
+const SLEEP_DEBT_HEALTH_GAIN = 0.5;     // 债务对健康衰减的加成系数
+const SLEEP_DEBT_RECOVERY_GAIN = 0.15;  // 债务对睡眠恢复的加成系数（补觉睡得更沉）
 
 // ============================================================
 // 引擎开关
@@ -85,9 +100,17 @@ export function getDefaultBodyState() {
       expectedDurationHours: 0,
     },
     lastWakeTime: now,
+    // 审计 P3-6：totalSleepHours 原为「累计睡眠时长」，写了从不读。
+    // 现改为「当日已睡小时数」（含午休），跨游戏日自动清零，
+    // 由睡眠债结算、身体描述与 /inspect 共同消费。
     totalSleepHours: 0,
+    sleepLedgerDate: null,
     sleepQuality: 1.0,
+    // 审计 P3-6：dreamContent 原为死字段，现由睡醒时的梦境生成写入（见 generateDream）。
     dreamContent: '',
+    lastDreamDate: null,
+    // 审计 P3-6 / P3-8：睡眠债（小时）。见 applySleepDebt。
+    sleepDebtHours: 0,
     lastUpdate: now,
     napStartTime: 0,
     lastNapDecideDate: null,
@@ -186,6 +209,83 @@ function getDateKey(gameDate) {
   return `${gameDate.getFullYear()}-${gameDate.getMonth()}-${gameDate.getDate()}`;
 }
 
+// ============================================================
+// 睡眠债（审计 P3-6 / P3-8）
+// ============================================================
+
+/**
+ * 懒补齐睡眠债相关字段。老角色的 bodyState 里没有这些键，
+ * 直接参与算术会得到 NaN 并把 NaN 写回数据库。
+ */
+function ensureSleepDebtFields(state) {
+  if (typeof state.sleepDebtHours !== 'number' || !Number.isFinite(state.sleepDebtHours)) {
+    state.sleepDebtHours = 0;
+  }
+  if (typeof state.totalSleepHours !== 'number' || !Number.isFinite(state.totalSleepHours)) {
+    state.totalSleepHours = 0;
+  }
+  if (state.sleepLedgerDate === undefined) state.sleepLedgerDate = null;
+  if (state.lastDreamDate === undefined) state.lastDreamDate = null;
+  if (typeof state.dreamContent !== 'string') state.dreamContent = '';
+  state.sleepDebtHours = Math.max(0, state.sleepDebtHours);
+}
+
+/**
+ * 每日睡眠需求（小时）。profile 缺失或非法时回落 7 小时。
+ */
+function getSleepNeedHours(profile) {
+  const need = Number(profile && profile.sleepNeedHours);
+  return Number.isFinite(need) && need > 0 ? need : 7;
+}
+
+/**
+ * 债务比：当前债务 ÷ 每日需求。1.0 表示整整欠了一天的量。
+ */
+function getSleepDebtRatio(state, profile) {
+  return state.sleepDebtHours / getSleepNeedHours(profile);
+}
+
+/**
+ * 当日睡眠统计跨游戏日清零（totalSleepHours 是「当日已睡」而非累计值）。
+ */
+function rollSleepLedger(state, gameDate) {
+  const todayKey = getDateKey(gameDate);
+  if (state.sleepLedgerDate !== todayKey) {
+    state.sleepLedgerDate = todayKey;
+    state.totalSleepHours = 0;
+  }
+  return todayKey;
+}
+
+/**
+ * 累积 / 偿还睡眠债。
+ * @param {'sleep'|'nap'|'awake'} mode 睡眠模式（nap 的还债效率低于夜间睡眠）
+ */
+function applySleepDebt(state, profile, hours, mode) {
+  ensureSleepDebtFields(state);
+  // 无睡意类型（不死之身 / 人造生命等）不产生也不偿还睡眠债
+  if (hasNoSleepiness(profile)) {
+    state.sleepDebtHours = 0;
+    return;
+  }
+
+  const need = getSleepNeedHours(profile);
+  if (mode === 'sleep' || mode === 'nap') {
+    const quality = typeof state.sleepQuality === 'number' && Number.isFinite(state.sleepQuality)
+      ? state.sleepQuality
+      : 1;
+    const efficiency = mode === 'nap' ? NAP_REPAY_FACTOR : 1;
+    state.sleepDebtHours = Math.max(0, state.sleepDebtHours - hours * quality * efficiency);
+    state.totalSleepHours += hours;
+  } else {
+    // 清醒时按「每日需求摊到 24 小时」连续累积：清醒一整天正好欠一天的量
+    state.sleepDebtHours = Math.min(
+      need * SLEEP_DEBT_MAX_FACTOR,
+      state.sleepDebtHours + hours * (need / 24)
+    );
+  }
+}
+
 /**
  * 处理午休状态转换。
  */
@@ -194,6 +294,7 @@ function processNapping(state, profile, gameDate, gameNow) {
   if (state.napStartTime === undefined) state.napStartTime = 0;
   if (state.lastNapDecideDate === undefined) state.lastNapDecideDate = null;
   if (state.lastNapDate === undefined) state.lastNapDate = null;
+  ensureSleepDebtFields(state);
 
   const hour = gameDate.getHours();
   const inWindow = isNapWindow(hour);
@@ -217,7 +318,8 @@ function processNapping(state, profile, gameDate, gameNow) {
     state.sleepStatus = '清醒';
     state.consciousness = '清醒';
     state.lastWakeTime = gameNow;
-    state.totalSleepHours += napElapsedHours;
+    // 审计 P3-6：午休时长计入当日睡眠并按较低效率偿还睡眠债
+    applySleepDebt(state, profile, napElapsedHours, 'nap');
     state.sleepiness = Math.max(0, state.sleepiness - 40);
     state.energy = Math.min(100, state.energy + 20);
     state.sleepQuality = Math.min(1.0, state.sleepQuality + 0.1);
@@ -265,6 +367,13 @@ export async function updateBodyByTime(character, hours) {
   const gameDate = getGameDate();
   const circadian = getCircadianMultiplier(gameDate.getHours(), profile);
 
+  // 睡眠债（审计 P3-6 / P3-8）：本 tick 用「进入时的债务」影响各项速率，
+  // tick 末尾再按实际睡/醒结算，避免同一次计算里自相矛盾。
+  ensureSleepDebtFields(state);
+  rollSleepLedger(state, gameDate);
+  const debtRatio = getSleepDebtRatio(state, profile);
+  const debtAmplify = Math.min(debtRatio, SLEEP_DEBT_MAX_FACTOR);
+
   const period = getTimePeriod();
 
   // ============================================================
@@ -273,6 +382,7 @@ export async function updateBodyByTime(character, hours) {
   if (isImmortalLike(profile)) {
     state.energy = Math.max(state.energy, 90);
     state.sleepiness = 0;
+    state.sleepDebtHours = 0;
     state.health = Math.max(state.health, 95);
     state.consciousness = '清醒';
     state.sleepStatus = '清醒';
@@ -299,6 +409,8 @@ export async function updateBodyByTime(character, hours) {
   }
 
   const isSleeping = (state.sleepStatus === '浅睡' || state.sleepStatus === '深睡');
+  // 本 tick 是否自然睡醒（浅睡 → 清醒），用于触发梦境生成
+  let wokeUpNaturally = false;
 
   // ============================================================
   // 精力
@@ -306,14 +418,17 @@ export async function updateBodyByTime(character, hours) {
   let energyChange = 0;
   if (isSleeping) {
     const quality = state.sleepQuality;
+    // 欠觉越多补觉睡得越沉（债务对恢复的正向加成）
     energyChange = RECOVERY_RATE_SLEEP * quality * hours
       * profile.energyRecoveryFactor
-      * (1 + state.health / 200);
+      * (1 + state.health / 200)
+      * (1 + debtAmplify * SLEEP_DEBT_RECOVERY_GAIN);
   } else {
     let baseConsume = ENERGY_DECAY_RATE * hours
       * profile.energyDecayFactor
       * circadian
-      * (1 - conscientiousness * 0.1);
+      * (1 - conscientiousness * 0.1)
+      * (1 + debtAmplify * SLEEP_DEBT_ENERGY_GAIN);
     if (state.specialStates.includes('亢奋')) baseConsume *= 1.5;
     if (state.specialStates.includes('萎靡')) baseConsume *= 0.7;
     if (period === '深夜') baseConsume *= 1.2;
@@ -331,10 +446,12 @@ export async function updateBodyByTime(character, hours) {
     if (isSleeping) {
       sleepinessChange = -8 * hours * state.sleepQuality;
     } else {
+      // 睡眠债让困意来得更早、更猛
       let baseIncrease = SLEEPINESS_INCREASE_RATE * hours
         * profile.sleepinessRateFactor
         / Math.max(0.5, circadian)
-        * (1 - conscientiousness * 0.1);
+        * (1 - conscientiousness * 0.1)
+        * (1 + debtAmplify * SLEEP_DEBT_SLEEPINESS_GAIN);
       if (period === '深夜') baseIncrease *= 2;
       else if (period === '午间') baseIncrease *= 1.5;
       else if (period === '清晨') baseIncrease *= 0.5;
@@ -358,7 +475,8 @@ export async function updateBodyByTime(character, hours) {
       state.sleepStatus = '清醒';
       state.consciousness = '清醒';
       state.lastWakeTime = getGameTime();
-      state.totalSleepHours += hours;
+      // 本 tick 的睡眠时长由末尾 applySleepDebt 统一结算（不再在此处重复累加）
+      wokeUpNaturally = true;
     }
   } else {
     const sleepinessThreshold = 80 - (profile.sleepNeedHours - 7) * 3;
@@ -385,7 +503,10 @@ export async function updateBodyByTime(character, hours) {
       * profile.recoverySpeed
       * (1 + agreeableness * 0.2);
   } else {
-    let baseHealthDecay = HEALTH_DECAY_RATE * hours * (1 + neuroticism * 0.5);
+    // 长期缺觉拖垮身体：健康衰减随债务放大
+    let baseHealthDecay = HEALTH_DECAY_RATE * hours
+      * (1 + neuroticism * 0.5)
+      * (1 + debtAmplify * SLEEP_DEBT_HEALTH_GAIN);
     if (state.specialStates.includes('萎靡')) baseHealthDecay *= 1.5;
     baseHealthDecay /= Math.max(0.3, profile.constitution * 1.5 + 0.3);
     healthChange = -baseHealthDecay;
@@ -416,11 +537,27 @@ export async function updateBodyByTime(character, hours) {
   // ============================================================
   // 生病概率
   // ============================================================
-  if (!state.illness.type && state.health < 50) {
+  // 审计 P3-8：生病不再只看健康值。睡眠债过重会压低免疫力，即使健康值还很高
+  // 也可能病倒——这才是 FAQ 一直承诺、但代码里从未实现的「长期不睡会生病」。
+  if (!state.illness.type) {
     const resistanceFactor = 2 - profile.illnessResistance * 2;
-    const illnessChance = Math.min(1, 0.01 * hours * (1 + neuroticism) * resistanceFactor);
-    if (Math.random() < illnessChance) {
-      const illnesses = ['感冒', '发烧', '胃炎', '头痛'];
+    let illnessChance = 0;
+    if (state.health < 50) {
+      illnessChance = 0.01 * hours * (1 + neuroticism) * resistanceFactor;
+    }
+    const sickFromDebt = debtRatio >= SLEEP_DEBT_SICK_THRESHOLD;
+    if (sickFromDebt) {
+      // 债务越重概率越高：刚过阈值约 0.6%/游戏小时，触顶（3 倍需求）约 1.5%/游戏小时
+      const debtChance = SLEEP_DEBT_SICK_RATE * hours
+        * (debtRatio - SLEEP_DEBT_SICK_THRESHOLD + 1)
+        * resistanceFactor;
+      illnessChance = Math.max(illnessChance, debtChance);
+    }
+    if (illnessChance > 0 && Math.random() < Math.min(1, illnessChance)) {
+      // 缺觉致病的病因池不含胃炎（胃炎与作息无关）
+      const illnesses = (sickFromDebt && state.health >= 50)
+        ? ['感冒', '发烧', '头痛']
+        : ['感冒', '发烧', '胃炎', '头痛'];
       const type = illnesses[Math.floor(Math.random() * illnesses.length)];
       state.illness.type = type;
       state.illness.severity = Math.min(80, 20 + Math.random() * 40);
@@ -481,6 +618,16 @@ export async function updateBodyByTime(character, hours) {
     state.consciousness = '清醒';
   }
 
+  // ============================================================
+  // 睡眠债结算（审计 P3-6）：本 tick 睡了就按睡眠质量还债，醒着就继续欠
+  // ============================================================
+  const isNapping = isSleeping && state.napStartTime > 0;
+  applySleepDebt(state, profile, hours, isSleeping ? (isNapping ? 'nap' : 'sleep') : 'awake');
+  if (isSleeping) {
+    // 入睡后上一场梦失效，等下次醒来再生成
+    state.dreamContent = '';
+  }
+
   state.lastUpdate = getGameTime();
   await updateCharacter(character.id, { bodyState: state }, { skipReload: true });
 
@@ -489,6 +636,8 @@ export async function updateBodyByTime(character, hours) {
     state: state,
     timestamp: Date.now(),
   });
+
+  if (wokeUpNaturally) maybeGenerateDream(character);
 }
 
 // ---------- 刷新身体状态 ----------
@@ -561,6 +710,8 @@ export async function tryWakeUp(character, callCount = 1) {
       state: state,
       timestamp: Date.now(),
     });
+    // 被叫醒时同样可能有梦（开关关闭时不触发）
+    maybeGenerateDream(character);
     return { success: true, message: '你唤醒了角色，她睡眼惺忪地看着你', newState: '迷糊' };
   } else {
     return { success: false, message: '角色仍在沉睡，没有回应你的呼唤', refusal: true };
@@ -737,6 +888,11 @@ export function getBodyDescription(character) {
   parts.push(`精力:${Math.round(state.energy)}`);
   parts.push(`睡意:${Math.round(state.sleepiness)}`);
   parts.push(`健康:${Math.round(state.health)}`);
+  // 审计 P3-6：睡眠债与当日睡眠时长此前从不展示，是「写了从不读」的死字段
+  const debtHours = Number.isFinite(state.sleepDebtHours) ? state.sleepDebtHours : 0;
+  if (debtHours >= 0.5) parts.push(`睡眠债:${debtHours.toFixed(1)}h`);
+  const sleptHours = Number.isFinite(state.totalSleepHours) ? state.totalSleepHours : 0;
+  if (sleptHours > 0) parts.push(`今日已睡:${sleptHours.toFixed(1)}h`);
   if (state.sleepStatus !== '清醒') parts.push(`睡眠状态:${state.sleepStatus}`);
   if (state.consciousness !== '清醒') parts.push(`意识:${state.consciousness}`);
   if (state.specialStates.length) parts.push(`特殊状态:${state.specialStates.join(',')}`);
@@ -746,6 +902,8 @@ export function getBodyDescription(character) {
     parts.push(`受伤:${injuryDesc}(${Math.round(state.injury.severity)})`);
   }
   if (state.napStartTime > 0) parts.push('午休中');
+  // 审计 P3-6：lastNapDate 写了从不读，现用于「今日已午休」展示
+  else if (state.lastNapDate && state.lastNapDate === getDateKey(getGameDate())) parts.push('今日已午休');
   if (profile.special) {
     const specialLabel = profile.special;
     parts.push(`类型:${specialLabel}`);
@@ -993,5 +1151,183 @@ export function buildBodyPrompt(character) {
     prompt += '\n\n你依赖阳光维生，白天精力充沛，夜晚则萎靡不振。';
   }
 
+  // ============================================================
+  // 睡眠债（可叠加在主状态之上，与疾病/受伤同级）
+  // ============================================================
+  prompt += buildSleepDebtPrompt(state, profile);
+
+  // ============================================================
+  // 梦境（审计 P3-6：dreamContent 由死字段变为真实消费）
+  // ============================================================
+  if (!isSleeping && state.dreamContent) {
+    prompt += `\n\n【刚做的梦】你醒来前正在做一个梦：${state.dreamContent}
+梦是零散、不合逻辑的，可以把它当作醒来时残留的情绪，不必当作真实发生的事。
+如果梦境让你感到不安或留恋，可以自然地带入语气中；不要大段复述梦境。`;
+  }
+
   return prompt;
+}
+
+// ============================================================
+// 睡眠债提示词
+// ============================================================
+
+/**
+ * 按债务比生成「缺觉」提示段。债务轻微时不注入，避免污染正常对话。
+ */
+export function buildSleepDebtPrompt(state, profile) {
+  if (!state || typeof state.sleepDebtHours !== 'number') return '';
+  const ratio = getSleepDebtRatio(state, profile);
+  if (ratio < 0.5) return '';
+
+  const hours = state.sleepDebtHours.toFixed(1);
+  if (ratio >= 2) {
+    return `\n\n【睡眠不足：严重缺觉】你已经欠下约 ${hours} 小时的睡眠。
+【身体感受】· 太阳穴一跳一跳地疼，眼睛干涩发烫
+· 注意力难以维持，听人说话要反应好几秒才跟上
+· 站着都能打盹，短时间的「断片」时有发生
+【行为倾向】· 回复简短、迟钝，可能说到一半忘掉要说什么
+· 容易走神，可能把话题接错
+· 会下意识抗拒需要动脑的事，想找个地方躺下
+【语气】疲惫、含糊、反应慢。`;
+  }
+  if (ratio >= 1) {
+    return `\n\n【睡眠不足：明显缺觉】你欠了约 ${hours} 小时的睡眠，身体在抗议。
+【身体感受】· 眼皮发沉，脑子像裹了一层棉花
+· 反应比平时慢半拍，容易听漏细节
+【行为倾向】· 回复偏短，偶尔打哈欠或发愣
+【语气】慵懒、没什么精神。`;
+  }
+  return `\n\n【睡眠不足：轻度缺觉】你欠了约 ${hours} 小时的睡眠，略有疲惫但不影响正常交流。`;
+}
+
+// ============================================================
+// 梦境生成（审计 P3-6：dreamContent 写了从不读 → 睡醒时真实生成并注入）
+// ============================================================
+
+/** 每日每角色最多生成一次梦境 */
+const DREAM_MAX_PER_DAY = 1;
+
+/** 无 API / 生成失败时的兜底梦境（按当前情绪取用） */
+const DREAM_FALLBACKS = {
+  喜悦: [
+    '梦见和你在一条晒得发烫的街上走，说了很多话，醒来一句都想不起来，只剩那个笑。',
+    '梦见自己轻飘飘地飞过屋顶，风很暖，落地时还在笑。',
+  ],
+  悲伤: [
+    '梦见一直在找一扇门，推开后是很久以前的一个房间，一个人也没有。',
+    '梦见雨下得很大，你在伞的那头，怎么喊都听不见。',
+  ],
+  愤怒: [
+    '梦见和谁争执，声音越来越远，最后只剩自己喘气。',
+    '梦见把什么东西摔了，碎得很慢，慢得让人烦躁。',
+  ],
+  恐惧: [
+    '梦见身后一直有脚步声，不敢回头，醒来心跳还很快。',
+    '梦见从很高的地方往下看，风声灌满耳朵。',
+  ],
+  惊讶: [
+    '梦见天空换了好几种颜色，一件接一件意外地发生，醒来有点发懵。',
+    '梦见收到了一封没有署名的信，怎么也拆不开。',
+  ],
+  厌恶: [
+    '梦见在一间闷热的屋子里待了很久，醒来只想开窗。',
+    '梦见什么东西黏在手上，怎么洗都洗不掉。',
+  ],
+  平静: [
+    '梦见一片很安静的水，没有风，也没有人说话。',
+    '梦见慢慢地走一段熟悉的楼梯，走到一半就醒了。',
+  ],
+  default: [
+    '梦见一些零散的片段：一个背影、一段路、一句听不清的话，醒来只剩一点模糊的情绪。',
+    '梦见自己在等谁，等了很久，最后却忘了在等什么。',
+  ],
+};
+
+/**
+ * 梦境生成开关（默认关闭）。开启后每次睡醒会消耗一次 AI 调用。
+ */
+export function isDreamGenerationEnabled() {
+  const settings = getAppState().get('settings') || {};
+  return settings.dreamGeneration?.enabled === true;
+}
+
+function pickFallbackDream(character) {
+  const emotion = getEmotionLabel(character.emotionState);
+  const pool = DREAM_FALLBACKS[emotion] || DREAM_FALLBACKS.default;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * 调用 AI 生成一段梦境。失败时返回空串，由调用方回落模板。
+ */
+async function requestDreamFromAI(character) {
+  try {
+    // proactiveChat 依赖链较重且可能反向引用本模块，动态导入避免静态循环依赖
+    const { buildPersonaSystemMessage } = await import('./proactiveChat.js');
+    const emotion = getEmotionLabel(character.emotionState);
+    const debt = (character.bodyState?.sleepDebtHours || 0).toFixed(1);
+    const prompt = `请写一段这个角色刚做的梦，30-60 字，第一人称或第三人称均可。
+要求：
+- 梦境是零散、不合逻辑的，只留情绪和画面，不要写成完整故事
+- 与角色当前的情绪（${emotion}）和缺觉程度（欠 ${debt} 小时睡眠）相称
+- 不要出现"我做了一个梦"这类前缀，直接写梦的内容
+- 不要出现解释、标题或引号`;
+
+    const response = await sendChatRequest({
+      messages: [{ role: 'user', content: prompt }],
+      systemPrompt: buildPersonaSystemMessage(character),
+      temperature: 0.95,
+      maxTokens: 120,
+      stream: false,
+    });
+    const text = (response?.content || '').trim();
+    return text ? text.slice(0, 200) : '';
+  } catch (error) {
+    console.warn('[BodyState] 梦境生成失败，回落模板:', error);
+    return '';
+  }
+}
+
+/**
+ * 生成（或复用）今日梦境并写回角色。
+ * @param {Object} character
+ * @param {{force?: boolean}} options force 跳过每日节流
+ * @returns {Promise<string>} 梦境内容；开关关闭或不该做梦时返回空串
+ */
+export async function generateDream(character, options = {}) {
+  if (!character || !character.bodyState) return '';
+  if (!isDreamGenerationEnabled() && !options.force) return '';
+
+  const state = character.bodyState;
+  ensureSleepDebtFields(state);
+
+  const profile = getBodyProfile(character);
+  if (hasNoSleepiness(profile)) return ''; // 不睡觉的类型不做梦
+
+  const todayKey = getDateKey(getGameDate());
+  if (!options.force && state.lastDreamDate === todayKey) {
+    return state.dreamContent || '';
+  }
+  if (DREAM_MAX_PER_DAY <= 0) return '';
+
+  const content = (await requestDreamFromAI(character)) || pickFallbackDream(character);
+  state.dreamContent = content;
+  state.lastDreamDate = todayKey;
+  try {
+    await updateCharacter(character.id, { bodyState: state }, { skipReload: true });
+  } catch (error) {
+    console.warn('[BodyState] 梦境写回失败:', error);
+  }
+  return content;
+}
+
+/**
+ * 睡醒后异步生成梦境。开关关闭时完全不触发（默认关闭 → 零 API 开销）。
+ */
+function maybeGenerateDream(character) {
+  if (!isDreamGenerationEnabled()) return;
+  Promise.resolve()
+    .then(() => generateDream(character))
+    .catch(error => console.warn('[BodyState] 梦境生成异常:', error));
 }
