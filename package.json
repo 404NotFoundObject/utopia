@@ -1,6 +1,6 @@
 {
   "name": "utopia",
-  "version": "3.9.2",
+  "version": "3.9.3",
   "private": true,
   "license": "Apache-2.0",
   "description": "AI 角色扮演 Agent —— 让角色真正活起来的工具集",

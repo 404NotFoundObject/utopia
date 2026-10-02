@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.2-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.3-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,17 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.3
+
+**新增睡眠债建模，朋友圈交互微信化重构，审计遗留项清零。**
+
+- **睡眠债**：清醒按「每日睡眠需求 ÷ 24」持续累积缺觉、睡眠按「时长 × 睡眠质量」偿还（午休 80%），影响睡意增速、精力消耗与健康衰减；**长期不睡会生病**首次真正生效（欠债超需求 1.5 倍独立触发判定，此前只看 `health < 50`）；激活 `totalSleepHours` / `lastNapDate` / `dreamContent` 三个死字段，新增可选的 AI 梦境生成（默认关闭）
+- **朋友圈**：修复回复不显示回复对象、角色只肯回一次、回复某条回复无人接话三个问题，新增点赞；界面按微信重构——方形圆角头像、蓝色昵称、相对时间、「···」赞评菜单、灰底点赞行与评论区，点击评论/回复行直接回复
+- **数据完整性**：备份补齐 lastMode / lastCharacterId / lastGroupId 与插件 VFS，新增版本头与导入前校验，并补上此前缺失的导入恢复路径（原来只能导出不能恢复）
+- **其他**：原生角色卡往返不再静默重掷性格、记忆预算按条目而非按行裁剪、`eventBus.off` 语义回归与 `once` 误删修复、粘性事件支持通配符订阅与参数快照、`pluginDragDrop.destroy()` 不再抛错、`server.py` 按 Ctrl+C 不再卡死（自死锁）
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.2
 

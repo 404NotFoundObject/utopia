@@ -65,7 +65,7 @@ function scheduleSocialTask(type, payload, delayMs) {
       if (type === 'generateComments') {
         await generateCommentsForPost(payload.postId);
       } else if (type === 'generateReply') {
-        await generateReplyForComment(payload.postId, payload.commentId);
+        await generateReplyForComment(payload.postId, payload.commentId, null, 2, payload.replierId || null, payload.replyToReplyId || null);
       }
     } catch (err) {
       console.error('[Social] 调度任务执行失败:', err);
@@ -94,7 +94,7 @@ export async function rebuildSocialSchedule() {
         if (task.type === 'generateComments') {
           await generateCommentsForPost(task.payload.postId);
         } else if (task.type === 'generateReply') {
-          await generateReplyForComment(task.payload.postId, task.payload.commentId);
+          await generateReplyForComment(task.payload.postId, task.payload.commentId, null, 2, task.payload.replierId || null, task.payload.replyToReplyId || null);
         }
       } catch (err) {
         console.error('[Social] 重建调度任务执行失败:', err);
@@ -173,6 +173,7 @@ export async function publishPostByCharacter(character) {
     authorId: character.id,
     content,
     images: [],
+    likes: [],
     timestamp: getGameTime(),
     emotionSnapshot: character.emotionState,
     bodySnapshot: character.bodyState,
@@ -203,6 +204,7 @@ export async function publishPostByUser(user, content) {
     authorId: 'user',
     content,
     images: [],
+    likes: [],
     timestamp: getGameTime(),
     emotionSnapshot: {},
     bodySnapshot: {},
@@ -240,7 +242,8 @@ export async function generateComment(character, post) {
 }
 
 // ---------- 生成回复（含重试与加锁） ----------
-export async function generateReplyForComment(postId, commentId, userReplyContent = null, retries = 2) {
+// replyToReplyId：用户「回复某条回复」时该回复的 id；为空表示回复的是评论本身。
+export async function generateReplyForComment(postId, commentId, userReplyContent = null, retries = 2, replierId = null, replyToReplyId = null) {
   return withKeyLock('post', postId, async () => {
     const stores = await getS();
     const post = await stores.posts.get(postId);
@@ -250,22 +253,30 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
 
     const hasCharacterReply = Array.isArray(comment.replies)
       && comment.replies.some(r => r.authorType === 'character');
-    if (hasCharacterReply && !userReplyContent) return;
+    // replierId 显式指定（用户回复触发的接话）时绕过该守卫：
+    // 旧守卫在角色回过一次后，把用户触发的后续接话调度全部掐断，
+    // 表现为「评论区无法再触发角色的回复」。守卫仅用于限制无明确
+    // 回复者的帖主自动接话，避免对同一条评论反复自动回复。
+    if (hasCharacterReply && !userReplyContent && !replierId) return;
 
-    const author = await stores.characters.get(post.authorId);
-    if (!author) return;
-
-    const commentAuthor = comment.authorType === 'character'
-      ? await stores.characters.get(comment.authorId)
-      : null;
-    const commentAuthorName = commentAuthor ? commentAuthor.name : '用户';
-
-    // ---------- 用户手动回复：写入后 1 分钟触发 AI 回复 ----------
+    // ---------- 用户手动回复：先落库，再由「被回复对象」决定是否触发 AI 接话 ----------
     if (userReplyContent) {
+      // 回复对象：显式「回复某条回复」则取该回复的作者，否则为被回复的评论作者
+      let targetType = comment.authorType;
+      let targetId = comment.authorId;
+      if (replyToReplyId) {
+        const targetReply = (comment.replies || []).find(r => r.id === replyToReplyId);
+        if (targetReply) {
+          targetType = targetReply.authorType;
+          targetId = targetReply.authorId;
+        }
+      }
       const reply = {
         id: generateUUID(),
         authorType: 'user',
         authorId: 'user',
+        replyToAuthorType: targetType,
+        replyToAuthorId: targetId,
         content: userReplyContent,
         timestamp: getGameTime(),
       };
@@ -273,14 +284,45 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
       comment.replies.push(reply);
       await stores.posts.update(postId, post);
 
-      if (post.authorType === 'character') {
-        scheduleSocialTask('generateReply', { postId, commentId: comment.id }, 1 * 60 * 1000);
+      // 被回复对象若是角色，由该角色接话（用户是在跟这个角色对话），
+      // 与帖子作者是谁无关。
+      if (targetType === 'character') {
+        scheduleSocialTask(
+          'generateReply',
+          { postId, commentId: comment.id, replierId: targetId, replyToReplyId: replyToReplyId || null },
+          1 * 60 * 1000
+        );
       }
       return;
     }
 
     // ---------- AI 生成回复 ----------
-    const prompt = `请以你的角色身份，回复好友“${commentAuthorName}”对你动态的评论（约10-30字），内容应符合你的人设和当前状态。
+    // 回复者：显式指定则用之，否则回落到帖子作者（保持"帖主回应评论"的原有语义）。
+    // 取角色的早退只能放在这里——用户帖子没有作者角色，但用户回复仍需正常落库。
+    const author = await stores.characters.get(replierId || post.authorId);
+    if (!author) return;
+
+    const commentAuthor = comment.authorType === 'character'
+      ? await stores.characters.get(comment.authorId)
+      : null;
+    const commentAuthorName = commentAuthor ? commentAuthor.name : '用户';
+
+    // replierId 显式指定 ⇒ 用户对话触发的接话，回复对象是用户的最新回复；
+    // 否则是帖主回应评论，回复对象是评论作者。
+    const lastUserReply = (comment.replies || [])
+      .filter(r => r.authorType === 'user')
+      .slice(-1)[0]?.content || '';
+    const isOwnComment = !!replierId && replierId === comment.authorId;
+
+    const prompt = replierId
+      ? `请以你的角色身份，回应对方在评论区的回复（约10-30字），内容应符合你的人设和当前状态。
+动态内容：${post.content}
+${isOwnComment ? `你的评论：${comment.content}` : `相关评论（${commentAuthorName}）：${comment.content}`}
+对方的回复：${lastUserReply}
+你的情绪：${getEmotionLabel(author.emotionState)}
+你的状态：${getBodyDescription(author)}
+直接输出回复内容，不要添加任何前缀。`
+      : `请以你的角色身份，回复好友“${commentAuthorName}”对你动态的评论（约10-30字），内容应符合你的人设和当前状态。
 动态内容：${post.content}
 评论内容：${comment.content}
 你的情绪：${getEmotionLabel(author.emotionState)}
@@ -290,6 +332,10 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
     const fallbackPrompt = `请以你的角色身份，回复好友“${commentAuthorName}”的评论（10-30字）。直接输出回复内容。`;
 
     const systemPrompt = buildPersonaSystemMessage(author);
+
+    // 回复对象展示字段：用户会话中回复的是用户；帖主自动接话则回复评论作者
+    const replyTargetType = replierId ? 'user' : comment.authorType;
+    const replyTargetId = replierId ? 'user' : comment.authorId;
 
     for (let attempt = 0; attempt < retries; attempt++) {
       const currentPrompt = attempt === 0 ? prompt : fallbackPrompt;
@@ -313,6 +359,8 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
             id: generateUUID(),
             authorType: 'character',
             authorId: author.id,
+            replyToAuthorType: replyTargetType,
+            replyToAuthorId: replyTargetId,
             content,
             timestamp: getGameTime(),
           };
@@ -336,6 +384,8 @@ export async function generateReplyForComment(postId, commentId, userReplyConten
         id: generateUUID(),
         authorType: 'character',
         authorId: author.id,
+        replyToAuthorType: replyTargetType,
+        replyToAuthorId: replyTargetId,
         content: defaultReply,
         timestamp: getGameTime(),
       };
@@ -394,8 +444,9 @@ export async function generateCommentsForPost(postId) {
 }
 
 // ---------- 用户评论帖子（加锁） ----------
-export async function userCommentPost(postId, content, replyToCommentId = null) {
-  // 分支 1：回复评论 —— 直接调用 generateReplyForComment（它自己会加锁），
+// replyToCommentId：被回复的评论 id；replyToReplyId：被回复的回复 id（回复"评论下某条回复"时传）。
+export async function userCommentPost(postId, content, replyToCommentId = null, replyToReplyId = null) {
+  // 分支 1：回复评论/回复 —— 直接调用 generateReplyForComment（它自己会加锁），
   //        避免外层再套一层锁导致同一 postId 死锁
   if (replyToCommentId) {
     const stores = await getS();
@@ -403,7 +454,7 @@ export async function userCommentPost(postId, content, replyToCommentId = null) 
     if (!post) return;
     const parentComment = post.comments.find(c => c.id === replyToCommentId);
     if (!parentComment) return;
-    await generateReplyForComment(postId, parentComment.id, content);
+    await generateReplyForComment(postId, parentComment.id, content, 2, null, replyToReplyId);
     return;
   }
 
@@ -428,6 +479,27 @@ export async function userCommentPost(postId, content, replyToCommentId = null) 
     if (post.authorType === 'character') {
       scheduleSocialTask('generateReply', { postId, commentId: comment.id }, 1 * 60 * 1000);
     }
+  });
+}
+
+// ---------- 用户点赞/取消点赞（加锁） ----------
+export async function togglePostLike(postId) {
+  return withKeyLock('post', postId, async () => {
+    const stores = await getS();
+    const post = await stores.posts.get(postId);
+    if (!post) return false;
+    if (!Array.isArray(post.likes)) post.likes = [];
+    const idx = post.likes.findIndex(l => l.authorType === 'user' && l.authorId === 'user');
+    let liked;
+    if (idx >= 0) {
+      post.likes.splice(idx, 1);
+      liked = false;
+    } else {
+      post.likes.push({ authorType: 'user', authorId: 'user', timestamp: getGameTime() });
+      liked = true;
+    }
+    await stores.posts.update(postId, post);
+    return liked;
   });
 }
 

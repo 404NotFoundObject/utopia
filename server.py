@@ -133,10 +133,22 @@ def parse_port():
     return DEFAULT_PORT
 
 
+class ThreadingHTTPServer(socketserver.ThreadingTCPServer):
+    """线程化 HTTP 服务器。
+
+    allow_reuse_address 必须在 bind 之前生效（类属性），不能像旧实现那样在
+    bind_server() 返回后再给实例赋值——那时 socket 已经 bind 完，赋值不生效，
+    服务重启时容易撞上 TIME_WAIT 误报「端口被占用」。
+    daemon_threads：工作线程设为守护线程，主进程退出时不被 join 卡住。
+    """
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def bind_server(port, max_try=10):
     for i in range(max_try):
         try:
-            httpd = socketserver.ThreadingTCPServer(("", port), RangeRequestHandler)
+            httpd = ThreadingHTTPServer(("", port), RangeRequestHandler)
             return httpd, port
         except OSError as e:
             print(f"端口 {port} 不可用（{e}），尝试 {port + 1} ...")
@@ -148,8 +160,6 @@ def main():
     port = parse_port()
     acquire_wake_lock()
     httpd, port = bind_server(port)
-    httpd.daemon_threads = True
-    httpd.allow_reuse_address = True
 
     print("=" * 50)
     print(f"网站根目录: {BASE_DIR}")
@@ -167,25 +177,41 @@ def main():
         )
         t.start()
 
-    def shutdown(signum, frame):
+    def request_shutdown(signum, frame):
+        """请求关闭：只做非阻塞收尾，真正的循环退出交给 serve_forever()。
+
+        严禁在该函数里直接调用 httpd.shutdown()——shutdown() 会阻塞等待
+        serve_forever() 结束，而信号处理器恰恰运行在 serve_forever() 的
+        调用栈上（主线程），等于等自己结束，必然死锁：Windows 控制台下
+        表现为按下 Ctrl+C 后进程彻底卡住不动，只能关闭窗口或杀进程。
+        这里改为派一个守护线程去 shutdown，主线程得以继续退出循环。
+        """
         print("\n正在关闭服务...")
         stop_event.set()
-        httpd.shutdown()
         release_wake_lock()
-        sys.exit(0)
+        threading.Thread(target=httpd.shutdown, daemon=True).start()
 
-    signal.signal(signal.SIGINT, shutdown)
+    # Ctrl+C（SIGINT）：显式注册 handler，让控制台 Ctrl+C / Ctrl+Break / SIGTERM
+    # 都走同一条「非阻塞收尾」路径。handler 内绝不阻塞，循环退出交给 serve_forever()。
+    signal.signal(signal.SIGINT, request_shutdown)
     try:
-        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGTERM, request_shutdown)
     except Exception:
-        pass  # Windows 上 SIGTERM 支持有限
+        pass  # Windows 上 SIGTERM 不会真正产生
+    try:
+        # Ctrl+Break（Windows）走同一条非阻塞收尾路径
+        signal.signal(getattr(signal, 'SIGBREAK', signal.SIGTERM), request_shutdown)
+    except Exception:
+        pass
 
     try:
-        httpd.serve_forever()
+        httpd.serve_forever(poll_interval=0.5)
     except KeyboardInterrupt:
-        shutdown(None, None)
+        request_shutdown(None, None)
     finally:
         httpd.server_close()
+        release_wake_lock()
+        print("服务已停止")
 
 
 if __name__ == '__main__':
