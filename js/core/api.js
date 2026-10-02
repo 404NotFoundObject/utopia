@@ -70,6 +70,13 @@ function toFiniteNumber(v) {
 // ============================================================
 export function getModelCapabilities(modelName) {
   const lower = (modelName || '').toLowerCase();
+
+  // 审计 C-2：带供应商前缀的 id（如 openai/o3-mini、anthropic/claude-4）匹配不上推理模型模式——
+  // 模式的边界字符类是 [-_.]，不含 '/'，前缀与模型名之间的 '/' 断裂了匹配。
+  // 先剥掉最后一段 '/' 之前的前缀，让判定只看模型名本身。
+  const slashIdx = lower.lastIndexOf('/');
+  const base = slashIdx >= 0 ? lower.slice(slashIdx + 1) : lower;
+
   const caps = {
     temperature: true,
     top_p: true,
@@ -95,13 +102,20 @@ export function getModelCapabilities(modelName) {
     /gpt[-_.]?5/i,                                             // gpt-5（推理模型）
   ];
 
-  if (reasoningPatterns.some(re => re.test(lower))) {
+  // base 命中剥离前缀后的模型名；lower 兜底完整字符串（保留既有匹配能力）
+  if (reasoningPatterns.some(re => re.test(base) || re.test(lower))) {
     caps.temperature = false;
     caps.top_p = false;
     caps.frequency_penalty = false;
     caps.presence_penalty = false;
     caps.top_k = false;
-    console.log(`[API] 检测到推理模型 "${modelName}"，禁用采样参数（temperature/top_p/penalties/top_k）`);
+    // 审计 C-3：日志原写「penalties」，未说明是否含 repetition_penalty，而后者
+    // 实际并未被禁用（它是厂商特定参数，由适配器的 requestMapping 决定是否发送）。
+    // 改为逐项列举，让日志与实际禁用的字段完全一致。
+    console.log(
+      `[API] 检测到推理模型 "${modelName}"，禁用采样参数` +
+      `（temperature/top_p/frequency_penalty/presence_penalty/top_k）`
+    );
   }
 
   return caps;

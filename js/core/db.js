@@ -432,6 +432,15 @@ function createStore(db, storeName) {
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     }),
+    // 原样写回一条记录（不注入 id）。供备份恢复使用：
+    // update() 会强制 put({...data, id})，对自增主键 store 会写坏主键。
+    put: (data) => new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const req = store.put(data);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }),
   };
 }
 

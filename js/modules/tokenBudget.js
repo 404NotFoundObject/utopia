@@ -555,14 +555,31 @@ export function truncateMemoryEntries(text, maxTokens) {
   const headerTokens = estimateTokens(headerText);
   const entryBudget = Math.max(0, maxTokens - headerTokens);
 
-  // 逐条累加，直到逼近预算
+  // 审计 C-6：先按「条目」切分，再逐条累加。
+  // 一个条目可能跨多行（如 `[1] 您曾问："..."\n   回答：...`）。旧实现按行累加，
+  // 预算耗尽时正好切在条目中间，留下「只有问没有答」的悬空片段。
+  const startIdx = firstEntryIdx > 0 ? firstEntryIdx : 0;
+  const entries = [];
+  let currentEntry = null;
+  for (let i = startIdx; i < lines.length; i++) {
+    if (/^\s*\[\d+\]/.test(lines[i])) {
+      if (currentEntry) entries.push(currentEntry);
+      currentEntry = [lines[i]];
+    } else if (currentEntry) {
+      currentEntry.push(lines[i]); // 条目续行，归入当前条目
+    }
+  }
+  if (currentEntry) entries.push(currentEntry);
+
+  // 逐条累加，直到逼近预算（条目作为最小单位，不可拆分）
   let result = headerText;
   let used = headerTokens;
-  for (let i = firstEntryIdx > 0 ? firstEntryIdx : 0; i < lines.length; i++) {
-    const lineTokens = estimateTokens(lines[i]);
-    if (used + lineTokens > maxTokens) break;
-    result += (result ? '\n' : '') + lines[i];
-    used += lineTokens;
+  for (const entry of entries) {
+    const entryText = entry.join('\n');
+    const entryTokens = estimateTokens(entryText);
+    if (used + entryTokens > maxTokens) break;
+    result += (result ? '\n' : '') + entryText;
+    used += entryTokens;
   }
 
   // 若一条都没保留（预算极小），退化为 token 级截断

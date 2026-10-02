@@ -370,6 +370,10 @@ export async function quantifyCharacter(character, retries = 3) {
   console.warn('[Quantify] 所有尝试失败，使用默认值');
   const defaultPersonality = getDefaultPersonality();
   return {
+    // 审计 C-4：量化失败的兜底值必须可被识别。
+    // 本函数吞掉异常后返回默认值，调用方无法区分「AI 真的给了全 50」和
+    // 「API 不可达回落默认值」，故显式标记，避免把失败值当成成功结果写库。
+    failed: true,
     personalityParameters: defaultPersonality,
     bodyProfile: deriveBodyProfileFromPersonality(defaultPersonality),
     emotionProfile: deriveEmotionProfileFromPersonality(defaultPersonality),
@@ -400,7 +404,10 @@ export async function quantifyPersonality(character, retries = 3) {
  */
 export async function autoQuantifyIfNeeded(character, force = false, options = {}) {
   if (!character) return character;
-  if (!force && character.personalityParameters && character.lastQuantifiedAt) {
+  // 审计 C-4：跳过条件不再要求 lastQuantifiedAt。
+  // 原生卡导入时自带 personalityParameters 但通常没有 lastQuantifiedAt，
+  // 旧条件下「有参数 + 无时间戳」仍会重掷，导致角色往返一次性格就被改写。
+  if (!force && character.personalityParameters) {
     return character;
   }
 
@@ -408,6 +415,15 @@ export async function autoQuantifyIfNeeded(character, force = false, options = {
 
   try {
     const result = await quantifyCharacter(character);
+
+    // 审计 C-4：量化失败（重试耗尽后回落默认值）时，若角色已有性格参数则原样保留。
+    // 这是「API 不可达 → 角色性格被静默改成全 50」的实际发生点：quantifyCharacter
+    // 内部吞掉异常、失败只体现在 failed 标记上，不能依赖 catch 分支兜住。
+    if (result.failed && character.personalityParameters) {
+      showToast('量化失败，已保留角色原有设定', 'warning');
+      return character;
+    }
+
     const updates = {
       personalityParameters: result.personalityParameters,
       bodyProfile: preserveProfiles && character.bodyProfile
@@ -423,6 +439,14 @@ export async function autoQuantifyIfNeeded(character, force = false, options = {
     showToast('角色性格与体质量化完成', 'success');
     return { ...character, ...updates };
   } catch (error) {
+    // 审计 C-4：量化失败时，若角色已有性格参数，必须原样保留。
+    // 旧实现直接写 getDefaultPersonality()（全 50），等于把角色卡自带性格
+    // 静默抹平——这正是「API 不可达时性格变成全 50」的来源。
+    if (character.personalityParameters) {
+      console.warn('[Personality] 量化失败，保留角色已有参数:', error);
+      showToast('量化失败，已保留角色原有设定', 'warning');
+      return character;
+    }
     showToast('量化失败，使用默认值', 'warning');
     const defaultPersonality = getDefaultPersonality();
     const updates = {

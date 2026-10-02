@@ -114,6 +114,58 @@ describe('characterAdapter · PNG 端到端解码（A-1）', () => {
   });
 });
 
+describe('characterAdapter · 文本字段类型守卫（审计 C-5）', () => {
+  it('原生 Utopia 格式的对象型 personality 不再变成 [object Object]', () => {
+    // 回归：utopia-v3 分支此前 `return data` 零守卫，对象字段原样透传
+    const out = convertToUtopia({
+      schema: 'utopia-character/v3.1',
+      name: '小兰',
+      personality: { 外向: '高', 细心: '低' },
+      description: ['第一条', '第二条'],
+    }, 'utopia-v3.1');
+
+    expect(out.personality).not.toBe('[object Object]');
+    expect(out.personality).toBe('{"外向":"高","细心":"低"}');
+    // 数组按行拼接
+    expect(out.description).toBe('第一条\n第二条');
+  });
+
+  it('原生格式的结构化字段原样透传，不被文本化', () => {
+    const params = { neuroticism: 30, extraversion: 80 };
+    const out = convertToUtopia({
+      schema: 'utopia-character/v3.1',
+      name: '小兰',
+      personalityParameters: params,
+    }, 'utopia-v3.1');
+
+    // 结构化字段必须原样保留（不能变成 JSON 字符串）
+    expect(out.personalityParameters).toEqual(params);
+    expect(out.personalityParameters).toBe(params);
+  });
+
+  it('通用格式的对象型字段也走守卫', () => {
+    const out = convertToUtopia({
+      name: '通用卡',
+      personality: { a: 1 },
+      systemPrompt: { b: 2 },
+    }, 'generic');
+
+    expect(out.personality).toBe('{"a":1}');
+    expect(out.systemPrompt).toBe('{"b":2}');
+  });
+
+  it('未提供的字段不塞默认值（保持原样）', () => {
+    const out = convertToUtopia({
+      schema: 'utopia-character/v3.1',
+      name: '小兰',
+    }, 'utopia-v3.1');
+
+    // 原本没有的字段不应被守卫凭空造出来
+    expect('relationship' in out).toBe(false);
+    expect(out.name).toBe('小兰');
+  });
+});
+
 // 内联构造：在最小 PNG 的 IHDR 后插入指定 tEXt 数据，返回 ArrayBuffer
 function makePngWithText(textBytes) {
   const base = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';

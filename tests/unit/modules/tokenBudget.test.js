@@ -244,6 +244,25 @@ describe('modules/tokenBudget', () => {
       expect(result).not.toContain('[3]');
     });
 
+    it('条目跨多行时不被切一半（审计 C-6）', () => {
+      const text = `${header}\n${entry(1)}\n${entry(2)}\n${entry(3)}`;
+      // 预算：头部 + 条目 1 完整（问+答），再加条目 2 的「问」行——
+      // 刚好容不下条目 2 的「答」行。
+      const budget =
+        estimateTokens(header) +
+        estimateTokens('[1] 您曾问："问题1"') +
+        estimateTokens('我回答："回答1"') +
+        estimateTokens('[2] 您曾问："问题2"');
+      const result = truncateMemoryEntries(text, budget);
+
+      // 条目 1 完整保留（含回答）
+      expect(result).toContain('[1] 您曾问："问题1"');
+      expect(result).toContain('我回答："回答1"');
+      // 关键：条目 2 放不下就必须整条丢弃，不能只留「只有问没有答」的悬空片段
+      expect(result).not.toContain('[2]');
+      expect(result).not.toContain('回答2');
+    });
+
     it('预算极小时退化为 token 级截断而非返回空串', () => {
       const text = `${header}\n${entry(1)}`;
       const result = truncateMemoryEntries(text, 10);

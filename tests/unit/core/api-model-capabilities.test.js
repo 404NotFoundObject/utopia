@@ -74,6 +74,28 @@ describe('core/api · getModelCapabilities（审计 P2-14）', () => {
   it('大小写不敏感', () => {
     expect(getModelCapabilities('DeepSeek-R1').temperature).toBe(false);
   });
+
+  it('带供应商前缀的模型 id 也能识别（审计 C-2）', () => {
+    // 回归：分隔符字符类是 [-_.] 不含 '/'，前缀与模型名之间的 '/' 断裂匹配，
+    // 导致 openai/o3-mini 这类 id 被当成普通模型 → 发 sampling 参数 → 400。
+    expect(getModelCapabilities('openai/o3-mini').temperature).toBe(false);
+    expect(getModelCapabilities('openai/o4-mini').temperature).toBe(false);
+    expect(getModelCapabilities('anthropic/claude-4-sonnet').temperature).toBe(false);
+    expect(getModelCapabilities('deepseek/deepseek-reasoner').temperature).toBe(false);
+  });
+
+  it('供应商前缀不影响非推理模型的判定（审计 C-2）', () => {
+    // 剥离前缀后 qwen-max 仍应保留采样参数，不能因为带了前缀就误判
+    expect(getModelCapabilities('openai/gpt-4o').temperature).toBe(true);
+    expect(getModelCapabilities('alibaba/qwen-max').temperature).toBe(true);
+  });
+
+  it('repetition_penalty 不被推理模型判定禁用（审计 C-3：日志与行为一致）', () => {
+    // 日志已改为逐项列举实际禁用字段，repetition_penalty 由适配器决定是否发送，
+    // 不应被"是否推理模型"一刀切禁用。
+    expect(getModelCapabilities('o3').repetition_penalty).toBe(true);
+    expect(getModelCapabilities('gpt-4o').repetition_penalty).toBe(true);
+  });
 });
 
 describe('core/api · buildGoogleStreamUrl（审计 B-2）', () => {

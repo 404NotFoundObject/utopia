@@ -30,6 +30,11 @@ export function createPluginDragDrop(pluginId) {
   let currentDragData = null;
   // 拖拽源元素
   let currentDragSource = null;
+  // 自定义拖拽的幽灵元素（审计 C-9）
+  // 原先声明在 customDrag() 方法体内，而 destroy() 是另一个方法，引用它会抛
+  // ReferenceError（且被 try/catch 吞掉，导致幽灵节点与监听器泄漏）。
+  // 提升为闭包状态后，destroy() 能真正清理它。
+  let ghostEl = null;
 
   // 全局 dragover 监听（用于找到 droppable 元素）
   let listenersAttached = false;
@@ -280,7 +285,7 @@ export function createPluginDragDrop(pluginId) {
         throw new Error('dragDrop.customDrag: source 必须是 HTMLElement');
       }
 
-      let ghostEl = null;
+      // ghostEl 已提升为闭包级状态（审计 C-9），此处不再局部声明
       let isDragging = false;
       let startX = 0;
       let startY = 0;

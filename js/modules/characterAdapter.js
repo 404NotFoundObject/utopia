@@ -139,7 +139,11 @@ export function convertToUtopia(data, format) {
   switch (format) {
     case 'utopia-v3.1':
     case 'utopia-v3':
-      return data;
+      // 审计 C-5：原生格式此前零守卫直接返回，对象型的 personality / description
+      // 会原样进入提示词（模板拼接时静默变成 [object Object]）。
+      // 这里只把文本字段做安全转换，结构化字段（personalityParameters /
+      // emotionState / bodyState / schema 等）原样透传，不改变既有语义。
+      return sanitizeUtopiaTextFields(data);
     case 'st-v3':
       base = fromSTV3(data);
       break;
@@ -249,7 +253,7 @@ function fromSTV2(data) {
     name: data.name || '',
     description: data.description || '',
     firstMessage: data.first_mes || '',
-    personality: toPersonalityText(data.personality),
+    personality: toSafeText(data.personality),
     systemPrompt,
     scene: data.scenario || '',
     dialogueExamples: data.mes_example || '',
@@ -286,7 +290,7 @@ function fromSTV3(data) {
     name: d.name || '',
     description: d.description || '',
     firstMessage: d.first_mes || '',
-    personality: toPersonalityText(d.personality),
+    personality: toSafeText(d.personality),
     systemPrompt,
     scene: d.scenario || '',
     dialogueExamples: d.mes_example || '',
@@ -299,15 +303,45 @@ function fromSTV3(data) {
   };
 }
 
+/** 进入提示词的文本字段白名单（结构化字段不在此列，避免被误转） */
+const TEXT_FIELDS = [
+  'name', 'description', 'firstMessage', 'personality', 'relationship',
+  'systemPrompt', 'callUser', 'avatar', 'chatBg', 'background',
+  'cgImage', 'scene', 'dialogueExamples',
+];
+
 /**
- * 将 ST personality 字段安全转为字符串，避免对象/数组被隐式转成 `[object Object]`。
+ * 把任意值安全转为文本，避免对象/数组被隐式转成 `[object Object]` 进入提示词。
+ *
+ * 审计 C-5：原仅用于 ST v2/v3 的 personality 字段，通用格式与原生直通路径
+ * 没有守卫，遇到对象型字段会静默变成 `[object Object]`。现作为通用工具，
+ * 供所有进入提示词的文本字段使用。
  */
-function toPersonalityText(v) {
+function toSafeText(v) {
   if (v === null || v === undefined) return '';
   if (typeof v === 'string') return v;
   if (Array.isArray(v)) return v.join('\n');
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
+}
+
+/**
+ * 对 Utopia 原生格式的文本字段做安全转换（审计 C-5）。
+ *
+ * 只处理 TEXT_FIELDS 白名单内且存在的字段：
+ *  - 存在的对象/数组型字段 → 转文本，不再变成 [object Object]
+ *  - 不存在的字段 → 不塞默认值，保持原样（避免改变既有语义）
+ * 结构化字段（personalityParameters / emotionState / bodyState 等）一律原样透传。
+ */
+function sanitizeUtopiaTextFields(data) {
+  if (!data || typeof data !== 'object') return data;
+  const out = { ...data };
+  for (const field of TEXT_FIELDS) {
+    if (out[field] !== undefined) {
+      out[field] = toSafeText(out[field]);
+    }
+  }
+  return out;
 }
 
 /**
@@ -344,18 +378,20 @@ function fromCAI(data) {
  */
 function fromGeneric(data) {
   return {
-    name: data.name || '',
-    description: data.description || '',
-    firstMessage: data.firstMessage || '',
-    personality: data.personality || '',
-    relationship: data.relationship || '',
-    systemPrompt: data.systemPrompt || '',
-    callUser: data.callUser || '用户',
-    avatar: data.avatar || '',
-    dialogueExamples: data.dialogueExamples || '',
-    background: data.background || '',
-    cgImage: data.cgImage || '',
-    scene: data.scene || '',
+    // 审计 C-5：所有进入提示词的文本字段统一走 toSafeText 守卫。
+    // 对象/数组型的 personality、description 等不再被隐式转成 [object Object]。
+    name: toSafeText(data.name),
+    description: toSafeText(data.description),
+    firstMessage: toSafeText(data.firstMessage),
+    personality: toSafeText(data.personality),
+    relationship: toSafeText(data.relationship),
+    systemPrompt: toSafeText(data.systemPrompt),
+    callUser: toSafeText(data.callUser) || '用户',
+    avatar: toSafeText(data.avatar),
+    dialogueExamples: toSafeText(data.dialogueExamples),
+    background: toSafeText(data.background),
+    cgImage: toSafeText(data.cgImage),
+    scene: toSafeText(data.scene),
     // ★ 通用格式：透传 profile
     bodyProfile: data.bodyProfile || undefined,
     emotionProfile: data.emotionProfile || undefined,

@@ -251,8 +251,11 @@ export async function createCharacter(data, opts = {}) {
   showToast('角色创建成功', 'success');
 
   const userProvidedProfile = !!(data.bodyProfile || data.emotionProfile);
+  // 审计 C-4：角色卡自带性格参数时不再强制量化。
+  // force 的语义应是「尚未量化，需要补齐」，而非「无论如何都重掷一次」。
+  const hasProvidedPersonality = !!character.personalityParameters;
   import('./personality.js').then(({ autoQuantifyIfNeeded }) => {
-    autoQuantifyIfNeeded(character, true, {
+    autoQuantifyIfNeeded(character, !hasProvidedPersonality, {
       preserveProfiles: userProvidedProfile,
     }).catch(err => {
       console.warn('后台量化失败:', err);
