@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.3-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.4-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,15 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.4
+
+**朋友圈界面第二轮对齐微信；内部重复实现收敛。**
+
+- **朋友圈**：点赞与评论合并进同一个灰底容器（白线分隔，无内容时不渲染）；评论文案改微信格式「名字: 内容」「A 回复 B: 内容」（原全角冒号且回复缺空格），作者名改链接蓝；「···」改两枚小圆点、菜单向上弹出；图片按微信规则排版——单图大图保持比例、4 图 2×2、其余九宫格；「评论」可在容器尚不存在时动态创建，不再点了没反应
+- **内部重构**（无用户可见行为变化）：余弦相似度 3 份合一（`js/core/vectorMath.js`）、路径取值 2 份合一（`lib/pathUtils.js`）、群成员查询 2 份合一（`js/modules/groupMembers.js`）、角色更新锁改用 `db.withKeyLock`；新增 27 例测试，四项均做过反向验证
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.3
 

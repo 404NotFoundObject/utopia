@@ -31,7 +31,7 @@ import {
   isSpeechSupported,
 } from './services/sttService.js';
 
-const APP_VERSION = '3.9.3';
+const APP_VERSION = '3.9.4';
 const STORAGE_VERSION_KEY = 'utopia_app_version';
 const PENDING_CALL_END_KEY = 'utopia:pending-call-end';
 
