@@ -548,21 +548,9 @@ export async function removeGroupMember(groupId, memberId, memberType) {
   return true;
 }
 
-export async function getGroupMembers(groupId) {
-  const stores = await getStores();
-  const members = await stores.group_members.getByIndex('groupId', groupId);
-  const enriched = [];
-  for (const m of members) {
-    if (m.memberType === 'character') {
-      const char = await stores.characters.get(m.memberId);
-      enriched.push({ ...m, character: char });
-    } else {
-      const settings = await stores.settings.get('app_settings');
-      enriched.push({ ...m, user: settings?.user || { name: '用户' } });
-    }
-  }
-  return enriched;
-}
+// 审计 P3-5：实现已抽到 groupMembers.js（与 groupChatEngine 共用），此处保留
+// 对外导出以维持既有 API（groupChatUI / groupSettingsUI / commandEngine 等仍从此处取）。
+export { getGroupMembers } from './groupMembers.js';
 
 export async function setGroupMemberMute(groupId, memberId, memberType, durationSeconds = null) {
   const stores = await getStores();

@@ -1,5 +1,5 @@
 // js/modules/character.js - 角色管理模块（含 PNG 卡头像提取 + 个性化 profile）
-import { getStores } from '../core/db.js';
+import { getStores, withKeyLock } from '../core/db.js';
 import { getAppState } from '../core/state.js';
 import { generateUUID } from '../core/utils.js';
 import { showToast } from '../ui/components/toast.js';
@@ -22,31 +22,6 @@ let _stores = null;
 async function getS() {
   if (!_stores) _stores = await getStores();
   return _stores;
-}
-
-// ============================================================
-// 角色更新串行锁
-// ============================================================
-const _updateLocks = new Map();
-
-async function _withCharacterLock(characterId, fn) {
-  const prev = _updateLocks.get(characterId) || Promise.resolve();
-  let release;
-  const current = new Promise(r => { release = r; });
-  _updateLocks.set(characterId, current);
-
-  try {
-    await prev;
-  } catch (_) {}
-
-  try {
-    return await fn();
-  } finally {
-    release();
-    if (_updateLocks.get(characterId) === current) {
-      _updateLocks.delete(characterId);
-    }
-  }
 }
 
 // ============================================================
@@ -267,9 +242,11 @@ export async function createCharacter(data, opts = {}) {
 
 // ============================================================
 // updateCharacter（串行队列保护）
+// 审计 P3-5：原 _withCharacterLock 与 db.js 的 withKeyLock 实现逐行相同，
+// 现统一复用 withKeyLock（namespace 'character'）。
 // ============================================================
 export async function updateCharacter(id, updates, opts = {}) {
-  return _withCharacterLock(id, async () => {
+  return withKeyLock('character', id, async () => {
     const stores = await getS();
     const existing = await stores.characters.get(id);
     if (!existing) throw new Error('角色不存在');

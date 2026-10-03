@@ -2,6 +2,7 @@
 
 import { getGameTime } from './time.js';
 import { getAppState } from '../core/state.js';
+import { cosineSimilarity } from '../core/vectorMath.js';
 import { SCENE_REGISTRY, getSceneDef } from './sceneRegistry.js';
 
 // ============================================================
@@ -362,20 +363,6 @@ export async function extractSceneBySemantic(messages) {
     console.warn('[ConversationState] 语义场景识别失败:', e);
     return null;
   }
-}
-
-function cosineSimilarity(a, b) {
-  if (!a || !b) return 0;
-  if (a.length !== b.length) return 0;
-  let dot = 0, na = 0, nb = 0;
-  const len = a.length;
-  for (let i = 0; i < len; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
-  if (na === 0 || nb === 0) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
 // ============================================================

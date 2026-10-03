@@ -6,6 +6,7 @@ import { calculateActiveLevel } from './groupActivity.js';
 import { syncCharacterState } from './character.js';
 import { getTempParams } from '../core/runtimeParams.js';
 import { extractMentionNames } from './mentionUtils.js';
+import { getGroupMembers } from './groupMembers.js';
 
 const _autoSpeakLocks = new Set();
 
@@ -22,7 +23,7 @@ function getAutoSpeakSamplingParams(settings) {
 
 export async function decideSpeaker(groupId, userMessage, context = {}) {
   const stores = await getStores();
-  const members = await getGroupMembersWithDetails(groupId, stores);
+  const members = await getGroupMembers(groupId, stores);
 
   const activeCharacters = members
     .filter(m => m.memberType === 'character' && !m.isMuted && m.character)
@@ -153,21 +154,6 @@ function selectByLeastRecent(characters, members) {
   return selected;
 }
 
-async function getGroupMembersWithDetails(groupId, stores) {
-  const members = await stores.group_members.getByIndex('groupId', groupId);
-  const enriched = [];
-  for (const m of members) {
-    if (m.memberType === 'character') {
-      const char = await stores.characters.get(m.memberId);
-      enriched.push({ ...m, character: char });
-    } else {
-      const settings = await stores.settings.get('app_settings');
-      enriched.push({ ...m, user: settings?.user || { name: '用户' } });
-    }
-  }
-  return enriched;
-}
-
 export async function runAutoSpeakCycle(groupId, options = {}) {
   if (_autoSpeakLocks.has(groupId)) {
     console.debug(`[GroupEngine] 自主发言仍在进行中，跳过本轮: ${groupId}`);
@@ -180,7 +166,7 @@ export async function runAutoSpeakCycle(groupId, options = {}) {
     const group = await stores.groups.get(groupId);
     if (!group || group.status === 'disbanded') return;
 
-    const members = await getGroupMembersWithDetails(groupId, stores);
+    const members = await getGroupMembers(groupId, stores);
     const activeCharacters = members
       .filter(m => m.memberType === 'character' && !m.isMuted && m.character)
       .map(m => ({ ...m, character: m.character }));

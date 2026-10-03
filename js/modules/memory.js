@@ -2,6 +2,7 @@
 import { getStores } from '../core/db.js';
 import { generateUUID } from '../core/utils.js';
 import { getAppState } from '../core/state.js';
+import { cosineSimilarity } from '../core/vectorMath.js';
 import { showToast } from '../ui/components/toast.js';
 
 // ============================================================
@@ -478,33 +479,14 @@ async function searchVectors(query, characterId, limit = 5) {
       isValidText(item.doc.userMessage)
     )
     .map(item => {
-      const sim = cosineSimilarity(qVec, item.vector);
+      const sim = cosineSimilarity(qVec, item.vector, (a, b) =>
+        console.warn(`[Memory] cosineSimilarity 维度不匹配: a=${a}, b=${b}，返回 0`));
       return { ...item, score: sim };
     })
     .filter(item => item.score > scoreThreshold)
     .sort((a, b) => b.score - a.score);
 
   return scores.slice(0, limit).map(item => item.doc);
-}
-
-// ============================================================
-// 余弦相似度
-// ============================================================
-function cosineSimilarity(a, b) {
-  if (!a || !b) return 0;
-  if (a.length !== b.length) {
-    console.warn(`[Memory] cosineSimilarity 维度不匹配: a=${a.length}, b=${b.length}，返回 0`);
-    return 0;
-  }
-  let dot = 0, na = 0, nb = 0;
-  const len = a.length;
-  for (let i = 0; i < len; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
-  if (na === 0 || nb === 0) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
 // ============================================================

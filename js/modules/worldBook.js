@@ -1,6 +1,7 @@
 // js/modules/worldBook.js - 世界书管理（完整版，含语义触发支持）
 import { getStores, withKeyLock } from '../core/db.js';
 import { generateUUID } from '../core/utils.js';
+import { cosineSimilarity } from '../core/vectorMath.js';
 import { getAppState } from '../core/state.js';
 import { showToast } from '../ui/components/toast.js';
 import globalEventBus from '../core/eventBus.js';
@@ -336,19 +337,6 @@ function buildSemanticCondition(rule) {
   }
 
   return { and: [semanticCond, userCond] };
-}
-
-function cosineSimilarity(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
-  let dot = 0, na = 0, nb = 0;
-  const len = a.length;
-  for (let i = 0; i < len; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
-  if (na === 0 || nb === 0) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
 export async function syncWorldBookVectors() {
