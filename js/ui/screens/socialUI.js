@@ -143,7 +143,17 @@ export async function openSocialFeed() {
     if (target.classList.contains('social-action-comment')) {
       const postId = target.dataset.postId;
       const postEl = target.closest('.social-post');
-      const commentsArea = postEl?.querySelector('.social-post-comments');
+      // 无点赞且无评论时不渲染灰底容器，首次评论动态创建
+      let bar = postEl.querySelector('.social-comment-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'social-comment-bar';
+        const commentsDiv = document.createElement('div');
+        commentsDiv.className = 'social-post-comments';
+        bar.appendChild(commentsDiv);
+        postEl.querySelector('.social-post-main').appendChild(bar);
+      }
+      const commentsArea = bar.querySelector('.social-post-comments');
       if (commentsArea) {
         showInlineInput(commentsArea, { postId, commentId: null, replyId: null, placeholder: '评论' });
       }
@@ -260,7 +270,8 @@ function renderPostHtml(post) {
   const safePostId = escapeHtml(post.id);
   const safeAuthorId = escapeHtml(post.authorId);
 
-  // —— 评论区（微信灰条）：点评论/回复行即可回复 ——
+  // —— 评论区（微信灰条，与点赞行同容器）：点评论/回复行即可回复 ——
+  // 微信文案格式：「名字: 内容」「A 回复 B: 内容」（半角冒号，名字链接蓝）
   const commentsHtml = (Array.isArray(post.comments) ? post.comments : []).map(c => {
     const cAuthor = getAuthorInfo(c.authorId, c.authorType);
     let repliesHtml = '';
@@ -273,29 +284,37 @@ function renderPostHtml(post) {
         const safeTargetType = escapeHtml(tType);
         const safeTargetName = escapeHtml(tInfo.name);
         // ★ 防 XSS：作者和内容转义
-        return `<div class="social-reply" data-post-id="${safePostId}" data-comment-id="${escapeHtml(c.id)}" data-reply-id="${escapeHtml(r.id)}" data-target-type="${safeTargetType}" data-target-name="${safeTargetName}"><span class="social-cname">${escapeHtml(rAuthor.name)}</span>回复<span class="social-cname">${safeTargetName}</span>：${escapeHtml(r.content)}</div>`;
+        return `<div class="social-reply" data-post-id="${safePostId}" data-comment-id="${escapeHtml(c.id)}" data-reply-id="${escapeHtml(r.id)}" data-target-type="${safeTargetType}" data-target-name="${safeTargetName}"><span class="social-cname">${escapeHtml(rAuthor.name)}</span> 回复 <span class="social-cname">${safeTargetName}</span>: ${escapeHtml(r.content)}</div>`;
       }).join('');
     }
     return `<div class="social-comment-floor">
-      <div class="social-comment-row" data-post-id="${safePostId}" data-comment-id="${escapeHtml(c.id)}" data-target-type="${escapeHtml(c.authorType)}" data-target-name="${escapeHtml(cAuthor.name)}"><span class="social-cname">${escapeHtml(cAuthor.name)}</span>：${escapeHtml(c.content)}</div>
+      <div class="social-comment-row" data-post-id="${safePostId}" data-comment-id="${escapeHtml(c.id)}" data-target-type="${escapeHtml(c.authorType)}" data-target-name="${escapeHtml(cAuthor.name)}"><span class="social-cname">${escapeHtml(cAuthor.name)}</span>: ${escapeHtml(c.content)}</div>
       ${repliesHtml}
     </div>`;
   }).join('');
-  const commentsAreaHtml = (post.comments && post.comments.length > 0) || (post.likes && post.likes.length > 0)
-    ? `<div class="social-post-comments">${commentsHtml}</div>`
-    : `<div class="social-post-comments" style="display:none;"></div>`;
 
-  // —— 点赞行 ——
+  // —— 点赞行（微信式：空心心形 + 蓝色名字列表，与评论同处一个灰底容器） ——
   let likesHtml = '';
   if (Array.isArray(post.likes) && post.likes.length > 0) {
-    const names = post.likes.map(l => escapeHtml(getAuthorInfo(l.authorId, l.authorType).name)).join('、');
-    likesHtml = `<div class="social-post-likes"><i class="${likedByMe ? 'fas' : 'far'} fa-heart social-like-icon"></i><span>${names}</span></div>`;
+    const names = post.likes
+      .map(l => `<span class="social-like-name">${escapeHtml(getAuthorInfo(l.authorId, l.authorType).name)}</span>`)
+      .join('');
+    likesHtml = `<div class="social-post-likes"><i class="${likedByMe ? 'fas' : 'far'} fa-heart social-like-icon"></i>${names}</div>`;
   }
 
-  // —— 图片九宫格（当前帖子 images 为空数组，为插件/未来图片功能预留渲染） ——
+  const hasLikes = !!(Array.isArray(post.likes) && post.likes.length > 0);
+  const hasComments = !!(Array.isArray(post.comments) && post.comments.length > 0);
+  // 微信式灰底容器：点赞在上、白色细线分隔、评论在下；无内容不渲染
+  const barHtml = (hasLikes || hasComments)
+    ? `<div class="social-comment-bar">${likesHtml}${hasLikes && hasComments ? '<div class="social-bar-divider"></div>' : ''}${hasComments ? `<div class="social-post-comments">${commentsHtml}</div>` : ''}</div>`
+    : '';
+
+  // —— 图片：微信规则 —— 单图大图（保持比例），4 图 2×2，其余 3 列九宫格 ——
   let imagesHtml = '';
   if (Array.isArray(post.images) && post.images.length > 0) {
-    imagesHtml = `<div class="social-post-images">${post.images.map(src => `<img src="${escapeHtml(src)}" alt="">`).join('')}</div>`;
+    const n = post.images.length;
+    const layoutClass = n === 1 ? ' count-1' : (n === 4 ? ' count-4' : '');
+    imagesHtml = `<div class="social-post-images${layoutClass}">${post.images.map(src => `<img src="${escapeHtml(src)}" alt="">`).join('')}</div>`;
   }
 
   // ★ 防 XSS：作者名、内容全部转义
@@ -312,16 +331,15 @@ function renderPostHtml(post) {
         <div class="social-post-meta">
           <span class="social-post-time">${escapeHtml(formatRelativeTime(post.timestamp))}</span>
           <div class="social-more-wrap">
-            <button class="social-more-btn" data-post-id="${safePostId}" aria-label="更多操作">&middot;&middot;&middot;</button>
+            <button class="social-more-btn" data-post-id="${safePostId}" aria-label="更多操作"><i></i><i></i></button>
             <div class="social-action-popup">
-              <button class="social-action-item social-action-like" data-post-id="${safePostId}"><i class="${likedByMe ? 'fas' : 'far'} fa-heart"></i>${likedByMe ? '取消' : '赞'}</button>
+              <button class="social-action-item social-action-like" data-post-id="${safePostId}"><i class="fas fa-heart"></i>${likedByMe ? '取消' : '赞'}</button>
               <button class="social-action-item social-action-comment" data-post-id="${safePostId}"><i class="far fa-comment"></i>评论</button>
               ${isOwnPost ? `<button class="social-action-item social-action-delete" data-post-id="${safePostId}"><i class="far fa-trash-alt"></i>删除</button>` : ''}
             </div>
           </div>
         </div>
-        ${likesHtml}
-        ${commentsAreaHtml}
+        ${barHtml}
         <!-- ★ 槽位：帖子底部操作区（插件可注入"翻译"、"点赞"等） ★ -->
         <div data-plugin-slot="social-post-actions" data-post-id="${safePostId}" style="display:contents;"></div>
       </div>

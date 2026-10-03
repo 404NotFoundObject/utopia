@@ -12,7 +12,8 @@
   --wx-divider: #ededed;       /* 帖子分隔线 */
   max-height: 70vh;
   overflow-y: auto;
-  padding: var(--spacing-sm) 0;
+  background: var(--color-bg-secondary);
+  padding: 0;
 }
 [data-theme="wechat-dark"] .social-feed,
 [data-theme="dark"] .social-feed {
@@ -23,12 +24,13 @@
   --wx-divider: #2e2e2e;
 }
 
-/* 头部 */
+/* 头部：微信顶栏式，白底 + 底部细分割线 */
 .social-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-lg);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--wx-divider);
 }
 .social-header h2 {
   margin: 0;
@@ -44,10 +46,9 @@
 /* 发布框 */
 .social-publish-box {
   background: var(--color-bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-base);
-  margin-bottom: var(--spacing-lg);
-  border: 1px solid var(--color-border);
+  padding: 10px 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--wx-divider);
   animation: fadeIn 0.2s ease;
 }
 .social-publish-box textarea {
@@ -74,26 +75,30 @@
   margin-top: var(--spacing-sm);
 }
 
-/* 帖子列表 */
+/* 帖子列表：微信式平铺，帖子间细分割线（无卡片） */
 .social-posts {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-base);
+  background: var(--color-bg-secondary);
 }
 
-/* 单条帖子：头像在左，内容区在右 */
+/* 单条帖子：头像在左，内容区在右；无卡片边框阴影，靠分割线分层 */
 .social-post {
   display: flex;
   gap: 10px;
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: 14px 14px 6px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--color-border-light);
-  transition: box-shadow var(--transition-fast);
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--wx-divider);
 }
-.social-post:hover {
-  box-shadow: var(--shadow-md);
+.social-posts .social-post:last-child {
+  border-bottom: none;
+}
+/* 覆盖 main.css 的悬停卡片动画（微信朋友圈无此效果） */
+.social-posts .social-post {
+  transition: none;
+}
+.social-posts .social-post:hover {
+  box-shadow: none;
+  transform: none;
 }
 .social-post-avatar {
   width: 42px;
@@ -123,7 +128,7 @@
   color: var(--color-text-primary);
 }
 
-/* 图片九宫格 */
+/* 图片：单图大图（保持比例），4 图 2×2，其余 3 列九宫格 */
 .social-post-images {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -138,6 +143,20 @@
   border-radius: 4px;
   display: block;
 }
+.social-post-images.count-1 {
+  display: block;
+  max-width: 65%;
+}
+.social-post-images.count-1 img {
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: auto;
+  max-height: 320px;
+}
+.social-post-images.count-4 {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 56%;
+}
 
 /* 元信息行：时间 + ··· 按钮 + 赞/评论弹出菜单 */
 .social-post-meta {
@@ -151,29 +170,38 @@
   color: var(--wx-muted);
   font-size: 13px;
 }
+/* 「··」按钮：微信式浅灰圆角 + 两个小圆点（用 <i> 画点） */
 .social-more-wrap {
   position: relative;
 }
 .social-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   background: var(--wx-bar-bg);
-  color: var(--wx-link);
   border: none;
   border-radius: 4px;
-  padding: 1px 10px 3px;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
+  width: 28px;
+  height: 20px;
   cursor: pointer;
-  letter-spacing: 1px;
   transition: background var(--transition-fast);
 }
-.social-more-btn:hover {
-  background: color-mix(in srgb, var(--wx-bar-bg) 80%, var(--wx-link) 8%);
+.social-more-btn i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wx-link);
+  opacity: 0.85;
 }
+.social-more-btn:hover {
+  background: color-mix(in srgb, var(--wx-bar-bg) 78%, var(--wx-link) 10%);
+}
+/* 微信式弹出菜单：深灰半透明圆角横条，在按钮上方弹出 */
 .social-action-popup {
   position: absolute;
   right: 0;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   display: none;
   background: var(--wx-popup-bg);
   border-radius: 6px;
@@ -188,12 +216,12 @@
 .social-action-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   color: #ffffff;
   background: transparent;
   border: none;
-  padding: 8px 14px;
-  font-size: 13px;
+  padding: 9px 18px;
+  font-size: 13.5px;
   cursor: pointer;
   white-space: nowrap;
   transition: background var(--transition-fast);
@@ -208,35 +236,47 @@
   color: #fa9d9d;
 }
 
-/* 点赞行（灰底） */
-.social-post-likes {
+/* —— 微信式灰底容器：点赞行 + 白线分隔 + 评论区，同处一个圆角条 —— */
+.social-comment-bar {
   background: var(--wx-bar-bg);
   border-radius: 4px;
   margin-top: 8px;
-  padding: 6px 9px;
   font-size: 13.5px;
-  line-height: 1.5;
+  overflow: hidden;
+}
+/* 点赞行：空心心形 + 蓝色名字列表 */
+.social-post-likes {
+  padding: 7px 9px;
+  line-height: 1.6;
   color: var(--wx-link);
 }
 .social-like-icon {
   margin-right: 8px;
+  color: var(--wx-muted);
+  font-size: 14px;
 }
-
-/* 评论区（灰底） */
+.social-like-name {
+  color: var(--wx-link);
+  font-weight: 600;
+  margin-right: 7px;
+}
+.social-like-name:last-child {
+  margin-right: 0;
+}
+/* 点赞与评论之间的白色细分割线 */
+.social-bar-divider {
+  height: 1px;
+  background: var(--color-bg-secondary);
+  margin: 0 9px;
+}
+/* 评论区 */
 .social-post-comments {
-  background: var(--wx-bar-bg);
-  border-radius: 4px;
-  margin-top: 2px;
-  padding: 5px 9px;
-  font-size: 13.5px;
+  padding: 5px 9px 6px;
   line-height: 1.55;
   color: var(--color-text-primary);
 }
-.social-post-likes + .social-post-comments {
-  margin-top: 6px;
-}
 .social-comment-floor {
-  padding: 3px 0;
+  padding: 2.5px 0;
 }
 .social-comment-row {
   cursor: pointer;
@@ -249,16 +289,16 @@
 .social-cname {
   color: var(--wx-link);
   font-weight: 600;
-  margin: 0 2px;
+  margin-right: 2px;
   cursor: pointer;
 }
 .social-comment-row .social-cname:first-child {
   margin-left: 0;
 }
 
-/* 回复行 */
+/* 回复行：A 回复 B: 内容 */
 .social-reply {
-  padding: 3px 0;
+  padding: 2.5px 0;
   cursor: pointer;
   word-break: break-word;
   color: var(--color-text-primary);
@@ -300,6 +340,7 @@
   text-align: center;
   color: var(--color-text-muted);
   padding: var(--spacing-2xl);
+  margin: 0;
 }
 
 /* 动画 */
