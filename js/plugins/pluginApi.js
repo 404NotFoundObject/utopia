@@ -51,7 +51,13 @@ const eventUnsubscribers = new Map();
 
 // 事件广播器：由 pluginRuntime 注入，用于把主线程 emit 的事件回传给 Worker。
 // 修复审计 P1-4：Worker 的 api.events.on 订阅后，此前全链路无任何代码向 Worker post event:emit。
-let eventBroadcaster = null;
+//
+// 注意：必须用 var 而非 let/const。pluginApi 经
+// pluginApi → modules/index → chat → chatUI → uiBridge → pluginRuntime → pluginApi
+// 成环被嵌套求值，pluginRuntime 顶层会在 pluginApi 函数体执行前调用 setEventBroadcaster；
+// 若为 let/const 则此处处于 TDZ（Cannot access 'eventBroadcaster' before initialization）。
+// var 在模块实例化期即初始化为 undefined，循环依赖下赋值安全。请勿改回 let。
+var eventBroadcaster = null;
 
 /**
  * 注入事件广播器（由 pluginRuntime 调用，避免循环依赖）。
@@ -253,20 +259,39 @@ const _api = {
 // ============================================================
 // 自动装载：从 modules/index.js 遍历所有核心模块
 // ============================================================
+// 惰性执行：模块求值期（pluginApi 经 chat→chatUI→uiBridge→pluginRuntime 成环
+// 被嵌套求值时），直接遍历 ModulesIndex 会命中"尚未求值完成的模块命名空间"，
+// 在部分构建/测试环境下抛 Object.keys(undefined)。改为首次访问时再装载——
+// 此时应用早已启动完成、所有模块就绪，API 形态与运行时行为完全不变。
 
-for (const [moduleName, moduleExports] of Object.entries(ModulesIndex)) {
-  if (_api[moduleName] !== undefined) {
-    console.warn(`[PluginApi] 模块名冲突: "${moduleName}" 已被占用，跳过`);
-    continue;
+let modulesLoaded = false;
+
+function ensureModulesLoaded() {
+  if (modulesLoaded) return;
+  modulesLoaded = true;
+  for (const [moduleName, moduleExports] of Object.entries(ModulesIndex)) {
+    if (_api[moduleName] !== undefined) {
+      console.warn(`[PluginApi] 模块名冲突: "${moduleName}" 已被占用，跳过`);
+      continue;
+    }
+    // 防御：即便仍在求值中（理论上不会到达这里），未就绪的命名空间不包装
+    if (!moduleExports || typeof moduleExports !== 'object') {
+      console.warn(`[PluginApi] 模块 "${moduleName}" 尚未就绪，跳过装载`);
+      continue;
+    }
+    _api[moduleName] = wrapModule(moduleName, moduleExports);
   }
-  _api[moduleName] = wrapModule(moduleName, moduleExports);
 }
+
+// 兼容旧引用：原顶层循环在此直接执行，现暴露为可调用以确保装载完成
+export { ensureModulesLoaded };
 
 // ============================================================
 // 方法路径解析
 // ============================================================
 
 export function resolveApiMethod(methodPath) {
+  ensureModulesLoaded();
   if (typeof methodPath !== 'string') return null;
   const parts = methodPath.split('.');
   if (parts.length !== 2) return null;
@@ -286,6 +311,7 @@ export function resolveApiMethod(methodPath) {
 // ============================================================
 
 export async function invokeApiMethod(methodPath, args = [], callerContext = {}) {
+  ensureModulesLoaded();
   const pluginId = callerContext.pluginId;
 
   // ============================================================
@@ -366,6 +392,7 @@ function serializeResult(result) {
 // ============================================================
 
 export function listApiMethods() {
+  ensureModulesLoaded();
   const result = {};
   for (const [moduleName, module] of Object.entries(_api)) {
     if (typeof module !== 'object') continue;

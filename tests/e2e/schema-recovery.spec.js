@@ -142,6 +142,23 @@ test.describe('Schema 失配恢复', () => {
       memories: { keyPath: 'id' },
     });
 
+    // ★ 必须写入一条「无法无损迁移」的记录，否则本用例测不到报错路径。
+    // db.js 的 migrateKeyPaths 对「空的错配 store」会零风险地自动重建
+    // （审计 A-2 缺陷③：重建空表不丢数据，不再走报错），因此空库会被静默自愈、
+    // 不弹任何对话框。只有记录里缺新主键字段（此处记录只有旧主键 key、没有 id）
+    // 时，无损迁移才会放弃，把决策交回上层并弹出可读提示。
+    await page.evaluate(() => new Promise((resolve, reject) => {
+      const req = indexedDB.open('UtopiaDB', 9);
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('settings', 'readwrite');
+        tx.objectStore('settings').add({ key: 'theme', value: 'wechat' });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    }));
+
     await page.goto('/');
 
     // 应用应当弹出重建对话框，而不是带着坏库继续跑

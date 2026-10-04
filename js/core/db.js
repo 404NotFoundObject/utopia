@@ -3,6 +3,11 @@
 const DB_NAME = 'UtopiaDB';
 const DB_VERSION = 9;
 
+// 升版 open 被其他连接阻塞时，等待其释放的最长时间。
+// blocked 通常会在毫秒级自行解除（对方关闭连接后即继续走 upgrade），
+// 只有超过这个时长才认定是「真有其他标签页占用」，才向用户报错。
+const BLOCK_WAIT_MS = 10_000;
+
 const EXPECTED_SCHEMA = {
   characters: {
     keyPath: 'id',
@@ -164,7 +169,7 @@ const _migratedStoreNames = new Set();
  *   keyPathMismatches: Array<{store: string, actual: string|null, expected: string}>,
  * }}
  */
-function inspectSchema(db) {
+async function inspectSchema(db) {
   const missingStores = [];
   const missingIndexes = [];
   const keyPathMismatches = [];
@@ -191,6 +196,19 @@ function inspectSchema(db) {
         missingIndexes.push({ store: storeName, index: idx.name });
       }
     }
+  }
+
+  // ★ 修复「自愈自阻塞」：必须等本探测事务真正提交后再返回。
+  // 调用方 ensureSchemaCompatible 紧接着会 db.close() 并以更高版本重开；
+  // 若此时该连接仍有未完成的事务，close() 会被推迟、连接继续占位，
+  // 于是紧随其后的升版 open 触发 onblocked —— 表现为「数据库被其他页面阻塞」的误报，
+  // 实际上并没有别的页面，是刚关闭的连接还没释放。
+  if (tx) {
+    await new Promise((resolve) => {
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+      tx.onabort = resolve;
+    });
   }
 
   return { missingStores, missingIndexes, keyPathMismatches };
@@ -230,6 +248,17 @@ function openAtVersion(version) {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, version);
 
+    // 收口为「只 settle 一次」：blocked 期间不结束 Promise，等真正的 success/error，
+    // 或等到超时才判定为真阻塞。
+    let settled = false;
+    let timer = null;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      fn(value);
+    };
+
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       const transaction = event.target.transaction;
@@ -245,11 +274,18 @@ function openAtVersion(version) {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => finish(resolve, request.result);
+    request.onerror = () => finish(reject, request.error);
     request.onblocked = () => {
-      console.warn('[DB] 打开被阻塞，可能有其他页面正在使用旧版本');
-      reject(new Error('数据库被其他页面阻塞，请关闭其他标签页后重试'));
+      // blocked 是**可恢复的中间态**：其他连接释放后，本请求会继续走
+      // upgradeneeded/success。此前在此直接 reject，会把「本应用自己刚关闭的
+      // 连接尚未完全释放」这类瞬时阻塞变成硬失败——用户被引导去执行
+      // 「删除所有数据并重建（不可恢复）」，代价与问题严重不匹配。
+      // 现改为只告警并等待；只有长时间仍未解除（确实有其他标签页占用）才报错。
+      console.warn('[DB] 打开被阻塞：等待其他连接释放…');
+      timer = setTimeout(() => {
+        finish(reject, new Error('数据库被其他页面阻塞，请关闭其他标签页后重试'));
+      }, BLOCK_WAIT_MS);
     };
   });
 }
@@ -266,7 +302,7 @@ function openAtVersion(version) {
  * @returns {Promise<IDBDatabase>}
  */
 async function ensureSchemaCompatible(db) {
-  const first = inspectSchema(db);
+  const first = await inspectSchema(db);
 
   if (first.keyPathMismatches.length > 0) {
     // 记录级迁移（审计 P1-13）：不再直接删整库，而是先读出旧数据，
@@ -294,7 +330,7 @@ async function ensureSchemaCompatible(db) {
   db.close();
 
   const repaired = await openAtVersion(repairVersion);
-  const second = inspectSchema(repaired);
+  const second = await inspectSchema(repaired);
 
   if (second.missingStores.length > 0 || second.missingIndexes.length > 0) {
     repaired.close();
@@ -449,6 +485,13 @@ let dbInstance = null;
 export async function getDB() {
   if (!dbInstance) {
     dbInstance = await openDB();
+    // 当别处（其他标签页，或本应用自愈流程抬升版本）请求升版时主动释放连接。
+    // 不这么做的话，这个长连接会把对方的 open 卡在 onblocked 上。
+    dbInstance.onversionchange = () => {
+      console.warn('[DB] 检测到版本变更请求，释放当前连接');
+      try { dbInstance.close(); } catch (_) {}
+      dbInstance = null;
+    };
   }
   return dbInstance;
 }

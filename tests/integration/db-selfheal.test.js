@@ -127,6 +127,33 @@ describe('core/db · schema 失配处理', () => {
       second.close();
     });
 
+    it('升版被其他连接阻塞时不立即失败，连接释放后自愈继续完成', async () => {
+      // 场景：自愈要抬版本补全缺表，但此刻另有一个连接占着库。
+      // blocked 是**可恢复的中间态**。旧实现在 onblocked 里立即 reject，
+      // 把瞬时阻塞变成「数据库初始化失败 → 删除所有数据重建（不可恢复）」的硬错误，
+      // 而实际上并没有别的页面，只是连接尚未释放。现应等待并最终完成自愈。
+      await seedLegacyDb({
+        characters: { keyPath: 'id' },
+        settings: { keyPath: 'id' },
+        memories: { keyPath: 'id' },
+      });
+
+      // 保持一个 v9 连接不关，制造升版阻塞
+      const blocker = await new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 9);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      const pending = openDB();
+      // 稍后释放占用连接，模拟「其他连接很快关掉」的真实情况
+      setTimeout(() => blocker.close(), 50);
+
+      const db = await pending;
+      expect(storeNames(db)).toHaveLength(EXPECTED_STORE_COUNT);
+      db.close();
+    });
+
     it('自愈后可正常读写（settings 主键可命中）', async () => {
       await seedLegacyDb({
         characters: { keyPath: 'id' },
