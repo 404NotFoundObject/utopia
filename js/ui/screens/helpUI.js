@@ -89,7 +89,7 @@ export function renderHelpModal() {
       </style>
 
       <h1>📖 Utopia 使用指南</h1>
-      <p class="note">版本 v3.7 · 文档更新于 2026-09-19</p>
+      <p class="note">版本 v3.9.5 · 文档更新于 2026-10-04</p>
 
       <section>
         <h2>✨ 概述</h2>
@@ -105,7 +105,7 @@ export function renderHelpModal() {
           <li><strong>世界书系统 v2.0</strong>：规则组、嵌套条件、宏模板、<strong>语义触发</strong>与向量同步。</li>
           <li><strong>插件系统 v1.0</strong>：Worker 隔离、钩子系统、UI 槽位、权限声明。</li>
           <li><strong>统一右键菜单</strong>：核心菜单与插件菜单自动合并，按优先级排列。</li>
-          <li><strong>朋友圈社交</strong>：角色和用户可发布动态，AI 自动互动。</li>
+          <li><strong>朋友圈社交</strong>：角色和用户可发布动态，AI 自动互动。界面已对齐微信风格——方形圆角头像、蓝色昵称、九宫格图片（单图大图 / 4 图 2×2 / 其余九宫格）、赞与评论合并在同一灰底容器，评论采用「A 回复 B：内容」格式。</li>
           <li><strong>群聊支持</strong>：多角色同屏对话，@提及、@触发回复、自动发言轮询。</li>
           <li><strong>🔊 语音合成 (TTS)</strong>：Web Speech API / Kokoro，每角色可独立配置音色。</li>
           <li><strong>🎤 语音输入 (STT)</strong>：长按麦克风或按住 Ctrl/Alt 说话。</li>
@@ -343,6 +343,13 @@ export function renderHelpModal() {
           通过 <code>api.character.updateCharacter()</code> 修改。
           需要使用 <code>character:read</code> 和 <code>character:write</code> 权限。
         </p>
+
+        <h3>ℹ️ 关于</h3>
+        <ul>
+          <li><strong>当前版本</strong>：设置 → 关于 中直接展示完整版本号（取自 <code>js/core/appMeta.js</code>），不再依赖翻代码或猜。</li>
+          <li><strong>检查更新</strong>：走独立版本通道 <code>version.json</code>（不依赖已加载代码的版本常量），每 30 分钟自动检查一次，页面重新可见时也会补检查；「最后检查时间」以 <code>yyyy-mm-dd hh:mm:ss</code> 显示。发现新版本可在面板内直接「立即更新」。</li>
+          <li><strong>清除缓存并重载</strong>：一键清理本地缓存并刷新页面，用于版本切换或样式/脚本「没生效」时强制刷新。</li>
+        </ul>
       </section>
 
       <section>
@@ -1164,7 +1171,7 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
       </section>
 
       <div style="text-align:right;font-size:0.8rem;color:var(--color-text-muted);margin-top:1rem;border-top:1px solid var(--color-border);padding-top:0.5rem;">
-        Utopia v3.7 · 文档版本 3.4 · 2026-09-19
+        Utopia v3.9.5 · 2026-10-04
       </div>
     </div>
   `;

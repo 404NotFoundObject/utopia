@@ -13,6 +13,14 @@ import { generateUUID } from './core/utils.js';
 import { openModal, closeModal } from './ui/components/modal.js';
 import { showToast } from './ui/components/toast.js';
 
+// 版本号单一真源：ui / sw / 更新检查都从这里取，避免各存一份
+import { APP_VERSION, STORAGE_VERSION_KEY } from './core/appMeta.js';
+import {
+  registerWorldTask,
+  startWorldTick,
+  stopWorldTick,
+} from './core/worldTick.js';
+
 import { initTheme, bindThemeToggle } from './ui/layout/theme.js';
 import { initSidebar } from './ui/layout/sidebar.js';
 import { initWechatTheme } from './ui/layout/wechatTheme.js';
@@ -31,8 +39,6 @@ import {
   isSpeechSupported,
 } from './services/sttService.js';
 
-const APP_VERSION = '3.9.4';
-const STORAGE_VERSION_KEY = 'utopia_app_version';
 const PENDING_CALL_END_KEY = 'utopia:pending-call-end';
 
 let _stopProactiveChat = null;
@@ -40,26 +46,24 @@ let _hangupCurrentCall = null;
 // _hangupCurrentCallSync：同步挂断引用，仅用于 beforeunload。
 // 只写 pending + 关闭 UI，消息落库交给 recoverPendingCallEnd 补偿。
 let _hangupCurrentCallSync = null;
-let _intervalIds = [];
 
-function checkAppVersion() {
-  const storedVersion = localStorage.getItem(STORAGE_VERSION_KEY);
-  if (storedVersion && storedVersion !== APP_VERSION) {
-    console.log(`🔄 应用版本更新: ${storedVersion} → ${APP_VERSION}`);
-    if ('caches' in window) {
-      caches.keys().then(keys => {
-        keys.forEach(key => caches.delete(key));
-      });
-    }
-    localStorage.setItem(STORAGE_VERSION_KEY, APP_VERSION);
-    setTimeout(() => {
-      if (confirm(`应用已更新至 v${APP_VERSION}，建议刷新页面以获得最佳体验。`)) {
-        location.reload();
-      }
-    }, 500);
-  } else if (!storedVersion) {
-    localStorage.setItem(STORAGE_VERSION_KEY, APP_VERSION);
-  }
+/**
+ * 启动更新守护（替代原 checkAppVersion）。
+ *
+ * 原实现拿「已加载代码里的 APP_VERSION」去比对 localStorage，
+ * 而 Service Worker 对静态资源是 stale-while-revalidate —— 长期不关页面时
+ * 跑的一直是旧代码，版本号也是旧的，于是永远既不提示也装不上新版。
+ * 现在改由独立通道 version.json 探测（不进缓存），并用非阻塞横幅提示。
+ */
+function startVersionWatch() {
+  import('./core/updateChecker.js')
+    .then(({ startUpdateWatch }) => {
+      // 更新检查延迟到 init 末尾，不与数据库校验抢首屏
+      startUpdateWatch();
+    })
+    .catch((err) => {
+      console.warn('[App] 更新守护启动失败:', err);
+    });
 }
 
 function showDbErrorDialog(errorMsg, errorCode) {
@@ -200,25 +204,19 @@ async function recoverPendingCallEnd() {
   }
 }
 
-function registerInterval(fn, ms) {
-  const id = setInterval(() => {
-    if (document.hidden) return;
-    try {
-      fn();
-    } catch (e) {
-      console.warn('[App] 定时任务异常:', e);
-    }
-  }, ms);
-  _intervalIds.push(id);
-  return id;
-}
-
-function clearAllIntervals() {
-  for (const id of _intervalIds) {
-    try { clearInterval(id); } catch (_) {}
-  }
-  _intervalIds = [];
-}
+// ============================================================
+// 周期性世界任务
+//
+// character / social / group 三者的轮询此前各自持有独立 setInterval
+// （registerInterval），相位不统一、后台跳过也不顺延，切回前台后世界状态
+// 要滞后一个周期才追上。统一收编到 worldTick 的单一心跳上，按「距上次
+// 执行已过去多久」判定到期，隐藏页只走时间、不执行，回前台即补跑。
+// ============================================================
+const WORLD_TICK_INTERVALS = {
+  character: 60_000,
+  social: 600_000,
+  group: 300_000,
+};
 
 let _wbVectorSyncAttempted = false;
 let _wbVectorSyncPollTimer = null;
@@ -805,7 +803,7 @@ function handleResize() {
 let _groupMsgRenderTimer = null;
 
 async function init() {
-  checkAppVersion();
+  startVersionWatch();
 
   const dbStatus = await checkDatabase();
   if (!dbStatus.ok) {
@@ -887,7 +885,7 @@ async function init() {
 
     try { _hangupCurrentCallSync?.(); } catch (_) {}
 
-    clearAllIntervals();
+    stopWorldTick();
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -1076,33 +1074,37 @@ async function init() {
 
   bindUIEvents();
   initSidebar();
-  initWechatTheme();
+  // 恢复微信主题时须等皮肤样式表就绪再置就绪标志，避免首帧裸样式
+  await initWechatTheme();
 
   window.addEventListener('resize', handleResize);
   handleResize();
 
-  registerInterval(() => {
+  registerWorldTask('character', () => {
     const currentChar = getCurrentCharacter();
     if (currentChar) {
       syncCharacterState(currentChar.id).catch(err => console.warn('[Timer] 状态同步失败:', err));
     }
-  }, 60000);
+  }, WORLD_TICK_INTERVALS.character);
 
-  registerInterval(() => {
+  registerWorldTask('social', () => {
     checkAutoPost().catch(err => console.warn('[Social] 自动发帖失败:', err));
-  }, 600000);
+  }, WORLD_TICK_INTERVALS.social);
 
   // 重建上次会话遗留的评论/回复延时调度（P2-5）
   rebuildSocialSchedule().catch(err => console.warn('[Social] 重建调度失败:', err));
 
-  registerInterval(() => {
+  registerWorldTask('group', () => {
     const groupId = state.get('currentGroupId');
     if (groupId) {
       import('./modules/groupChatEngine.js').then(m => {
         m.runAutoSpeakCycle(groupId).catch(err => console.warn('[Group] 自主发言轮询失败:', err));
       });
     }
-  }, 300000);
+  }, WORLD_TICK_INTERVALS.group);
+
+  // 三条世界任务注册完毕，统一启动心跳
+  startWorldTick();
 
   if (localStorage.getItem('utopia:dev-monitor') === 'on') {
     import('./dev/engineMonitor.js')
@@ -1114,8 +1116,10 @@ async function init() {
   // 外部（如 E2E 测试）若以它为「可交互」信号会在点击时落空。
   if (typeof window !== 'undefined') {
     window.__utopiaReady = true;
+    // 版本号挂到 window：控制台 / E2E 可直接确认当前跑的是哪一版
+    window.__utopiaVersion = APP_VERSION;
   }
-  console.log('✅ Utopia 应用已启动');
+  console.log(`✅ Utopia v${APP_VERSION} 应用已启动`);
 }
 
 init().catch(err => {

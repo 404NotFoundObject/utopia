@@ -33,6 +33,7 @@ import { renderContextSection, bindContextSection } from './settingsUI/sections/
 import { renderTtsSection, bindTtsSection } from './settingsUI/sections/ttsSection.js';
 import { renderSttSection, bindSttSection } from './settingsUI/sections/sttSection.js';
 import { renderProactiveSection, bindProactiveSection } from './settingsUI/sections/proactiveSection.js';
+import { renderAboutSection, bindAboutSection } from './settingsUI/sections/aboutSection.js';
 import { renderDangerSection, bindDangerSection } from './settingsUI/sections/dangerSection.js';
 
 // ---- 保存逻辑 ----
@@ -90,6 +91,8 @@ export function renderSettingsModal() {
 
     ${renderProactiveSection(settings, ctx)}
 
+    ${renderAboutSection(settings, ctx)}
+
     ${renderDangerSection(settings, ctx)}
 
     <div data-plugin-slot="settings-sections" style="display:contents;"></div>
@@ -143,6 +146,7 @@ export function bindSettingsSave(modalContent) {
     bindTtsSection(modalContent, ctx),
     bindSttSection(modalContent, ctx),
     bindProactiveSection(modalContent, ctx),
+    bindAboutSection(modalContent, ctx),
     bindDangerSection(modalContent, ctx),
   ];
 
