@@ -5,6 +5,41 @@
 
 ---
 
+## [3.9.5] - 2026-10-04
+
+世界心跳与版本子系统落地；微信主题样式按需加载、朋友圈视觉统一；修复数据库自愈的「自阻塞」真实缺陷与插件模块链初始化缺陷。
+
+### 新增
+
+- **世界心跳（P3-4）**：新增 `js/core/worldTick.js` 作为唯一 1s 心跳，收敛 `app.js` 里三条各自为政的 `setInterval`。核心修复：后台 tick 不顺延 → 回到前台立即补跑（此前离开页面再回来，世界里的时间是停的）；async 重入保护；顺延排在 `time.js` 的 `visibilitychange` 之后，避免状态错位。配套 `tests/unit/core/worldTick.test.js`（12 例）
+- **版本子系统（P3-10 阶段 B）**：新增 `version.json` 作为独立于应用资源的版本通道，配套 `js/core/appMeta.js`（运行期唯一版本真源）与 `js/core/updateChecker.js`（每 30 分钟 / 页面重新可见时检查，发现新版本主动清 SW 缓存并 reload——此前用户会长期停在旧壳上）。设置页新增「关于」面板（`settingsUI/sections/aboutSection.js`），展示版本号与最后检查时间，可手动检查更新、清除缓存并重载
+- **发布脚本**：`scripts/release.mjs`——一处输入版本号，同步 `appMeta.js` / `package.json` / `version.json` / README 徽章四处副本（此前手工改必然漏改，导致 SW 缓存名陈旧与「设置页版本与实际不符」）
+
+### 朋友圈
+
+- **移除头部「🌐 朋友圈」标题**：sticky 顶栏标题由 `wechatTheme.js` 独立注入，不依赖此标题，返回后顶栏仍有标题。头部背景由 `transparent` 改为与帖子一致
+- **帖子区域背景统一**：`.social-feed` / `.social-posts` / `.social-publish-box` 由灰底 `--color-bg-secondary` 改为与帖子同色；微信主题下该变量为 `#f5f5f5` 与白卡不同值，故显式覆盖为 `#ffffff` / `#1f1f1f`（dark）。消除帖子上下灰色空白与白卡的割裂
+
+### 微信主题
+
+- **`css/wechat.css` 改为按需加载**：从 `index.html` 移除常驻 `<link>`，改由 `wechatTheme.js` 激活微信主题时注入、停用时移除——非微信主题下这几十 KB 规则不再参与样式匹配。注入点强制插在 `titlebar.css` 之前（窗口装饰器依赖加载顺序覆盖 wechat 变量）；`sw.js` 补 `EXTRA_PRECACHE` 显式预缓存（移除 link 后预缓存爬取已不可达，否则离线切微信主题会缺样式）
+- **消除按需加载引入的 FOUC**：注入前挂 `html[data-wx-loading]` 禁用全站过渡（否则 `main.css` 的 `* { transition: background-color 250ms }` 会让整页背景做动画），加载后双 rAF 解除；`activateWechatTheme` 等样式表真正就绪，`app.js` 在置 `__utopiaReady` 之前 `await initWechatTheme()`——启动恢复路径不再闪
+- **皮肤生命周期对称**：`wechatTheme.js` 的副作用全部登记 `disposers` 回收（阶段 C）
+
+### 修复
+
+- **数据库自愈「自阻塞」（真实生产缺陷）**：`DB_VERSION` 与旧库同版本时首次 open 不触发 upgrade，自愈发现缺表后 `db.close()` 立即 `openAtVersion(更高版本)`，而 `inspectSchema` 的只读事务尚未提交、连接仍在占位 → **自己把自己 blocked** → 旧逻辑在 `onblocked` 里立即 reject → 弹出「数据库被其他页面阻塞 / 删除所有数据重建」。三处修复：`inspectSchema` 改异步并等事务 `oncomplete` 后再返回（治本）；`onblocked` 由立即失败改为只告警并等待（blocked 是可恢复中间态），加 10s 超时兜底；`getDB()` 单例注册 `onversionchange` 主动释放连接。危害不止测试——真实用户缺表自愈时会被推进「删除全部数据」的不可恢复对话框
+- **插件模块链初始化缺陷**：`pluginApi → modules/index → chat → chatUI → uiBridge → pluginRuntime → pluginApi` 成静态环。以 `pluginApi.js` 为入口会 TDZ 崩溃（`Cannot access 'eventBroadcaster' before initialization`），以 `modules/index.js` 为入口会 `Object.keys(undefined)` 崩溃。修复：`let eventBroadcaster` → `var`（消除 TDZ，已加注释禁止改回）；自动装载循环改 `ensureModulesLoaded()` 惰性执行，由 `resolveApiMethod` / `invokeApiMethod` / `listApiMethods` 首次调用触发。浏览器入口顺序本就安全（app.js 动态 import 插件），故此为排雷而非修生产事故——现在任意入口顺序都免疫
+- **关于 / 帮助**：移除「版本号以 js/core/appMeta.js 为准」的内部实现说明；「最近检查」两行合一为「最后检查时间：yyyy-mm-dd hh:mm:ss」（补秒）；使用指南同步到当前版本并新增「关于」小节
+
+### 测试
+
+- 新增：`tests/unit/core/worldTick.test.js`、`updateChecker.test.js`、`versionConsistency.test.js`、`tests/unit/ui/settingsSections.test.js`、`themeVars.test.js`、`wechatThemeLifecycle.test.js`、`tests/unit/plugins/pluginApiEntry.test.js`、`modulesIndexEntry.test.js`、`pluginApiSurface.test.js`、`tests/e2e/social-visual.spec.js`、`update-check.spec.js`、`tests/e2e/helpers/wx-theme-ready.js`
+- 去重：抽出共享的 `waitForWxStylesheet` helper；「wechat.css 已注入且排在 titlebar.css 之前」的断言归并到 `wechat-theme`（主题层职责），`social-visual` 只保留朋友圈视觉断言
+- `schema-recovery.spec.js` 第三例此前断言的是已被废弃的旧契约（空错配 store 按 A-2 缺陷③应无损重建、不报错），补种「缺新主键字段」的记录后才真正命中不可无损迁移路径
+
+---
+
 ## [3.9.4] - 2026-10-03
 
 朋友圈界面第二轮对齐微信；内部重复实现收敛为单一来源（无用户可见行为变化）。

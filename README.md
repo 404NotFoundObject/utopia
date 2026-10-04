@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.4-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.5-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,20 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.5
+
+**世界心跳与版本子系统落地；微信主题样式按需加载；修复数据库自愈自阻塞。**
+
+- **世界心跳**：收敛散落的三条定时器为 `js/core/worldTick.js` 单一 1s 心跳。修复后台 tick 不顺延的问题——此前切走标签页再回来，世界里的时间是停的，现在回前台立即补跑
+- **版本子系统**：新增 `version.json` 独立版本通道 + 运行期唯一真源 `appMeta.js`，配合 `updateChecker.js` 定期检查，发现新版本会主动清 Service Worker 缓存并重载（此前用户会长期停在旧应用壳上）。设置页新增「关于」面板，可查看版本与最后检查时间、手动检查更新、清除缓存重载
+- **微信主题性能**：`wechat.css` 由常驻加载改为激活时注入、停用时移除，非微信主题不再参与样式匹配；注入期禁用全站过渡 + 启动等待样式表就绪，消除按需加载带来的整页背景闪烁；Service Worker 补上显式预缓存，保证离线切微信主题不缺样式
+- **朋友圈视觉**：移除头部「🌐 朋友圈」标题（顶栏标题独立注入，不受影响）；帖子区域容器统一为与帖子相同的背景色，消除帖子上下灰色空白与白卡的割裂
+- **修复数据库自愈自阻塞**：旧库缺表时，自愈关闭连接后立即以更高版本重开，却因只读事务未提交而连接仍在占位，把自己阻塞 → 旧逻辑立即失败并弹出「删除所有数据重建」的不可恢复提示。现在改为等事务提交后再关连接，`onblocked` 视为可恢复中间态（等待 + 超时兜底），单例连接主动响应 `onversionchange`
+- **修复插件模块链初始化缺陷**：`pluginApi` 与 `modules/index` 互为循环依赖的一环，直接以任一者作为入口导入会崩溃（TDZ / `Object.keys(undefined)`）。改为惰性装载，现在任意入口顺序都免疫（浏览器入口原本安全，属排雷）
+- **其他**：关于面板移除内部实现说明、检查时间补齐秒并合为一行；使用指南同步至当前版本；新增发布脚本 `scripts/release.mjs`，一处输入版本号同步四处副本（此前手工改必然漏改）
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.4
 
