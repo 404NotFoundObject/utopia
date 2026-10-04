@@ -13,7 +13,6 @@ export async function openSocialFeed() {
   const html = `
     <div class="social-feed">
       <div class="social-header" data-plugin-slot="social-header">
-        <h2><i class="fas fa-globe"></i> 朋友圈</h2>
         <div class="social-header-actions">
           <!-- ★ 槽位：头部按钮区（插件可注入） ★ -->
           <div data-plugin-slot="social-header-actions" style="display:contents;"></div>

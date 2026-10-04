@@ -12,7 +12,8 @@
   --wx-divider: #ededed;       /* 帖子分隔线 */
   max-height: 70vh;
   overflow-y: auto;
-  background: var(--color-bg-secondary);
+  /* 与帖子同底色，避免下方空白区露出灰底与白卡割裂 */
+  background: var(--color-bg-primary);
   padding: 0;
 }
 [data-theme="wechat-dark"] .social-feed,
@@ -24,18 +25,13 @@
   --wx-divider: #2e2e2e;
 }
 
-/* 头部：微信顶栏式，白底 + 底部细分割线 */
+/* 头部：仅保留右侧操作按钮（标题栏已移除），底色与帖子一致 */
 .social-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 12px 14px;
   border-bottom: 1px solid var(--wx-divider);
-}
-.social-header h2 {
-  margin: 0;
-  flex: 1;
-  font-size: var(--font-size-lg);
 }
 .social-header-actions {
   display: flex;
@@ -45,7 +41,7 @@
 
 /* 发布框 */
 .social-publish-box {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding: 10px 14px;
   margin-bottom: 4px;
   border-bottom: 1px solid var(--wx-divider);
@@ -79,7 +75,8 @@
 .social-posts {
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-secondary);
+  /* 与帖子（.social-post）同底色，整片区域不再出现灰白分层 */
+  background: var(--color-bg-primary);
 }
 
 /* 单条帖子：头像在左，内容区在右；无卡片边框阴影，靠分割线分层 */
@@ -197,18 +194,20 @@
 .social-more-btn:hover {
   background: color-mix(in srgb, var(--wx-bar-bg) 78%, var(--wx-link) 10%);
 }
-/* 微信式弹出菜单：深灰半透明圆角横条，在按钮上方弹出 */
+/* 微信式弹出菜单：深灰半透明圆角横条，在「··」按钮**左侧**水平弹出并与按钮垂直居中。
+   放在左侧而非上方：按钮贴在帖子右边缘，向上弹会被列表可视区/顶栏裁掉。 */
 .social-action-popup {
   position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
   display: none;
   background: var(--wx-popup-bg);
   border-radius: 6px;
   overflow: hidden;
   z-index: 8;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  animation: fadeIn 0.15s ease;
+  animation: socialPopupIn 0.15s ease;
 }
 .social-action-popup.open {
   display: flex;
@@ -348,6 +347,11 @@
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* 弹出菜单专用：必须保留 translateY(-50%)，否则会被动画覆写导致垂直居中失效 */
+@keyframes socialPopupIn {
+  from { opacity: 0; transform: translate(4px, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
 
 /* 响应式调整（可选） */
 @media (max-width: 768px) {
@@ -363,9 +367,5 @@
   .social-inline-comment .social-inline-actions {
     width: 100%;
     justify-content: flex-end;
-  }
-  .social-action-popup {
-    right: auto;
-    left: 0;
   }
 }

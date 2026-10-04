@@ -46,9 +46,10 @@ describe('PWA 资源完整性', () => {
     expect(html).toContain('js/pwa.js');
     // 键盘弹出时收缩布局视口：WEBAPK 与浏览器快捷方式行为一致
     expect(html).toContain('interactive-widget=resizes-content');
-    // 窗口装饰器样式表须在 wechat.css 之后，保证变量覆盖顺序一致
+    // 窗口装饰器样式表常驻；wechat.css 已改按需加载（wechatTheme.js
+    // 激活时注入、插在 titlebar.css 之前保持覆盖顺序），不应常驻 index.html
     expect(html).toContain('css/titlebar.css');
-    expect(html.indexOf('css/titlebar.css')).toBeGreaterThan(html.indexOf('css/wechat.css'));
+    expect(html).not.toContain('href="css/wechat.css"');
   });
 
   test('sw.js 递归预缓存同源资源（覆盖动态导入模块），由页面消息驱动', () => {
@@ -65,6 +66,40 @@ describe('PWA 资源完整性', () => {
     const pwa = readFileSync(resolve(root, 'js/pwa.js'), 'utf-8');
     expect(pwa).toMatch(/type: 'precache'/);
     expect(pwa).toContain('webdriver');
+  });
+
+  test('sw.js 显式预缓存按需加载的 wechat.css（爬取不可达）', () => {
+    const sw = readFileSync(resolve(root, 'sw.js'), 'utf-8');
+    // wechat.css 不在 index.html 引用链上，爬取从 entry 出发发现不了它，
+    // 必须由 EXTRA_PRECACHE 显式补进队列，否则离线切微信主题缺样式
+    expect(sw).toContain('EXTRA_PRECACHE');
+    expect(sw).toMatch(/EXTRA_PRECACHE\s*=\s*\['css\/wechat\.css'\]/);
+    expect(sw).toMatch(/for \(const extra of EXTRA_PRECACHE\)/);
+  });
+
+  test('sw.js 缓存名由 version.json 推导，激活时清理旧版本缓存', () => {
+    const sw = readFileSync(resolve(root, 'sw.js'), 'utf-8');
+    // 不再硬编码 CACHE_VERSION 常量：发版只改 version.json 就会自动换新缓存桶
+    expect(sw).toContain('resolveCacheName');
+    expect(sw).toMatch(/ACTIVE_CACHE_NAME\s*=\s*await\s+resolveCacheName\(\)/);
+    expect(sw).toMatch(/k !== ACTIVE_CACHE_NAME/);
+  });
+
+  test('sw.js 保证版本通道 version.json 永不进缓存', () => {
+    const sw = readFileSync(resolve(root, 'sw.js'), 'utf-8');
+    // 1) 递归预缓存爬取时必须跳过它
+    expect(sw).toMatch(/if\s*\(isNeverCached\(u\)\)\s*continue;/);
+    // 2) fetch 拦截必须网络直通，既不读缓存也不写缓存
+    expect(sw).toMatch(/if\s*\(isNeverCached\(url\)\)\s*\{\s*\n\s*event\.respondWith\(fetch\(req,\s*\{\s*cache:\s*'no-store'\s*\}\)\);/);
+    expect(sw).toContain("NEVER_CACHE_FILES = ['version.json']");
+  });
+
+  test('version.json 可被解析并与 appMeta 的版本号一致', () => {
+    const meta = readFileSync(resolve(root, 'js/core/appMeta.js'), 'utf-8');
+    const data = JSON.parse(readFileSync(resolve(root, 'version.json'), 'utf-8'));
+    expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(meta).toContain(`APP_VERSION = '${data.version}'`);
+    expect(data.build).toBeTruthy();
   });
 
   test('移动端键盘弹出由布局视口收缩承载', () => {

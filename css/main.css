@@ -336,6 +336,16 @@ ul, ol {
               box-shadow var(--transition-base);
 }
 
+/* 微信皮肤样式表按需注入期间禁用过渡：wechat.css 不再常驻，首次样式
+   计算不含它，link 应用瞬间 #main 等背景会从旧值向新值做 250ms 动画
+   （表现为整页背景闪烁）。注入前挂上此属性直接跳到终值，加载完成后
+   由 wechatTheme.js 双 rAF 移除，恢复正常过渡。 */
+html[data-wx-loading] *,
+html[data-wx-loading] *::before,
+html[data-wx-loading] *::after {
+  transition: none !important;
+}
+
 /* ============================================================
    核心组件过渡（确保主题切换平滑）
    ============================================================ */
@@ -506,4 +516,57 @@ ul, ol {
 .character-item .avatar,
 .avatar-preview {
   border-radius: 50% !important;
+}
+/* ============================================================
+   更新提示横幅（非阻塞，右上角浮层）
+   取代 confirm()：不打断正在进行的对话输入
+   ============================================================ */
+.app-update-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: 12px;
+  z-index: var(--z-toast, 500);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 14px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: 13.5px;
+  animation: appUpdateIn 0.25s ease;
+}
+.app-update-banner .app-update-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-update-banner button {
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+.app-update-banner button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.32);
+}
+.app-update-banner button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.app-update-banner .app-update-apply {
+  background: #fff;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+@keyframes appUpdateIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

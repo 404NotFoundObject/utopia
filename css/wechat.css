@@ -663,16 +663,33 @@
 }
 
 /* ---- 两端共用：标题行 / 帖子列表 / 帖子卡 / 关闭按钮 ---- */
+/* 头部底色与帖子一致（transparent 会露出 feed 的灰底，与白底帖子割裂） */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
   margin: 0;
   padding: 36px 14px 10px;
-  background: transparent;
   box-shadow: none;
+}
+[data-theme="wechat"] #modalOverlay:has(.social-feed) .social-header {
+  background: #ffffff;
+}
+[data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-header {
+  background: #1f1f1f;
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts {
   display: block;
   overflow: visible;
   padding: 0 0 28px;
+}
+/* 微信主题下容器与帖子卡同底色（primary 在微信主题为 #f5f5f5，需显式对齐白卡） */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-feed,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-publish-box {
+  background: #ffffff;
+}
+[data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-feed,
+[data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-posts,
+[data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-publish-box {
+  background: #1f1f1f;
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-post {
   border-radius: 0;

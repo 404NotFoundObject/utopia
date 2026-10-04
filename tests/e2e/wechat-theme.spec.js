@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForWxStylesheet } from './helpers/wx-theme-ready.js';
 
 /**
  * 微信主题（实验功能）验证。
@@ -19,6 +20,9 @@ async function openWithTheme(page, themeId) {
   }, themeId);
   await page.goto('/');
   await page.waitForFunction(READY, null, { timeout: 30_000 });
+  // wechat.css 已改按需注入（wechatTheme.js），微信主题下须等样式表
+  // CSSOM 就绪且注入期的过渡禁用标记解除；非微信主题不注入，直接通过
+  await waitForWxStylesheet(page);
 }
 
 test.describe('微信主题 · 桌面', () => {
@@ -63,6 +67,24 @@ test.describe('微信主题 · 桌面', () => {
     }));
     expect(headerInfo.headerBg).toBe(headerInfo.chatBg);
     expect(headerInfo.shadow).not.toBe('none');
+  });
+
+  test('wechat.css 按需注入，且位于 titlebar.css 之前', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    const linkInfo = await page.evaluate(() => {
+      const wx = document.querySelector('link[data-wx-stylesheet]');
+      if (!wx) return null;
+      const kids = Array.from(document.head.children);
+      const titlebar = document.querySelector('link[href$="css/titlebar.css"]');
+      return {
+        href: wx.getAttribute('href'),
+        beforeTitlebar: titlebar ? kids.indexOf(wx) < kids.indexOf(titlebar) : true,
+      };
+    });
+    expect(linkInfo, 'wechat.css 应已按需注入').not.toBeNull();
+    expect(linkInfo.href).toBe('css/wechat.css');
+    expect(linkInfo.beforeTitlebar, '注入点须在 titlebar.css 之前').toBe(true);
   });
 
   test('会话列表：行间分隔线内缩对齐文字，选中项整行绿色', async ({ page }) => {

@@ -8,13 +8,46 @@
      兜底覆盖动态拼接等静态分析不到的路径
    - 页面导航：网络优先，离线时回退 index.html（应用壳）
    - 第三方资源（CDN 库、用户配置的 AI API）一律不拦截不缓存
-   缓存按版本命名，激活时清理旧版本；更新 CACHE_VERSION 并
-   重新发布 sw.js 即可触发客户端升级。
+   - version.json：版本探测通道，**永不缓存**（网络直通），否则
+     「装在缓存里的版本文件」与 manual 检查形成鸡生蛋，永远探测不到新版本
+   缓存名按版本命名（安装时读 version.json 推导）；解析失败回退常量，
+   激活时清理旧版本缓存。
    ============================================================ */
 
-const CACHE_VERSION = 'v2';
-const CACHE_NAME = `utopia-static-${CACHE_VERSION}`;
+/* version.json 探测不到时的兜底缓存名。正常情况下用不到。 */
+const FALLBACK_CACHE_VERSION = 'v2';
+
+/* 永不进缓存的路径前缀/文件名。这些必须是「每次都问网络」的活数据。 */
+const NEVER_CACHE_FILES = ['version.json'];
+
+/* 当前生效的缓存名（install 时解析一次，供 message/fetch 复用） */
+let ACTIVE_CACHE_NAME = `utopia-static-${FALLBACK_CACHE_VERSION}`;
+
+function isNeverCached(url) {
+  if (!url || !url.pathname) return false;
+  return NEVER_CACHE_FILES.some((name) => url.pathname.endsWith(`/${name}`) || url.pathname === `/${name}`);
+}
+
+/* 缓存名来自 version.json 的版本号：发版改一次 version.json，
+   客户端就自动换一个新缓存桶，旧资源随之作废（不再依赖手工改常量）。 */
+async function resolveCacheName() {
+  try {
+    const res = await fetch(new URL('./version.json', self.location.href), { cache: 'no-store' });
+    if (!res.ok) return ACTIVE_CACHE_NAME;
+    const data = await res.json();
+    const raw = data && typeof data.version === 'string' ? data.version.trim() : '';
+    if (!raw) return ACTIVE_CACHE_NAME;
+    const slug = raw.replace(/[^0-9A-Za-z.]/g, '-');
+    return `utopia-static-v${slug}`;
+  } catch (_) {
+    return ACTIVE_CACHE_NAME; // 离线安装：沿用兜底名
+  }
+}
 const APP_SHELL = ['./', './index.html'];
+// 不被页面静态引用、需显式补进预缓存的资源：
+// css/wechat.css 已改按需加载（wechatTheme.js 激活时注入 link），
+// 从 index.html 出发的爬取不再能发现它，离线切微信主题会缺样式
+const EXTRA_PRECACHE = ['css/wechat.css'];
 const MAX_PRECACHE = 500;
 
 /* ============================================================
@@ -98,6 +131,13 @@ async function precacheAppAssets(cache) {
   const entry = new URL('./index.html', self.location.origin).href;
   const seen = new Set([entry]);
   const queue = [entry];
+  for (const extra of EXTRA_PRECACHE) {
+    const u = sameOriginUrl(extra, entry);
+    if (u && !seen.has(u.href)) {
+      seen.add(u.href);
+      queue.push(u.href);
+    }
+  }
   const responses = [];
   let importMap = null;
 
@@ -139,6 +179,8 @@ async function precacheAppAssets(cache) {
     for (const raw of refs) {
       const u = sameOriginUrl(raw, url);
       if (!u) continue;
+      // 版本通道必须每次问网络，预缓存里绝不能出现它
+      if (isNeverCached(u)) continue;
       const path = u.pathname;
       if (!PARSEABLE_EXT_RE.test(path) && !ASSET_EXT_RE.test(path)) continue;
       if (seen.has(u.href)) continue;
@@ -152,7 +194,8 @@ async function precacheAppAssets(cache) {
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
+    ACTIVE_CACHE_NAME = await resolveCacheName();
+    const cache = await caches.open(ACTIVE_CACHE_NAME);
     await cache.addAll(APP_SHELL).catch(() => {});
     await self.skipWaiting();
   })());
@@ -166,7 +209,7 @@ self.addEventListener('message', (event) => {
   if (!event.data || event.data.type !== 'precache' || precaching) return;
   precaching = true;
   event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
+    const cache = await caches.open(ACTIVE_CACHE_NAME);
     await precacheAppAssets(cache).catch(() => {});
   })());
 });
@@ -174,7 +217,7 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => k !== ACTIVE_CACHE_NAME).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -187,6 +230,13 @@ self.addEventListener('fetch', (event) => {
   // 跨域请求（CDN 第三方库 / 用户配置的 AI API）不拦截
   if (url.origin !== self.location.origin) return;
 
+  // 版本探测通道：网络直通，不读也不写缓存。
+  // 一旦它进了缓存，坐等版本号变新的检查就永远看不到新版本。
+  if (isNeverCached(url)) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
   // 页面导航：网络优先，离线回退应用壳
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
@@ -195,12 +245,12 @@ self.addEventListener('fetch', (event) => {
         // 仅应用入口导航刷新壳缓存，避免把 404 页等存成入口
         const rootPath = new URL('./', self.location.origin).pathname;
         if (fresh.ok && (url.pathname === rootPath || url.pathname.endsWith('/index.html'))) {
-          const cache = await caches.open(CACHE_NAME);
+          const cache = await caches.open(ACTIVE_CACHE_NAME);
           cache.put('./index.html', fresh.clone()).catch(() => {});
         }
         return fresh;
       } catch (_) {
-        const cache = await caches.open(CACHE_NAME);
+        const cache = await caches.open(ACTIVE_CACHE_NAME);
         return (
           (await cache.match('./index.html')) ||
           (await cache.match('./')) ||
@@ -213,7 +263,7 @@ self.addEventListener('fetch', (event) => {
 
   // 同源静态资源：stale-while-revalidate
   event.respondWith((async () => {
-    const cache = await caches.open(CACHE_NAME);
+    const cache = await caches.open(ACTIVE_CACHE_NAME);
     const cached = await cache.match(req);
     const network = fetch(req)
       .then((res) => {

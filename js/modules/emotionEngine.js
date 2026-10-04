@@ -608,6 +608,16 @@ export async function handleInteraction(character, eventType, intensity = 0.5) {
   });
 }
 
+/**
+ * 按距上次更新的时间差追补一次情绪。
+ *
+ * 主应用内没有调用点——周期性的状态追补由 character.syncCharacterState
+ * 承担（它还一并追补身体状态，阈值也更合理）。保留它是因为它是**插件 API
+ * 面的一部分**：modules/index.js 把本模块整体导出为 `emotion`，pluginApi.js
+ * 再把所有模块自动包装成 `api.emotion.*`，第三方插件可以调用它。
+ * 在插件化仓库里，凡是进 modules/index.js 的导出都属对外契约，
+ * 不能按「主应用无人引用」当作死代码清理。
+ */
 export async function refreshEmotion(character) {
   if (!character) return;
   if (!isEmotionEngineEnabled()) return;

@@ -221,6 +221,7 @@ function compressImage(file, maxSize = 1280, quality = 0.85) {
 export function ensureSocialCover() {
   const feed = document.querySelector('#modalContent .social-feed');
   if (!isWechatTheme()) {
+    unbindCoverScroll();
     feed?.querySelector('.wx-cover-topbar')?.remove();
     feed?.querySelector('.wx-social-cover')?.remove();
     return;
@@ -297,6 +298,7 @@ export function ensureSocialCover() {
     });
   }
 
+  bindCoverScroll();
   syncSocialTopbarSolid();
 }
 
@@ -314,20 +316,36 @@ function syncSocialTopbarSolid() {
   topbar.classList.toggle('solid', bottom <= 0);
 }
 
-document.addEventListener('scroll', (e) => {
-  if (e.target?.id !== 'modalContent') return;
-  syncSocialTopbarSolid();
-}, { capture: true, passive: true });
+/**
+ * 顶栏 solid 态的滚动驱动：监听滚动容器 #modalContent 本身，而不是在
+ * document 上常驻 capture 监听。挂在容器上是为了让监听器生命周期跟着
+ * 封面走——封面随主题切出被移除时这里同步解绑，不留常驻副作用。
+ */
+function bindCoverScroll() {
+  const scroller = document.getElementById('modalContent');
+  if (!scroller || scroller.__wxCoverScrollBound) return;
+  scroller.__wxCoverScrollBound = true;
+  scroller.addEventListener('scroll', syncSocialTopbarSolid, { passive: true });
+}
 
-/** 点击菜单与「+」以外区域时收起菜单 */
+function unbindCoverScroll() {
+  const scroller = document.getElementById('modalContent');
+  if (!scroller || !scroller.__wxCoverScrollBound) return;
+  delete scroller.__wxCoverScrollBound;
+  scroller.removeEventListener('scroll', syncSocialTopbarSolid);
+}
+
+/** 点击菜单与「+」以外区域时收起菜单；返回解绑函数供皮肤停用调用 */
 function bindPlusMenuDismiss() {
-  document.addEventListener('click', (e) => {
+  const onDocumentClick = (e) => {
     const menu = document.getElementById('wxPlusMenu');
     if (!menu || !menu.classList.contains('open')) return;
     const plus = document.getElementById('wxPlusBtn');
     if (menu.contains(e.target) || plus?.contains(e.target)) return;
     closePlusMenu();
-  });
+  };
+  document.addEventListener('click', onDocumentClick);
+  return () => document.removeEventListener('click', onDocumentClick);
 }
 
 /** 幂等补齐全部注入节点 */
@@ -338,6 +356,179 @@ export function ensureInjectedNodes() {
   ensurePlusMenu();
 }
 
+// ============================================================
+// 皮肤生命周期
+//
+// 注入节点、MutationObserver、state 订阅与 DOM 监听器都是「只在微信主题下
+// 才需要」的副作用。此前用一次性布尔守卫装配，装配后永不卸载：切到别的
+// 主题时这些节点（被 css/wechat.css 全局 display:none 兜住，看不见）连同
+// 监听器与 observer 一起滞留到会话结束。
+//
+// 现在拆成 activate / deactivate 一对：
+// - activate 期间产生的每个副作用都登记进 disposers，deactivate 统一回收
+// - theme:changed 的调度器不属于皮肤自身（切走后还要能切回来），保持常驻
+// ============================================================
+
+/** 皮肤当前是否激活（供 observer 在延迟调度窗口内二次确认） */
+let active = false;
+
+/** 当前激活流程的就绪 Promise（样式表加载 + 副作用装配完成） */
+let activatePromise = null;
+
+/** activate 登记的回收函数 */
+const disposers = [];
+
+/** 登记一个随皮肤停用而执行的回收动作 */
+function track(dispose) {
+  if (typeof dispose === 'function') disposers.push(dispose);
+}
+
+function runDisposers() {
+  const pending = disposers.splice(0, disposers.length);
+  for (const dispose of pending) {
+    try {
+      dispose();
+    } catch (err) {
+      console.error('[wechatTheme] 回收皮肤副作用失败:', err);
+    }
+  }
+}
+
+/** 移除全部注入节点（与 ensureInjectedNodes 一一对应） */
+function removeInjectedNodes() {
+  for (const id of ['wxBackBtn', 'wxDockChatBtn', 'wxUserAvatar', 'wxPlusBtn', 'wxPlusMenu']) {
+    document.getElementById(id)?.remove();
+  }
+}
+
+/**
+ * 按需加载皮肤样式表：wechat.css 不在 index.html 常驻（非微信主题下
+ * 几十 KB 规则全程参与 CSSOM 匹配），激活时注入、停用时移除。
+ * 插入点必须在 titlebar.css 之前——窗口装饰器样式表依赖加载顺序
+ * 覆盖 wechat 的变量（原先由 index.html 的静态顺序保证）。
+ *
+ * @returns {Promise<void>} 样式表加载完成（或失败，失败不阻塞装配）
+ */
+function ensureStylesheet() {
+  const existing = document.querySelector('link[data-wx-stylesheet]');
+  if (existing) {
+    // 已存在但可能尚未加载完成：sheet 就绪即完成
+    return existing.sheet ? Promise.resolve() : waitForSheet(existing);
+  }
+  // 首次注入：首次样式计算不含 wechat.css，link 应用瞬间会触发全站
+  // `*` 通用 transition（背景色 250ms 动画）。先禁掉过渡让首帧直接到位，
+  // 加载完成后双 rAF 恢复（见 main.css 的 html[data-wx-loading] 规则）。
+  document.documentElement.setAttribute('data-wx-loading', '');
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'css/wechat.css';
+  link.dataset.wxStylesheet = '';
+  const titlebar = document.querySelector('link[href$="css/titlebar.css"]');
+  const parent = titlebar?.parentNode ?? document.head;
+  if (!parent) {
+    document.documentElement.removeAttribute('data-wx-loading');
+    return Promise.resolve();
+  }
+  parent.insertBefore(link, titlebar ?? null);
+  return waitForSheet(link).then(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.documentElement.removeAttribute('data-wx-loading');
+      });
+    });
+  });
+}
+
+/** 等待 link 的 CSSOM 就绪（load/error 任一即返回，不阻塞在失败上） */
+function waitForSheet(link) {
+  return new Promise((resolve) => {
+    if (link.sheet) {
+      resolve();
+      return;
+    }
+    // jsdom 等单测环境不加载资源、不派发 load 事件：直接视为就绪，
+    // 否则 activate 的装配永远挂在微任务之后，同步断言全部竞争失败
+    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) {
+      resolve();
+      return;
+    }
+    link.addEventListener('load', () => resolve(), { once: true });
+    link.addEventListener('error', () => resolve(), { once: true });
+  });
+}
+
+function removeStylesheet() {
+  document.querySelector('link[data-wx-stylesheet]')?.remove();
+}
+
+/** 激活微信皮肤：装配注入节点与全部监听；重复调用返回同一就绪 Promise */
+export function activateWechatTheme() {
+  if (active) return activatePromise ?? Promise.resolve();
+  active = true;
+
+  // 样式表先注入并等就绪：注入节点的量宽/视图计算不能跑在裸样式上
+  const stylesheetReady = ensureStylesheet();
+  track(removeStylesheet);
+  // 加载中途被停用时清掉禁用过渡标记，避免过渡被永久禁用
+  track(() => document.documentElement.removeAttribute('data-wx-loading'));
+
+  activatePromise = stylesheetReady.then(() => {
+    // 等待期间可能已被停用（快速来回切换）
+    if (!active) return;
+
+    ensureInjectedNodes();
+    refreshMode();
+
+    track(bindPlusMenuDismiss());
+    track(bindRebuildObserver());
+
+    // 用户在设置里更换头像 / 用户名时同步左上角头像
+    track(state.subscribe('settings', () => updateUserAvatar()));
+
+    window.addEventListener('resize', refreshMode);
+    track(() => window.removeEventListener('resize', refreshMode));
+
+    // 启动时已恢复上次会话（订阅注册晚于恢复逻辑），补一次视图对齐
+    if (state.get('currentCharacterId') !== null || state.get('currentGroupId') !== null) {
+      if (isWechatTheme() && isMobileViewport()) {
+        setMobileView('chat');
+      }
+    }
+
+    // 选中角色 / 群组后进入对话页（仅微信主题 + 移动端）
+    const enterChat = (id) => {
+      if (id !== null && id !== undefined && isWechatTheme() && isMobileViewport()) {
+        setMobileView('chat');
+      }
+    };
+    track(state.subscribe('currentCharacterId', enterChat));
+    track(state.subscribe('currentGroupId', enterChat));
+  });
+  return activatePromise;
+}
+
+/** 停用微信皮肤：回收所有副作用并清除注入 DOM；重复调用无副作用 */
+export function deactivateWechatTheme() {
+  if (!active) return;
+  active = false;
+  activatePromise = null;
+
+  runDisposers();
+  removeInjectedNodes();
+  clearMobileView();
+  // 朋友圈封面与顶栏随主题走：非微信主题下这里会一并清除
+  ensureSocialCover();
+}
+
+/** 按当前主题把皮肤拉到应有状态（幂等）；activate 返回就绪 Promise */
+export function syncWechatTheme() {
+  if (isWechatTheme()) {
+    return activateWechatTheme();
+  }
+  deactivateWechatTheme();
+  return Promise.resolve();
+}
+
 /**
  * sidebar.js 跨端 resize 时会整体重建 footer 按钮，注入节点可能被清掉；
  * 朋友圈模态渲染 / 重渲染时需要补封面。观察 #sidebar 与 #modalOverlay
@@ -346,13 +537,17 @@ export function ensureInjectedNodes() {
  */
 function bindRebuildObserver() {
   const sidebar = document.getElementById('sidebar');
-  if (!sidebar || typeof MutationObserver !== 'function') return;
+  if (!sidebar || typeof MutationObserver !== 'function') return () => {};
   let scheduled = false;
+  let timer = null;
   const observer = new MutationObserver(() => {
     if (scheduled) return;
     scheduled = true;
-    setTimeout(() => {
+    timer = setTimeout(() => {
       scheduled = false;
+      timer = null;
+      // 皮肤可能已在调度窗口内被停用，停下来避免重新注入
+      if (!active) return;
       ensureInjectedNodes();
       ensureSocialCover();
     }, 100);
@@ -360,45 +555,42 @@ function bindRebuildObserver() {
   observer.observe(sidebar, { childList: true, subtree: true });
   const overlay = document.getElementById('modalOverlay');
   if (overlay) observer.observe(overlay, { childList: true, subtree: true });
+
+  return () => {
+    observer.disconnect();
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
 }
 
 let initialized = false;
 
+/**
+ * 装配入口：把皮肤拉到与当前主题一致的状态，并订阅后续主题切换。
+ *
+ * 这里注册的是「皮肤管理器」级别的调度器，切出微信主题后也必须继续存活，
+ * 否则再也收不到切回来的事件；皮肤自身的副作用全部在
+ * activateWechatTheme / deactivateWechatTheme 内部成对装配与回收。
+ */
+/**
+ * 常驻调度器：主题切换事件 → 皮肤 activate / deactivate。
+ * 刻意不随皮肤回收（切走后还要能切回来）。
+ *
+ * @returns {Promise<void>} 若启动时已处于微信主题，resolve 于皮肤完全
+ *   就绪（样式表加载完成、注入节点装配完毕）；否则立即 resolve。
+ *   启动序列应在置位 __utopiaReady 之前 await 它，保证恢复微信主题
+ *   时首帧就带完整样式（否则既有 E2E 与真实用户都会看到裸样式一帧）。
+ */
 export function initWechatTheme() {
-  if (initialized) return;
+  if (initialized) return Promise.resolve();
   initialized = true;
 
-  ensureInjectedNodes();
-  refreshMode();
-  bindPlusMenuDismiss();
-  bindRebuildObserver();
-
-  // 用户在设置里更换头像 / 用户名时同步左上角头像
-  state.subscribe('settings', () => updateUserAvatar());
-
-  // 启动时已恢复上次会话（订阅注册晚于恢复逻辑），补一次视图对齐
-  if (state.get('currentCharacterId') !== null || state.get('currentGroupId') !== null) {
-    if (isWechatTheme() && isMobileViewport()) {
-      setMobileView('chat');
-    }
-  }
-
-  window.addEventListener('resize', refreshMode);
+  const startupReady = syncWechatTheme();
 
   if (window.__eventBus && typeof window.__eventBus.on === 'function') {
-    // 主题切换后视图状态与朋友圈封面（注入 / 清除）都要重算
-    window.__eventBus.on('theme:changed', () => {
-      refreshMode();
-      ensureSocialCover();
-    });
+    window.__eventBus.on('theme:changed', syncWechatTheme);
   }
-
-  // 选中角色 / 群组后进入对话页（仅微信主题 + 移动端）
-  const enterChat = (id) => {
-    if (id !== null && id !== undefined && isWechatTheme() && isMobileViewport()) {
-      setMobileView('chat');
-    }
-  };
-  state.subscribe('currentCharacterId', enterChat);
-  state.subscribe('currentGroupId', enterChat);
+  return startupReady ?? Promise.resolve();
 }

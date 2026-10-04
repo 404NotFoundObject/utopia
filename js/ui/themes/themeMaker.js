@@ -19,6 +19,7 @@ import {
   getThemeVariablesById,
   computeRadiusVars,
   computeShadowVars,
+  getAllThemeVarKeys,
 } from '../layout/theme.js';
 import { THEME_PRESETS } from './themePresets.js';
 import {
@@ -892,11 +893,10 @@ function applyEditingThemeToRoot() {
   const baseVars = THEME_PRESETS[_editingTheme.baseTheme]?.variables
     || THEME_PRESETS.light.variables;
 
-  const toClear = new Set([
-    ...Object.keys(THEME_PRESETS.light.variables),
-    ...Object.keys(THEME_PRESETS.dark.variables),
-    ...Object.keys(THEME_PRESETS.cyberpunk.variables),
-  ]);
+  // 用「所有内置主题变量键的并集」清理。此前这里手工列举
+  // light/dark/cyberpunk 三份键，既重复又会漏掉 wechat / wechat-dark，
+  // 导致编辑器预览里残留上一个主题的卡片色与聚焦色。
+  const toClear = new Set(getAllThemeVarKeys());
 
   for (const key of Object.keys(_editingTheme.variables)) {
     toClear.add(key);

@@ -26,7 +26,8 @@
   <link rel="stylesheet" href="css/social.css">
   <link rel="stylesheet" href="css/worldbook.css">
   <link rel="stylesheet" href="css/group-chat.css">
-  <link rel="stylesheet" href="css/wechat.css">
+  <!-- wechat.css 按需加载：仅在切换到微信主题时由 wechatTheme.js 注入，
+       必须插在 titlebar.css 之前以保持变量覆盖顺序，见 ensureStylesheet() -->
   <link rel="stylesheet" href="css/titlebar.css">
   <!-- 第三方库 -->
   <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>

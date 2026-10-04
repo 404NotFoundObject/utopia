@@ -66,6 +66,52 @@ export function getAvailableThemes() {
 }
 
 /**
+ * 清空 :root 上的内联主题变量。
+ *
+ * 主题变量是**内联样式**，优先级高于任何 stylesheet，写上去就盖住 CSS 里的
+ * 同名定义。若只写不清，从变量键更多的主题（wechat 系列）切回键更少的主题时，
+ * 多出来的键会残留在 :root 上，让 `.card` 背景、`input:focus` 边框拿到上一个
+ * 主题的颜色。这里按「所有主题变量键的并集」清理，保证切换后干净落地到 CSS 默认值。
+ *
+ * @param {HTMLElement} [root=document.documentElement]
+ * @returns {string[]} 被清理的键
+ */
+export function clearInlineThemeVars(root = document.documentElement) {
+  if (!root) return [];
+  const removed = [];
+  for (const key of getAllThemeVarKeys()) {
+    // removeProperty 对不存在的键返回空串，无需先判断
+    if (root.style.removeProperty(key) !== '') removed.push(key);
+  }
+  return removed;
+}
+
+// ============================================================
+// 主题变量键的并集（供切换时清理 + 主题制作器预览共用）
+// ============================================================
+
+let _allVarKeysCache = null;
+
+/**
+ * 所有内置主题 CSS 变量键的并集。
+ *
+ * 结果缓存：THEME_PRESETS 是静态常量，运行时不会增删键。
+ * 主题制作器此前手工列举 light/dark/cyberpunk 的键做清理，既重复又会漏
+ * （漏了 wechat / wechat-dark），统一走这里。
+ *
+ * @returns {string[]}
+ */
+export function getAllThemeVarKeys() {
+  if (_allVarKeysCache) return _allVarKeysCache;
+  const set = new Set();
+  for (const preset of Object.values(THEME_PRESETS)) {
+    for (const key of Object.keys(preset.variables || {})) set.add(key);
+  }
+  _allVarKeysCache = [...set];
+  return _allVarKeysCache;
+}
+
+/**
  * 按 id 获取主题的完整 CSS 变量（已合并 baseTheme + 用户覆盖 + 圆角/阴影系数）
  * @param {string} themeId
  * @returns {Object|null} 变量字典，或 null 表示主题不存在
@@ -132,6 +178,10 @@ export function applyTheme(themeId) {
     variables = getThemeVariablesById('light');
     if (!variables) return;
   }
+
+  // 先清掉上一次主题写进 :root 的内联变量（按所有主题键的并集），再写入。
+  // 不做这一步，从 wechat 切回 light 会残留 --color-bg-card / --color-border-focus。
+  clearInlineThemeVars(root);
 
   // 写入所有 CSS 变量
   for (const [key, value] of Object.entries(variables)) {
