@@ -7,7 +7,7 @@
 //   发版时只改这一处（配合 scripts/release.mjs 会更稳）。
 
 /** 当前应用版本（语义化版本，与 version.json 对齐） */
-export const APP_VERSION = '3.9.6';
+export const APP_VERSION = '3.9.7';
 
 /** localStorage 键：已落地的版本号 */
 export const STORAGE_VERSION_KEY = 'utopia_app_version';
