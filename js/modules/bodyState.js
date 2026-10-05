@@ -178,9 +178,9 @@ export function getInitialBodyState(gameTime, personality) {
 // 消除「5:00–6:00 时段划分不一致」的漂移。
 // 注：本模块沿用「午间」命名（区别于 time.js 的「中午」），因 bodyState
 // 内部多处字符串判断依赖「午间」，二者各自自洽，仅此处边界需对齐。
-function getTimePeriod() {
-  const date = getGameDate();
-  const hour = date.getHours();
+function getTimePeriod(date) {
+  const d = date || getGameDate();
+  const hour = d.getHours();
   if (hour >= 5 && hour < 8) return '清晨';
   if (hour >= 8 && hour < 12) return '上午';
   if (hour >= 12 && hour < 14) return '午间';
@@ -348,13 +348,35 @@ function processNapping(state, profile, gameDate, gameNow) {
   return 'nap-start';
 }
 
-// ============================================================
-// 时间驱动更新（核心：参数化 + 昼夜节律 + 特殊类型 + 午休）
-// ============================================================
-export async function updateBodyByTime(character, hours) {
-  if (!character || !character.bodyState) return;
-  if (!isBodyStateEngineEnabled()) return;
+// ---------- 分段推进（审计 S-2） ----------
+// 单次 updateBodyByTime 会收到「好几天没开应用」攒下的巨大 hours。此前整段
+// 只做一次「睡 / 醒」判定、并把全部时长一次性套用：入睡态把整段全算成睡觉，
+// 清醒态把整段全算成清醒 —— 后者尤其致命：角色连续清醒几十个游戏小时、睡眠债
+// 一口气顶到 3 倍上限，回归后立刻被「缺觉致病」判定判病，而玩家只觉得莫名其妙。
+// 这里把长跨度切成 ≤1 游戏小时的小步逐段推进，让睡/醒转换、昼夜节律与债务
+// 结算在跨度内部自然发生。步数上限兜底，避免超长离线把主线程卡住。
+const BODY_STEP_HOURS = 1;
+const BODY_MAX_STEPS = 720;   // 30 天 @1h；更长的跨度自动放大步长
 
+// ---------- 自然入睡（审计 S-1） ----------
+// 此前「困倦」是个死胡同：只有 energy<10 且 sleepiness>90 才会睡着，
+// 等价于「必须先昏厥才能睡觉」。于是角色几十小时不睡、债务打满、一睡又是长睡
+// 不起。这里补上困倦 → 入睡的正常通道。
+const SLEEP_ONSET_BEDTIME = 60;    // 夜间（夜晚/深夜/清晨）就寝的睡意阈值
+const SLEEP_DEEP_THRESHOLD = 70;   // 刚躺下、睡意仍重 → 转深睡（前半夜睡得沉）
+const INSOMNIA_BASE_RATE = 0.05;   // 「困但睡不着」的每小时基础概率（× 神经质）
+
+/**
+ * 推进一小段身体状态。updateBodyByTime 会把它按 BODY_STEP_HOURS 切成多步调用。
+ *
+ * @param {Object} character
+ * @param {Object} profile - getBodyProfile(character) 的结果
+ * @param {number} hours - 本步推进的游戏小时数
+ * @param {Date} at - 本步结束时对应的游戏时刻（昼夜节律按它算，而非「现在」）
+ * @param {boolean} verbose - 是否打印午休等过程日志（长跨度分段时关闭，避免刷屏）
+ * @returns {boolean} 本步是否自然睡醒（供上层触发梦境生成）
+ */
+function simulateBodyStep(character, profile, hours, at, verbose) {
   const state = character.bodyState;
   const personality = character.personalityParameters || {};
   const neuroticism = (personality.neuroticism || 50) / 100;
@@ -362,54 +384,28 @@ export async function updateBodyByTime(character, hours) {
   const agreeableness = (personality.agreeableness || 50) / 100;
   const conscientiousness = (personality.conscientiousness || 50) / 100;
 
-  // ★ 读取个性化 profile
-  const profile = getBodyProfile(character);
-  const gameDate = getGameDate();
+  const gameDate = at;
+  const nowTs = at.getTime();
   const circadian = getCircadianMultiplier(gameDate.getHours(), profile);
+  const period = getTimePeriod(gameDate);
 
-  // 睡眠债（审计 P3-6 / P3-8）：本 tick 用「进入时的债务」影响各项速率，
-  // tick 末尾再按实际睡/醒结算，避免同一次计算里自相矛盾。
+  // 睡眠债（审计 P3-6 / P3-8）：本步用「进入时的债务」影响各项速率，
+  // 步末再按实际睡/醒结算，避免同一次计算里自相矛盾。
   ensureSleepDebtFields(state);
   rollSleepLedger(state, gameDate);
   const debtRatio = getSleepDebtRatio(state, profile);
   const debtAmplify = Math.min(debtRatio, SLEEP_DEBT_MAX_FACTOR);
 
-  const period = getTimePeriod();
-
-  // ============================================================
-  // ★ 特殊类型：完全锁定状态
-  // ============================================================
-  if (isImmortalLike(profile)) {
-    state.energy = Math.max(state.energy, 90);
-    state.sleepiness = 0;
-    state.sleepDebtHours = 0;
-    state.health = Math.max(state.health, 95);
-    state.consciousness = '清醒';
-    state.sleepStatus = '清醒';
-    state.specialStates = state.specialStates.filter(s => s !== '失眠' && s !== '萎靡');
-    state.illness = { type: null, severity: 0, startTime: 0, duration: 0, recoveryRate: 1.0 };
-    state.injury = {
-      type: null, severity: 0, startTime: 0, duration: 0,
-      recoveryRate: 1.0, location: '', narrative: '', expectedDurationHours: 0,
-    };
-    state.napStartTime = 0;
-    state.lastUpdate = getGameTime();
-    await updateCharacter(character.id, { bodyState: state }, { skipReload: true });
-    globalEventBus.emit('body:updated', { characterId: character.id, state, timestamp: Date.now() });
-    return;
-  }
-
   // ============================================================
   // ★ 午休逻辑
   // ============================================================
-  const gameNow = getGameTime();
-  const napAction = processNapping(state, profile, gameDate, gameNow);
-  if (napAction) {
+  const napAction = processNapping(state, profile, gameDate, nowTs);
+  if (napAction && verbose) {
     console.log(`[BodyState] ${character.name || character.id} 午休${napAction === 'nap-start' ? '开始' : '结束'}`);
   }
 
   const isSleeping = (state.sleepStatus === '浅睡' || state.sleepStatus === '深睡');
-  // 本 tick 是否自然睡醒（浅睡 → 清醒），用于触发梦境生成
+  // 本步是否自然睡醒（浅睡 → 清醒），用于触发梦境生成
   let wokeUpNaturally = false;
 
   // ============================================================
@@ -474,23 +470,41 @@ export async function updateBodyByTime(character, hours) {
     } else if (state.sleepStatus === '浅睡' && state.sleepiness < 20) {
       state.sleepStatus = '清醒';
       state.consciousness = '清醒';
-      state.lastWakeTime = getGameTime();
-      // 本 tick 的睡眠时长由末尾 applySleepDebt 统一结算（不再在此处重复累加）
+      state.lastWakeTime = nowTs;
+      // 本步的睡眠时长由末尾 applySleepDebt 统一结算（不再在此处重复累加）
       wokeUpNaturally = true;
+    } else if (state.sleepStatus === '浅睡' && state.sleepiness >= SLEEP_DEEP_THRESHOLD) {
+      // 刚躺下、睡意还重 → 沉下去；后半夜睡意退了再自然转回浅睡
+      state.sleepStatus = '深睡';
     }
   } else {
     const sleepinessThreshold = 80 - (profile.sleepNeedHours - 7) * 3;
-    if (state.sleepiness > sleepinessThreshold) {
-      state.sleepStatus = '困倦';
+    // ★ 自然入睡通道（审计 S-1）：困倦不再只是个展示用的中间态，睡意到位就躺下。
+    //   夜间阈值更低（到点就寝），白天要攒够睡意才会睡。
+    const isBedtime = period === '夜晚' || period === '深夜' || period === '清晨';
+    const onsetThreshold = isBedtime
+      ? Math.min(sleepinessThreshold, SLEEP_ONSET_BEDTIME)
+      : sleepinessThreshold;
+
+    if (state.sleepiness >= onsetThreshold) {
+      // 神经质高的角色偶尔「困但睡不着」：这一步维持困倦，由下面的失眠判定挂上状态
+      const insomniaChance = INSOMNIA_BASE_RATE * neuroticism * hours;
+      if (insomniaChance > 0 && Math.random() < insomniaChance) {
+        state.sleepStatus = '困倦';
+      } else {
+        state.sleepStatus = '浅睡';
+        state.consciousness = '迷糊';
+      }
     } else if (state.sleepiness > 50 && (period === '深夜' || period === '午间')) {
       state.sleepStatus = '困倦';
     } else {
       state.sleepStatus = '清醒';
     }
     if (state.energy < 10 && state.sleepiness > 90) {
+      // 力竭昏厥：与主动入睡区分开，意识直接掉到「昏厥」
       state.sleepStatus = '深睡';
       state.consciousness = '昏厥';
-      state.lastWakeTime = getGameTime();
+      state.lastWakeTime = nowTs;
     }
   }
 
@@ -561,7 +575,7 @@ export async function updateBodyByTime(character, hours) {
       const type = illnesses[Math.floor(Math.random() * illnesses.length)];
       state.illness.type = type;
       state.illness.severity = Math.min(80, 20 + Math.random() * 40);
-      state.illness.startTime = getGameTime();
+      state.illness.startTime = nowTs;
       state.illness.duration = 0;
       state.illness.recoveryRate = 1.0;
     }
@@ -619,7 +633,7 @@ export async function updateBodyByTime(character, hours) {
   }
 
   // ============================================================
-  // 睡眠债结算（审计 P3-6）：本 tick 睡了就按睡眠质量还债，醒着就继续欠
+  // 睡眠债结算（审计 P3-6）：本步睡了就按睡眠质量还债，醒着就继续欠
   // ============================================================
   const isNapping = isSleeping && state.napStartTime > 0;
   applySleepDebt(state, profile, hours, isSleeping ? (isNapping ? 'nap' : 'sleep') : 'awake');
@@ -628,7 +642,68 @@ export async function updateBodyByTime(character, hours) {
     state.dreamContent = '';
   }
 
-  state.lastUpdate = getGameTime();
+  return wokeUpNaturally;
+}
+
+// ============================================================
+// 时间驱动更新（核心：参数化 + 昼夜节律 + 特殊类型 + 午休 + 分段推进）
+// ============================================================
+export async function updateBodyByTime(character, hours) {
+  if (!character || !character.bodyState) return;
+  if (!isBodyStateEngineEnabled()) return;
+
+  const totalHours = Number(hours);
+  if (!Number.isFinite(totalHours) || totalHours <= 0) return;
+
+  const state = character.bodyState;
+
+  // ★ 读取个性化 profile
+  const profile = getBodyProfile(character);
+
+  // ============================================================
+  // ★ 特殊类型：完全锁定状态
+  // ============================================================
+  if (isImmortalLike(profile)) {
+    state.energy = Math.max(state.energy, 90);
+    state.sleepiness = 0;
+    state.sleepDebtHours = 0;
+    state.health = Math.max(state.health, 95);
+    state.consciousness = '清醒';
+    state.sleepStatus = '清醒';
+    state.specialStates = state.specialStates.filter(s => s !== '失眠' && s !== '萎靡');
+    state.illness = { type: null, severity: 0, startTime: 0, duration: 0, recoveryRate: 1.0 };
+    state.injury = {
+      type: null, severity: 0, startTime: 0, duration: 0,
+      recoveryRate: 1.0, location: '', narrative: '', expectedDurationHours: 0,
+    };
+    state.napStartTime = 0;
+    state.lastUpdate = getGameTime();
+    await updateCharacter(character.id, { bodyState: state }, { skipReload: true });
+    globalEventBus.emit('body:updated', { characterId: character.id, state, timestamp: Date.now() });
+    return;
+  }
+
+  // ============================================================
+  // ★ 分段推进（审计 S-2）
+  // ============================================================
+  // 起点取「本角色上次结算时刻」，但不早于本次跨度的起点，避免时间倒流或
+  // 与 emotionState 共用 lastUpdate 时把身体多推进一段。
+  const endTs = getGameTime();
+  const spanStart = endTs - totalHours * 3600000;
+  const startTs = Math.min(endTs, Math.max(Number(state.lastUpdate) || 0, spanStart));
+
+  const stepCount = Math.min(BODY_MAX_STEPS, Math.max(1, Math.ceil(totalHours / BODY_STEP_HOURS)));
+  const stepHours = totalHours / stepCount;
+
+  let wokeUpNaturally = false;
+  for (let i = 0; i < stepCount; i++) {
+    const at = new Date(startTs + stepHours * (i + 1) * 3600000);
+    if (simulateBodyStep(character, profile, stepHours, at, stepCount === 1)) {
+      wokeUpNaturally = true;
+    }
+  }
+
+  state.lastUpdate = endTs;
   await updateCharacter(character.id, { bodyState: state }, { skipReload: true });
 
   globalEventBus.emit('body:updated', {

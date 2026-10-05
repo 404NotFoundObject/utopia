@@ -113,11 +113,14 @@ describe('modules/bodyState · 睡眠债（审计 P3-6 / P3-8）', () => {
     vi.restoreAllMocks();
   });
 
-  it('清醒一整天累积的债务等于每日睡眠需求', async () => {
+  it('清醒时按「每日需求摊到 24 小时」的速率累积债务', async () => {
+    // 只推进 6 小时：睡意还够不到就寝阈值，角色全程清醒，可纯粹检验累积速率。
     const char = makeCharacter({ sleepStatus: '清醒' });
-    await updateBodyByTime(char, 24);
-    // need=8 → 清醒 24h 欠 8h
-    expect(char.bodyState.sleepDebtHours).toBeCloseTo(8, 5);
+    await updateBodyByTime(char, 6);
+    // need=8 → 清醒 6h 欠 8 × 6/24 = 2h
+    expect(char.bodyState.sleepDebtHours).toBeCloseTo(2, 5);
+    expect(char.bodyState.sleepStatus).not.toBe('浅睡');
+    expect(char.bodyState.sleepStatus).not.toBe('深睡');
   });
 
   it('睡满需求时长可把债务还清，且不会变成负数', async () => {
@@ -133,6 +136,9 @@ describe('modules/bodyState · 睡眠债（审计 P3-6 / P3-8）', () => {
   });
 
   it('债务有上限，长期不睡也不会无限累积', async () => {
+    // sleepinessRateFactor = 0 → 睡意永不上升，角色无法自然入睡，
+    // 以此构造「持续清醒」的极端场景来检验上限。
+    mocks.profile.sleepinessRateFactor = 0;
     const char = makeCharacter({ sleepStatus: '清醒' });
     await updateBodyByTime(char, 24 * 30);
     // 上限 = 每日需求 × 3 = 24h
@@ -214,6 +220,94 @@ describe('modules/bodyState · 睡眠债致生病（审计 P3-8）', () => {
   it('债务未达阈值（比值 < 1.5）时不触发缺觉致病', async () => {
     const char = makeCharacter({ sleepStatus: '清醒', health: 90, sleepDebtHours: 8 });
     await updateBodyByTime(char, 1);
+    expect(char.bodyState.illness.type).toBeFalsy();
+  });
+});
+
+describe('modules/bodyState · 长离线分段推进（审计 S-1 / S-2）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.now = new Date('2026-10-02T08:00:00').getTime();
+    mocks.settings = { engineFlags: { bodyState: true }, dreamGeneration: { enabled: false } };
+    mocks.profile = {
+      special: null,
+      sleepNeedHours: 8,
+      constitution: 0.5,
+      illnessResistance: 0.5,
+      injuryResistance: 0.5,
+      recoverySpeed: 1,
+      energyDecayFactor: 1,
+      energyRecoveryFactor: 1,
+      sleepinessRateFactor: 1,
+      allowNapping: false,
+      napTendency: 0.3,
+      wakeEase: 0.5,
+    };
+    // random() = 1 → 不触发失眠、不触发随机致病，只观察睡/醒与债务演化
+    vi.spyOn(Math, 'random').mockReturnValue(1);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('睡意到位就自然入睡，「困倦」不再是死胡同', async () => {
+    const char = makeCharacter({ sleepStatus: '清醒', sleepiness: 100, energy: 80 });
+    await updateBodyByTime(char, 1);
+    // 白天的就寝阈值 = 80 - (8-7)*3 = 77，睡意 100 已经越过
+    expect(char.bodyState.sleepStatus).toBe('浅睡');
+  });
+
+  it('夜间到点就寝：睡意阈值比白天低', async () => {
+    mocks.now = new Date('2026-10-02T21:00:00').getTime();
+    const char = makeCharacter({ sleepStatus: '清醒', sleepiness: 65, energy: 60 });
+    await updateBodyByTime(char, 1);
+    // 21:00 属「夜晚」，阈值降到 60；白天 65 还够不到 77
+    expect(char.bodyState.sleepStatus).toBe('浅睡');
+  });
+
+  it('离线 3 天：期间真的入睡又醒来，而不是整段算作清醒', async () => {
+    const char = makeCharacter({ sleepStatus: '清醒' });
+    const startTs = char.bodyState.lastWakeTime;
+
+    await updateBodyByTime(char, 72);
+
+    // lastWakeTime 只在「浅睡 → 清醒」时被改写：它前进了就证明中途睡过并醒来
+    expect(char.bodyState.lastWakeTime).toBeGreaterThan(startTs);
+    // 夜间会自然入睡还债，债务不该顶到缺觉致病线（need=8 → 阈值 12h）
+    expect(char.bodyState.sleepDebtHours).toBeLessThan(12);
+    // 也没被拖到力竭昏厥
+    expect(char.bodyState.energy).toBeGreaterThan(10);
+  });
+
+  it('离线 3 天：从睡眠态进入也不会整段算作睡觉', async () => {
+    const char = makeCharacter({
+      sleepStatus: '深睡',
+      sleepiness: 90,
+      sleepDebtHours: 8,
+      sleepQuality: 1,
+    });
+    const startTs = char.bodyState.lastWakeTime;
+
+    await updateBodyByTime(char, 72);
+
+    expect(char.bodyState.lastWakeTime).toBeGreaterThan(startTs);
+    // 睡够了就该起来活动，而不是锁死在深睡
+    expect(char.bodyState.sleepStatus).not.toBe('深睡');
+  });
+
+  it('离线 3 天不会再凭空致病（债务根本没到阈值）', async () => {
+    // random() = 0 → 只要概率 > 0 就必定命中，用来放大「凭空生病」
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    // neuroticism = 0 → 关掉失眠门控，保证角色能正常入睡（否则测的是失眠不是债务）
+    const char = makeCharacter(
+      { sleepStatus: '清醒' },
+      { personalityParameters: { ...PERSONALITY, neuroticism: 0 } },
+    );
+
+    await updateBodyByTime(char, 72);
+
+    expect(char.bodyState.sleepDebtHours).toBeLessThan(12);
     expect(char.bodyState.illness.type).toBeFalsy();
   });
 });

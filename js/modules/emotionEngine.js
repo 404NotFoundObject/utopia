@@ -510,11 +510,12 @@ export async function updateEmotionByTime(character, hours) {
   }
 
   // 好感衰减：改用与六维一致的解析解，趋近 0 而非线性跨零翻转。
-  //   高 decayMultiplier（情绪恢复快）→ 好感也恢复快。
+  //   高 decayMultiplier（情绪平复快）→ 好感也消退得快，与六维同向（乘而非除）。
+  //   下限 0.3 只是防呆：profile 把 emotionalDecayFactor 配成 0 时好感不至于永远冻结。
   //   负值（厌恶）用 0.5× 速率消退，保持「讨厌比喜欢消退更慢」的原始意图。
   const affectionBaseK = AFFECTION_DECAY_RATE * hours
     * (1 + (1 - agreeableness) * 0.5)
-    / Math.max(0.3, decayMultiplier);
+    * Math.max(0.3, decayMultiplier);
   let affectionK = Number.isFinite(affectionBaseK) ? affectionBaseK : 0;
   if (state.affection < 0) affectionK *= 0.5;
   state.affection *= Math.exp(-affectionK);
