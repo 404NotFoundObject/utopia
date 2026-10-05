@@ -32,6 +32,7 @@ import {
   applyEngineEffects,
   buildSocialContext,
 } from './chatContext.js';
+import { getGroupMembers } from './groupMembers.js';
 
 function toFiniteNumber(v) {
   if (v === null || v === undefined) return null;
@@ -550,7 +551,10 @@ export async function removeGroupMember(groupId, memberId, memberType) {
 
 // 审计 P3-5：实现已抽到 groupMembers.js（与 groupChatEngine 共用），此处保留
 // 对外导出以维持既有 API（groupChatUI / groupSettingsUI / commandEngine 等仍从此处取）。
-export { getGroupMembers } from './groupMembers.js';
+// 注意：必须 import 后再 export —— `export { x } from '...'` 纯再导出语法不会在
+// 本模块作用域创建绑定，本文件内部的调用（sendUserGroupMessage 等）会抛
+// ReferenceError: getGroupMembers is not defined。
+export { getGroupMembers };
 
 export async function setGroupMemberMute(groupId, memberId, memberType, durationSeconds = null) {
   const stores = await getStores();
