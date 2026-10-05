@@ -254,3 +254,47 @@ describe('modules/social · 用户点赞 togglePostLike', () => {
     await stores.posts.delete(post.id);
   });
 });
+
+describe('modules/social · 生成失败不落机械兜底文案', () => {
+  it('generateComment：AI 失败返回 null，不再返回「哈哈哈，有趣！」', async () => {
+    const api = await import('../../js/core/api.js');
+    const spy = vi.spyOn(api, 'sendChatRequest').mockRejectedValue(new Error('API down'));
+    const { generateComment } = await import('../../js/modules/social.js');
+
+    const char = { id: `gc-${Date.now()}`, name: '评论角色', emotionState: {}, bodyState: {} };
+    const result = await generateComment(char, { authorType: 'user', authorId: 'user', content: '一条动态' });
+
+    expect(result).toBeNull();
+    expect(spy).toHaveBeenCalledTimes(2); // 重试 2 次后放弃
+    spy.mockRestore();
+  });
+
+  it('publishPostByCharacter：生成失败返回 null 且不写库', async () => {
+    const api = await import('../../js/core/api.js');
+    const spy = vi.spyOn(api, 'sendChatRequest').mockRejectedValue(new Error('API down'));
+    const stores = await getStores();
+    const uniq = `fb-${Date.now()}`;
+    await stores.characters.add({ id: uniq, name: '发帖角色', emotionState: {} });
+    const char = await stores.characters.get(uniq);
+
+    const { publishPostByCharacter } = await import('../../js/modules/social.js');
+    const result = await publishPostByCharacter(char);
+
+    expect(result).toBeNull();
+    const posts = await stores.posts.getAll();
+    expect(posts.filter(p => p.authorId === uniq)).toHaveLength(0);
+    spy.mockRestore();
+  });
+
+  it('generateComment：AI 返回空内容也返回 null（空串与空白不落库）', async () => {
+    const api = await import('../../js/core/api.js');
+    const spy = vi.spyOn(api, 'sendChatRequest').mockResolvedValue({ content: '   ' });
+    const { generateComment } = await import('../../js/modules/social.js');
+
+    const char = { id: `ge-${Date.now()}`, name: '空回复角色', emotionState: {}, bodyState: {} };
+    const result = await generateComment(char, { authorType: 'user', authorId: 'user', content: '一条动态' });
+
+    expect(result).toBeNull();
+    spy.mockRestore();
+  });
+});

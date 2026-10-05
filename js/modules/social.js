@@ -158,15 +158,20 @@ export async function generatePostContent(character, retries = 2) {
   } catch (e) {
     console.error('[Social] 生成帖子异常:', e);
   }
-  console.warn('[Social] 使用默认帖子内容');
-  return '今天心情不错，发条动态。';
+  // 重试耗尽：返回 null 让调用方跳过本次发帖。
+  // 历史上这里会返回「今天心情不错，发条动态。」这类机械文案，
+  // 用户一眼识破是预设的，比没有动态更伤沉浸感。
+  console.warn('[Social] 生成帖子失败，本次跳过');
+  return null;
 }
 
 // ---------- 角色发布（新建，无冲突） ----------
+// 生成失败时返回 null（调用方跳过），不落机械兜底文案。
 export async function publishPostByCharacter(character) {
   console.log('[Social] 角色发帖开始:', character?.name);
   const stores = await getS();
   const content = await generatePostContent(character);
+  if (!content) return null;
   const post = {
     id: generateUUID(),
     authorType: 'character',
@@ -216,6 +221,8 @@ export async function publishPostByUser(user, content) {
 }
 
 // ---------- 生成评论（纯生成，不写 DB） ----------
+// 返回值：成功为评论文本；失败/空回复返回 null（调用方跳过，绝不落
+// 机械的预设文案——那比「没有评论」更出戏）。
 export async function generateComment(character, post) {
   const stores = await getS();
   const author = post.authorType === 'character' ? await stores.characters.get(post.authorId) : null;
@@ -226,19 +233,23 @@ export async function generateComment(character, post) {
 你的状态：${getBodyDescription(character)}
 直接输出评论内容，不要添加任何前缀。`;
   const systemPrompt = buildPersonaSystemMessage(character);
-  try {
-    const response = await sendChatRequest({
-      messages: [{ role: 'user', content: prompt }],
-      systemPrompt,
-      temperature: 0.7,
-      maxTokens: 150,
-      stream: false,
-    });
-    return response.content?.trim() || '哈哈哈，有趣！';
-  } catch (e) {
-    console.error('生成评论失败:', e);
-    return '哈哈哈，有趣！';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await sendChatRequest({
+        messages: [{ role: 'user', content: prompt }],
+        systemPrompt,
+        temperature: 0.7,
+        maxTokens: 150 + attempt * 50,
+        stream: false,
+      });
+      const content = response.content?.trim();
+      if (content) return content;
+      console.warn(`[Social] 生成评论尝试 ${attempt + 1}/2 返回空`);
+    } catch (e) {
+      console.error(`[Social] 生成评论尝试 ${attempt + 1}/2 失败:`, e);
+    }
   }
+  return null;
 }
 
 // ---------- 生成回复（含重试与加锁） ----------
@@ -608,7 +619,8 @@ export async function checkAutoPost() {
     const valence = char.emotionState?.valence || 0;
     const probability = baseProbability * (1 + valence / 100);
     if (Math.random() < probability) {
-      await publishPostByCharacter(char);
+      const post = await publishPostByCharacter(char);
+      if (!post) continue; // 生成失败：不计入次数，下次心跳再试
       charCounts.set(char.id, (charCounts.get(char.id) || 0) + 1);
       globalToday += 1;
     }
