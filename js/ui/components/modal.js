@@ -1,5 +1,6 @@
 // 模态框组件
 import { escapeHtml } from '../../core/utils.js';
+import { pushView, releaseView } from '../layout/backNavigation.js';
 
 // 审计 P2-23：不在模块加载期捕获 DOM（壳重建后旧引用会静默失效），
 // 改为每次调用时惰性获取。
@@ -12,6 +13,9 @@ function getContent() {
 
 let _overlayClickHandler = null;
 let _onCloseCallback = null;
+
+// 当前打开的模态在历史栈中的占位（Android 返回手势/返回键关闭模态用）
+let _historyViewId = null;
 
 function _attachOverlayHandler() {
   _detachOverlayHandler();
@@ -66,13 +70,33 @@ export function openModal(htmlContent, onClose) {
   }
 
   _onCloseCallback = typeof onClose === 'function' ? onClose : null;
+
+  // 硬件返回支持：打开的模态占一条历史记录，返回键/返回手势 = 关闭模态。
+  // 连续 openModal（内容切换）复用同一条记录，不重复入栈。
+  if (_historyViewId === null) {
+    _historyViewId = pushView('modal', () => {
+      _historyViewId = null;
+      _hideOverlay();
+    });
+  }
 }
 
-export function closeModal() {
+function _hideOverlay() {
   const overlay = getOverlay();
   if (overlay) overlay.classList.add('hidden');
   _detachOverlayHandler();
   _fireOnCloseCallback();
+}
+
+export function closeModal() {
+  _hideOverlay();
+  // 回收历史占位：同步关闭已完成，这里只回退历史条目；
+  // popstate 到达时栈中已无该视图，不会重复关闭。
+  if (_historyViewId !== null) {
+    const id = _historyViewId;
+    _historyViewId = null;
+    releaseView(id);
+  }
 }
 
 /**

@@ -29,6 +29,7 @@
 import { getAppState } from '../../core/state.js';
 import { closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { pushView, releaseView, discardView } from './backNavigation.js';
 
 const state = getAppState();
 
@@ -60,16 +61,40 @@ export function currentMobileView() {
   return document.body.dataset.wxMobileView || 'list';
 }
 
+/** 对话页在历史栈中的占位（Android 返回手势 = 回列表层） */
+let wxChatViewId = null;
+
 /**
  * 切换移动端视图层
  * @param {'list'|'chat'} view
  */
 export function setMobileView(view) {
   if (view !== 'list' && view !== 'chat') return;
+  const prev = currentMobileView();
   document.body.dataset.wxMobileView = view;
+
+  if (view === 'chat' && prev !== 'chat' && wxChatViewId === null) {
+    // 进入对话页：占一条历史记录。rawClose 不走 setMobileView，
+    // 避免硬件返回路径里再次操作历史形成递归。
+    wxChatViewId = pushView('wxchat', () => {
+      wxChatViewId = null;
+      document.body.dataset.wxMobileView = 'list';
+    });
+  } else if (view === 'list' && prev === 'chat' && wxChatViewId !== null) {
+    // UI 主动返回（返回按钮 / dock 聊天 tab）：同步切层已完成，回收历史条目
+    const id = wxChatViewId;
+    wxChatViewId = null;
+    releaseView(id);
+  }
 }
 
 function clearMobileView() {
+  if (wxChatViewId !== null) {
+    // 视图状态被外部清除（切主题 / 回桌面端）：静默丢弃历史占位。
+    // 残留的历史条目由 backNavigation 的 id 校验兜底（回退到它时空操作）。
+    discardView(wxChatViewId);
+    wxChatViewId = null;
+  }
   delete document.body.dataset.wxMobileView;
 }
 
@@ -235,7 +260,7 @@ export function ensureSocialCover() {
     topbar.innerHTML = `
       <button class="wx-cover-back" type="button" aria-label="返回"><i class="fas fa-chevron-left"></i></button>
       <span class="wx-cover-title">朋友圈</span>
-      <button class="wx-cover-camera" type="button" aria-label="更换背景" title="更换背景"><i class="fas fa-camera"></i></button>
+      <button class="wx-cover-camera" type="button" aria-label="发表动态" title="发表动态"><i class="fas fa-camera"></i></button>
       <input type="file" class="wx-cover-upload-input" accept="image/*">
     `;
     feed.insertBefore(topbar, feed.firstChild);
@@ -274,7 +299,11 @@ export function ensureSocialCover() {
     topbar.querySelector('.wx-cover-back').addEventListener('click', () => closeModal());
 
     const uploadInput = topbar.querySelector('.wx-cover-upload-input');
-    topbar.querySelector('.wx-cover-camera').addEventListener('click', () => uploadInput.click());
+    // 与微信一致：相机按钮 = 发表动态。转发给发布按钮（微信主题下该按钮
+    // 隐藏但监听仍在），发布框开合逻辑完全复用 socialUI.js 原实现。
+    topbar.querySelector('.wx-cover-camera').addEventListener('click', () => {
+      document.getElementById('socialTogglePublishBtn')?.click();
+    });
     uploadInput.addEventListener('change', async () => {
       const file = uploadInput.files?.[0];
       if (!file) return;
@@ -295,6 +324,16 @@ export function ensureSocialCover() {
       } finally {
         uploadInput.value = '';
       }
+    });
+  }
+
+  if (isNewCover) {
+    // 与微信一致：点封面区域更换背景图（头像/昵称区除外，避免误触）。
+    // 上传入口从相机按钮移到这里。
+    const uploadInput = topbar.querySelector('.wx-cover-upload-input');
+    cover.addEventListener('click', (e) => {
+      if (e.target.closest('.wx-social-me')) return;
+      uploadInput?.click();
     });
   }
 

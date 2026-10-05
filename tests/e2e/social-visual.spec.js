@@ -57,26 +57,25 @@ test.describe('朋友圈头部视觉（微信主题）', () => {
     const feed = page.locator('.social-feed');
     await expect(feed).toBeVisible();
 
-    // 标题与图标已移除
-    await expect(feed.locator('.social-header h2')).toHaveCount(0);
-    await expect(feed.locator('.social-header .fa-globe')).toHaveCount(0);
-    // 发布按钮保留
-    await expect(feed.locator('#socialTogglePublishBtn')).toBeVisible();
+    // 微信主题下 social-header 整体退场（顶栏功能由 .wx-cover-topbar 承担）：
+    // 相机按钮 = 发表动态，发布按钮本体隐藏但监听保留（相机转发其 click）
+    await expect(feed.locator('.social-header')).toBeHidden();
+    await expect(feed.locator('#socialTogglePublishBtn')).toBeHidden();
+    await expect(feed.locator('.wx-cover-topbar .wx-cover-camera')).toBeVisible();
 
-    // 头部与帖子列表区背景必须与帖子一致（computed style 实测，非静态断言）。
+    // 帖子列表区背景必须与帖子一致（computed style 实测，非静态断言）。
     // posts 容器在帖子未填满时露出底色，漏覆盖就是截图里那块灰色空白。
     // 主题切换带 250ms 全站渐变（main.css 的 * 通用 transition），
-    // 固定等待可能采样到中间值，这里轮询到三值一致（= 过渡收敛）。
+    // 固定等待可能采样到中间值，这里轮询到两值一致（= 过渡收敛）。
     const readColors = () => page.evaluate(() => {
       const bg = (sel) => {
         const el = document.querySelector(sel);
         return el ? getComputedStyle(el).backgroundColor : null;
       };
-      return { header: bg('.social-header'), posts: bg('.social-posts'), post: bg('.social-post') };
+      return { posts: bg('.social-posts'), post: bg('.social-post') };
     });
     const allMatch = (colors) =>
-      colors.header !== null && colors.posts !== null && colors.post !== null &&
-      colors.header === colors.posts && colors.posts === colors.post;
+      colors.posts !== null && colors.post !== null && colors.posts === colors.post;
     await expect.poll(async () => allMatch(await readColors()), { timeout: 5_000 }).toBe(true);
 
     // 深色微信主题同样一致：保持模态打开直接切主题（observer 会补齐封面）
@@ -89,7 +88,6 @@ test.describe('朋友圈头部视觉（微信主题）', () => {
 
     // 收敛后采样一次，作为失败时的可读输出
     const darkColors = await readColors();
-    expect(darkColors.header).toBe(darkColors.posts);
     expect(darkColors.posts).toBe(darkColors.post);
   });
 });

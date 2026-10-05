@@ -433,6 +433,8 @@
     position: fixed;
     inset: 0;
     width: 100% !important;
+    /* viewport-fit=cover 后全屏页面延伸到状态栏下，列表内容退让 */
+    padding-top: env(safe-area-inset-top, 0px);
     transform: none !important;
     box-shadow: none;
     z-index: 90;
@@ -459,12 +461,13 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 52px;
+    /* 内容高 52px + 手势条/导航键安全区，dock 整体贴到屏幕底缘 */
+    height: calc(52px + env(safe-area-inset-bottom, 0px));
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     justify-content: space-around;
     align-items: center;
-    padding: 4px 2px;
+    padding: 4px 2px calc(4px + env(safe-area-inset-bottom, 0px));
     gap: 0;
     border-top: 1px solid var(--color-border);
     z-index: 95;
@@ -663,6 +666,14 @@
 }
 
 /* ---- 两端共用：标题行 / 帖子列表 / 帖子卡 / 关闭按钮 ---- */
+/* 微信主题下顶栏功能由 .wx-cover-topbar 承担（返回/标题/相机），
+   原 social-header（含「+发布」与「×」）整体退场：
+   - 发布：相机按钮转发 #socialTogglePublishBtn 的 click（隐藏按钮监听仍在）
+   - 头部插件槽位在微信主题不可用（如需插件按钮请走顶栏槽位）
+   同时消除封面下方那段空白头部带。 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
+  display: none;
+}
 /* 头部底色与帖子一致（transparent 会露出 feed 的灰底，与白底帖子割裂） */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-header {
   margin: 0;
@@ -723,7 +734,8 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 48px;
+  /* 磨砂栏覆盖状态栏高度，solid 态延伸到屏幕最顶端 */
+  height: calc(48px + env(safe-area-inset-top, 0px));
   background: rgba(247, 247, 247, 0.88);
   -webkit-backdrop-filter: blur(16px) saturate(1.5);
   backdrop-filter: blur(16px) saturate(1.5);
@@ -741,7 +753,7 @@
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-title {
   position: absolute;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   left: 52px;
   right: 52px;
   height: 48px;
@@ -765,12 +777,14 @@
   transform: none;
 }
 
-/* 封面区（wechatTheme.js 注入） */
+/* 封面区（wechatTheme.js 注入）。viewport-fit=cover 后页面延伸到状态栏下，
+   封面向上扩展同等高度，背景图铺进状态栏（微信行为） */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover {
   position: relative;
-  height: 240px;
+  height: calc(240px + env(safe-area-inset-top, 0px));
   background: #c8ccd4;
   overflow: visible;
+  cursor: pointer;
 }
 [data-theme="wechat-dark"] .wx-social-cover {
   background: #2c2c2c;
@@ -786,7 +800,8 @@
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-back,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-cover-camera {
   position: absolute;
-  top: 5px;
+  /* 退让状态栏，按钮落在安全区下方 */
+  top: calc(env(safe-area-inset-top, 0px) + 5px);
   width: 38px;
   height: 38px;
   border: none;

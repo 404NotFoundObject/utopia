@@ -309,7 +309,7 @@ test.describe('微信主题 · 桌面', () => {
     // 多铺几条动态，保证可滚动
     await page.evaluate(async () => {
       const social = await import('/js/modules/social.js');
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 12; i++) {
         await social.publishPostByUser({ id: 'user', name: '我' }, `滚动测试动态 ${i + 1}`);
       }
     });
@@ -588,7 +588,7 @@ test.describe('微信主题 · 移动端', () => {
     // 多铺几条动态，保证长列表可滚动
     await page.evaluate(async () => {
       const social = await import('/js/modules/social.js');
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 12; i++) {
         await social.publishPostByUser({ id: 'user', name: '我' }, `滚动测试动态 ${i + 1}`);
       }
     });
@@ -630,5 +630,54 @@ test.describe('微信主题 · 移动端', () => {
     // 返回 → 关闭页面
     await page.locator('.wx-cover-topbar .wx-cover-back').click();
     await expect(page.locator('#modalOverlay')).toBeHidden();
+  });
+
+  test('朋友圈相机按钮 = 发表动态，封面点击 = 更换背景', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    await page.locator('#socialBtn').click();
+    await expect(page.locator('#modalOverlay')).toBeVisible();
+    await page.waitForTimeout(450);
+
+    // 发布按钮在微信主题下隐藏，但监听仍在（相机按钮转发 click）
+    await expect(page.locator('#socialTogglePublishBtn')).toBeHidden();
+    await page.locator('.wx-cover-topbar .wx-cover-camera').click();
+    await expect(page.locator('#socialPublishBox')).toBeVisible();
+
+    // 点封面区域拉起文件选择（上传入口从相机按钮迁到封面）
+    const chooserPromise = page.waitForEvent('filechooser', { timeout: 5000 });
+    // 避开左上返回/右上相机按钮与右下头像区
+    await page.locator('.wx-social-cover').click({ position: { x: 200, y: 120 } });
+    const chooser = await chooserPromise;
+    expect(chooser.isMultiple()).toBe(false);
+  });
+
+  test('返回手势（history back）逐级关闭二级页面而非退出', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    // 朋友圈页面：goBack 关闭模态
+    await page.locator('#socialBtn').click();
+    await expect(page.locator('#modalOverlay')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('#modalOverlay')).toBeHidden();
+
+    // 进入对话页（真实路径：点角色行触发状态订阅切层）
+    await page.evaluate(async () => {
+      const { getAppState } = await import('/js/core/state.js');
+      const { createCharacter } = await import('/js/modules/character.js');
+      const chars = getAppState().get('characters') || [];
+      for (let i = chars.length; i < 1; i++) {
+        await createCharacter({ name: `返回手势测试角色${i}`, description: 'E2E 造数' }, { skipApiCheck: true });
+      }
+      const { renderCharacterList } = await import('/js/ui/screens/characterListUI.js');
+      await renderCharacterList();
+    });
+    await page.waitForTimeout(400);
+    await page.locator('#characterList .character-item').first().click();
+    await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'chat');
+
+    // 返回手势 → 回列表层
+    await page.goBack();
+    await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'list');
   });
 });

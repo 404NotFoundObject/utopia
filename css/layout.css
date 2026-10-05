@@ -8,6 +8,10 @@
   /* 动态视口兜底：配合 interactive-widget=resizes-content，键盘弹出时
      布局视口收缩，输入区始终贴在键盘上方、页面不整体滚动 */
   height: 100dvh;
+  /* 刘海屏/挖孔屏安全区（viewport-fit=cover 后页面延伸到状态栏与
+     手势条下，常规界面退让，朋友圈封面等沉浸面单独反向扩展） */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   overflow: hidden;
   background: var(--color-bg-secondary);
 }
