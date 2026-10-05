@@ -14,7 +14,9 @@
 #wxUserAvatar,
 #wxDockChatBtn,
 #wxPlusBtn,
-#wxPlusMenu {
+#wxPlusMenu,
+#wxChatMoreBtn,
+#wxChatMoreMenu {
   display: none;
 }
 
@@ -27,7 +29,9 @@
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .message .avatar,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item .avatar,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .avatar-preview,
-:is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages .group-message-top .avatar {
+/* 群聊消息头像：DOM 上带内联 border-radius:50%（groupChatUI.js 拼串渲染），
+   必须 !important 才能覆盖内联样式 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages .group-message .avatar {
   border-radius: 6px !important;
 }
 
@@ -45,9 +49,27 @@
   position: relative;
 }
 
-/* 尾巴：用户气泡（绿）朝右，对方气泡（白 / 深灰）朝左 */
-[data-theme="wechat"] .message.user .bubble::after,
-[data-theme="wechat"] .group-message.own .group-message-bubble::after {
+/* 群聊布局（微信式，DOM 见 groupChatUI.js）：头像与「昵称+气泡」列并排，
+   昵称与头像顶对齐、气泡紧贴昵称下方。
+   容器必须横向铺满：group-chat.css 的 max-width:80% 配合内容自适应宽度，
+   会让「calc(100% - 40px)」这类缩进从气泡自身宽度里扣，
+   把「怎么了」这类短消息压成一字一行。 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages .group-message {
+  max-width: 100% !important;
+}
+/* 清掉 group-chat.css 给气泡的缩进（44px / 移动端 36px / 30px）：
+   新结构下气泡已通过 DOM 层级与头像对齐，无需再缩进。 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages .group-message-bubble {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 尾巴：用户气泡（绿）朝右，对方气泡（白 / 深灰）朝左。
+   形状（content / 定位 / 尺寸）必须对 wechat 与 wechat-dark 同时生效：
+   此前形状只写在 [data-theme="wechat"] 下，深色只覆盖了颜色 ——
+   没有 content 的伪元素根本不存在，深色主题的尾巴整条消失。 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .message.user .bubble::after,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .group-message.own .group-message-bubble::after {
   content: '';
   position: absolute;
   top: 10px;
@@ -58,8 +80,8 @@
   border-right: 0;
   border-left-color: #95ec69;
 }
-[data-theme="wechat"] .message.assistant .bubble::after,
-[data-theme="wechat"] .group-message:not(.own) .group-message-bubble::after {
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .message.assistant .bubble::after,
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) .group-message:not(.own) .group-message-bubble::after {
   content: '';
   position: absolute;
   top: 10px;
@@ -70,6 +92,7 @@
   border-left: 0;
   border-right-color: #ffffff;
 }
+/* 深色：只换颜色，形状沿用上面的公共声明 */
 [data-theme="wechat-dark"] .message.user .bubble::after,
 [data-theme="wechat-dark"] .group-message.own .group-message-bubble::after {
   border-left-color: #3eb575;
@@ -77,6 +100,12 @@
 [data-theme="wechat-dark"] .message.assistant .bubble::after,
 [data-theme="wechat-dark"] .group-message:not(.own) .group-message-bubble::after {
   border-right-color: #2c2c2c;
+}
+/* 群聊尾巴：贴在气泡顶边（top:0）。气泡本身已在 15px 处起步 —— 靠
+   「昵称行高 14px + 1px 间距」把气泡整体抬上去，而不是把尾巴单独上移
+   （单独上移会让尾巴脱离气泡边缘）。抬升后尾巴中心约在头像中部。 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages .group-message .group-message-bubble::after {
+  top: 0;
 }
 
 /* 靠头像一侧的上角收尖，与尾巴衔接 */
@@ -564,7 +593,8 @@
     border-top: 0;
     border-bottom-color: #3e3e3e;
   }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu .wx-menu-item {
+  /* 列表层「+」与对话页「···」共用一套菜单项样式 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) :is(#wxPlusMenu, #wxChatMoreMenu) .wx-menu-item {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -573,13 +603,70 @@
     font-size: 14px;
     cursor: pointer;
   }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu .wx-menu-item + .wx-menu-item {
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) :is(#wxPlusMenu, #wxChatMoreMenu) .wx-menu-item + .wx-menu-item {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
-  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxPlusMenu .wx-menu-item i {
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) :is(#wxPlusMenu, #wxChatMoreMenu) .wx-menu-item i {
     width: 20px;
     text-align: center;
     font-size: 15px;
+  }
+  /* 无可操作项时的空态（会话已删除 / 列表未渲染） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxChatMoreMenu .wx-menu-empty {
+    color: rgba(255, 255, 255, 0.5);
+    cursor: default;
+    justify-content: center;
+  }
+
+  /* 对话页右上角「···」与下拉菜单：承载会话列表卡片上的编辑/导出/删除
+     （群聊为群设置），移动端列表层被隐藏后这些操作改从这里进入 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatHeader .header-actions {
+    position: relative;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxChatMoreBtn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-primary);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxChatMoreMenu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 184px;
+    background: #3e3e3e;
+    border-radius: 8px;
+    padding: 2px 0;
+    z-index: 98;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    display: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxChatMoreMenu.open {
+    display: block;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #wxChatMoreMenu::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    right: 16px;
+    width: 0;
+    height: 0;
+    border: 5px solid transparent;
+    border-top: 0;
+    border-bottom-color: #3e3e3e;
+  }
+
+  /* 会话列表卡片不再挂操作按钮（微信的会话列表没有它们）：
+     编辑 / 导出 / 删除（群聊为群设置）改由对话页右上角「···」菜单承载。
+     节点保留在 DOM 中（菜单项是转发它们的 click 来复用逻辑），仅视觉隐藏。 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) .character-item .item-actions {
+    display: none !important;
   }
 
   /* 汉堡按钮退场：列表层即会话列表，对话页由返回按钮回列表 */
@@ -590,6 +677,43 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  /* 对话页顶栏（微信式）：名称横向居中，不显示人物关系 / 群人数。
+     绝对定位居中是为了让标题相对整条顶栏居中，而不是「返回键与···之间
+     的剩余空间」居中——两侧按钮宽度不同时后者会偏。 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatHeader {
+    position: relative;
+  }
+  /* #characterInfo 转绝对定位后退出文档流，右侧「···」区失去推挤，
+     需自行靠右（否则会贴在返回键旁边） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatHeader .header-actions {
+    margin-left: auto;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatHeader #characterInfo {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-50%);
+    /* 两侧各留出返回键 / ··· 的位置，标题过长时截断 */
+    max-width: calc(100% - 120px);
+    justify-content: center;
+    /* 居中块浮在按钮之上：别挡住返回键与 ··· 的点击 */
+    pointer-events: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatHeader #characterInfo > div {
+    min-width: 0;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatHeader #charName {
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 微信顶栏只有会话名，不显示人物关系 / 「N 人」 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #charRelation {
+    display: none !important;
   }
 
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatMessages {
