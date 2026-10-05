@@ -4,7 +4,15 @@
  */
 
 import { getAppState } from '../core/state.js';
-import { getCurrentCharacter } from './character.js';
+import { getCurrentCharacter, updateCharacter } from './character.js';
+import {
+  resolveStatusField,
+  listStatusFields,
+  readStatusValue,
+  parseStatusValue,
+  buildStatusPatch,
+  formatStatusValue,
+} from './statusFields.js';
 import { searchMemories, getMemoriesByCharacter, deleteMemory } from './memory.js';
 import { getEmotionLabel } from './emotionEngine.js';
 import { showBanner } from '../ui/components/banner.js';
@@ -222,7 +230,9 @@ registerCommand('print', async (args, context) => {
 
     if (char) {
       try {
-        const memories = await searchMemories(char.id, '', 1000);
+        // 计数要用 getMemoriesByCharacter：searchMemories 是检索函数，
+        // 空查询会在 isValidText 处直接返回 []（恒为 0），不能当计数用
+        const memories = await getMemoriesByCharacter(char.id);
         lines.push(`🧠 记忆条目: ${memories.length}`);
       } catch (e) {}
     }
@@ -506,14 +516,10 @@ registerCommand('wake', async (args, context) => {
 registerCommand('undo', async (args, context) => {
   const state = getAppState();
 
-  if (state.get('sending')) {
-    return {
-      banner: '⚠️ 正在生成回复，请稍候',
-      console: '⚠️ 当前有消息正在生成中，无法执行撤回。',
-      consoleType: 'warning',
-    };
-  }
-
+  // 注意：命令总是在 sendMessage / sendUserGroupMessage 内部执行的，
+  // 那两个入口早已 state.set('sending', true)，在这里检查 sending 恒为 true，
+  // 会导致 /undo 永远被「正在生成」挡住。真正的防重入由发送入口的
+  // 「sending 时直接 return」守卫承担（生成期间用户消息根本进不来）。
   const convId = state.get('currentConversationId');
   if (!convId) {
     return {
@@ -551,14 +557,8 @@ registerCommand('undo', async (args, context) => {
 registerCommand('regen', async (args, context) => {
   const state = getAppState();
 
-  if (state.get('sending')) {
-    return {
-      banner: '⚠️ 正在生成回复，请稍候',
-      console: '⚠️ 当前有消息正在生成中，无法执行重新生成。',
-      consoleType: 'warning',
-    };
-  }
-
+  // 同 /undo：命令在发送流程内执行时 sending 恒为 true，此检查只会误伤。
+  // 防重入由 sendMessage 入口守卫承担。
   const convId = state.get('currentConversationId');
   if (!convId) {
     return {
@@ -1177,6 +1177,103 @@ registerCommand('worldbook', async (args, context) => {
   };
 }, { description: '世界书工具: /worldbook test <文本> 测试语义匹配', aliases: ['wb'] });
 
+/**
+ * `/status <字段> <值>` 的写入分支（赋值式：空格分隔，不用等号）。
+ *
+ * 语法：
+ *   /status                 查看（走原逻辑）
+ *   /status fields          列出所有可改字段与值域
+ *   /status health 90       设为绝对值
+ *   /status health +5       相对增减
+ *   /status health          只给字段不给值 → 显示当前值与用法
+ *
+ * 可改字段仅限 statusFields.js 的白名单（防止把时间戳、枚举等写坏）；
+ * 超范围值一律夹取到字段值域，并在输出里说明。
+ *
+ * @returns {object|null} null 表示「不是写入请求」，交回给查看逻辑
+ */
+async function trySetStatus(target, tokens) {
+  if (!target || !tokens || tokens.length === 0) return null;
+
+  // /status fields：列出可改字段
+  if (tokens[0] === 'fields') {
+    const all = listStatusFields();
+    const lines = [
+      '📋 可修改的数值字段（格式：字段 值）',
+      '数值写法：90 设为绝对值｜+5 / -5 相对增减｜=-50 设为负数（-50 会被当作相对减）',
+      '',
+    ];
+    const groups = [
+      ['⚡ 身体', all.filter((f) => f.group === 'body')],
+      ['😊 情感', all.filter((f) => f.group === 'emotion' && !f.path.includes('needs'))],
+      ['🍃 需求', all.filter((f) => f.path.includes('needs'))],
+    ];
+    for (const [title, list] of groups) {
+      lines.push(
+        `${title}: ${list.map((f) => `${f.key} ${f.label}(${f.range.min}~${f.range.max})`).join('、')}`
+      );
+    }
+    lines.push('');
+    lines.push('别名：body.* / emotion.* / needs.*');
+    lines.push('⚠️ 同名提示：emotion.energy 是情感能量，裸名 energy 指体力');
+    lines.push('⚠️ 设定后会随时间继续自然演化，不是锁定');
+    return {
+      console: lines.join('\n'),
+      consoleType: 'info',
+      banner: '📋 可修改字段已输出到控制台',
+    };
+  }
+
+  const field = resolveStatusField(tokens[0]);
+  if (!field) {
+    return {
+      console: `❌ 未知字段: ${tokens[0]}\n用 /status fields 查看可改字段，或直接 /status 查看当前状态`,
+      consoleType: 'error',
+      banner: `❌ 未知字段: ${tokens[0]}`,
+    };
+  }
+
+  const current = readStatusValue(target, field);
+  const sample = Math.round((field.range.min + field.range.max) / 2);
+
+  // 只给字段没给值：显示当前值与用法（比报错友好，也避免误改）
+  if (tokens.length < 2) {
+    return {
+      console:
+        `${field.label} (${field.key}) 当前: ${formatStatusValue(current)}　值域 ${field.range.min}~${field.range.max}\n` +
+        `用法: /status ${field.key} ${sample}　或　/status ${field.key} +5`,
+      consoleType: 'info',
+      banner: `${field.label}：${formatStatusValue(current)}`,
+    };
+  }
+
+  const parsed = parseStatusValue(tokens[1], current, field);
+  if (!parsed.ok) {
+    return {
+      console: `❌ ${parsed.error}\n用法: /status ${field.key} ${sample}`,
+      consoleType: 'error',
+      banner: '❌ 数值无效',
+    };
+  }
+
+  // 写回：buildStatusPatch 已做深合并并同步 lastUpdate（否则下一 tick 会用
+  // 陈旧基准一次性推进大量小时数，把刚设的值冲掉）
+  await updateCharacter(target.id, buildStatusPatch(target, field, parsed.value));
+
+  const lines = [
+    `✅ ${target.name || '角色'} 的${field.label}: ${formatStatusValue(current)} → ${formatStatusValue(parsed.value)}`,
+  ];
+  if (parsed.clamped) {
+    lines.push(`（超出值域，已夹取到 ${field.range.min}~${field.range.max}）`);
+  }
+  lines.push('⚠️ 数值会随时间继续自然演化，这不是锁定');
+  return {
+    console: lines.join('\n'),
+    consoleType: 'success',
+    banner: `✅ ${field.label} → ${formatStatusValue(parsed.value)}`,
+  };
+}
+
 // /status
 registerCommand('status', async (args, context) => {
   const state = getAppState();
@@ -1196,8 +1293,11 @@ registerCommand('status', async (args, context) => {
     const group = await getGroup(groupId);
     const members = await getGroupMembers(groupId);
 
-    if (args && args.trim().startsWith('@')) {
-      const targetName = args.trim().substring(1);
+    // 支持 `/status @成员 字段 值`：@ 之后若带字段则走写入分支
+    const argTokens = (args || '').trim().split(/\s+/).filter(Boolean);
+    const restTokens = argTokens.slice(1);
+    if (argTokens[0] && argTokens[0].startsWith('@')) {
+      const targetName = argTokens[0].substring(1);
       const targetMember = members.find(m =>
         m.memberType === 'character' && m.character?.name === targetName
       );
@@ -1207,6 +1307,10 @@ registerCommand('status', async (args, context) => {
           consoleType: 'error',
           banner: `❌ 未找到成员: ${targetName}`,
         };
+      }
+      if (restTokens.length > 0) {
+        const setResult = await trySetStatus(targetMember.character, restTokens);
+        if (setResult) return setResult;
       }
       const char = targetMember.character;
       lines.push(`📛 成员: ${char.name}`);
@@ -1273,6 +1377,13 @@ registerCommand('status', async (args, context) => {
         banner: '❌ 未选择角色',
       };
     }
+    // 单聊：`/status 字段 值` 写入；无参数则走下面的查看逻辑
+    const setResult = await trySetStatus(
+      char,
+      (args || '').trim().split(/\s+/).filter(Boolean)
+    );
+    if (setResult) return setResult;
+
     lines.push(`📛 角色: ${char.name}`);
     lines.push(`❤️ 关系: ${char.relationship || '未设置'}`);
     lines.push(`📝 简介: ${char.description || '无'}`);
@@ -1318,7 +1429,7 @@ registerCommand('status', async (args, context) => {
       banner: `📊 ${char.name} 的状态已输出到控制台`,
     };
   }
-}, { description: '查看当前角色/群组状态，群聊支持 @成员', aliases: ['s'] });
+}, { description: '查看/修改状态数值：/status 查看，/status 字段 值 修改（支持 +5/-5），/status fields 列出字段', aliases: ['s'] });
 
 // /memory
 registerCommand('memory', async (args, context) => {
@@ -1804,8 +1915,8 @@ registerCommand('social', async (args, context) => {
       let generated = 0;
       for (const char of targetChars) {
         try {
-          await social.publishPostByCharacter(char);
-          generated++;
+          const post = await social.publishPostByCharacter(char);
+          if (post) generated++;
         } catch (e) {
           console.warn(`[Social] 角色 ${char.name} 发帖失败:`, e);
         }

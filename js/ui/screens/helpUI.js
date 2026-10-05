@@ -105,7 +105,7 @@ export function renderHelpModal() {
           <li><strong>世界书系统 v2.0</strong>：规则组、嵌套条件、宏模板、<strong>语义触发</strong>与向量同步。</li>
           <li><strong>插件系统 v1.0</strong>：Worker 隔离、钩子系统、UI 槽位、权限声明。</li>
           <li><strong>统一右键菜单</strong>：核心菜单与插件菜单自动合并，按优先级排列。</li>
-          <li><strong>朋友圈社交</strong>：角色和用户可发布动态，AI 自动互动。界面已对齐微信风格——方形圆角头像、蓝色昵称、九宫格图片（单图大图 / 4 图 2×2 / 其余九宫格）、赞与评论合并在同一灰底容器，评论采用「A 回复 B：内容」格式。</li>
+          <li><strong>朋友圈社交</strong>：角色和用户可发布动态，AI 自动互动。界面已对齐微信风格——方形圆角头像、蓝色昵称、九宫格图片（单图大图 / 4 图 2×2 / 其余九宫格）、赞与评论合并在同一灰底容器，评论采用「A 回复 B：内容」格式。微信主题下与微信操作一致：<strong>右上角相机按钮发表动态</strong>，<strong>点击顶部背景图区域更换封面</strong>；手机上支持<strong>系统返回手势/返回键</strong>逐级返回（朋友圈、聊天页等二级页面）。</li>
           <li><strong>群聊支持</strong>：多角色同屏对话，@提及、@触发回复、自动发言轮询。</li>
           <li><strong>🔊 语音合成 (TTS)</strong>：Web Speech API / Kokoro，每角色可独立配置音色。</li>
           <li><strong>🎤 语音输入 (STT)</strong>：长按麦克风或按住 Ctrl/Alt 说话。</li>
@@ -376,7 +376,7 @@ export function renderHelpModal() {
               <tr><td><span class="cmd-name">/switch</span></td><td><span class="cmd-alias">/sw</span></td><td class="cmd-desc">切换到指定角色（支持模糊匹配）</td><td><code>/switch 猫猫</code></td></tr>
               <tr><td><span class="cmd-name">/inspect</span></td><td><span class="cmd-alias">/ins</span></td><td class="cmd-desc">查看当前生效的注入规则（含语义轨迹、Token 预算、会话状态）</td><td><code>/inspect</code></td></tr>
               <tr><td><span class="cmd-name">/worldbook</span></td><td><span class="cmd-alias">/wb</span></td><td class="cmd-desc">世界书工具（<code>test</code> 子命令测试语义匹配）</td><td><code>/worldbook test 我今天有点难过</code></td></tr>
-              <tr><td><span class="cmd-name">/status</span></td><td><span class="cmd-alias">/s</span></td><td class="cmd-desc">查看当前角色/群组状态</td><td><code>/status</code> 或 <code>/status @猫猫</code></td></tr>
+              <tr><td><span class="cmd-name">/status</span></td><td><span class="cmd-alias">/s</span></td><td class="cmd-desc">查看 / 修改状态数值</td><td><code>/status</code>、<code>/status health 90</code>、<code>/status fields</code>、<code>/status @猫猫 health 90</code></td></tr>
               <tr><td><span class="cmd-name">/memory</span></td><td><span class="cmd-alias">/mem</span></td><td class="cmd-desc">记忆管理：list / search / clear</td><td><code>/memory list</code></td></tr>
               <tr><td><span class="cmd-name">/stats</span></td><td>—</td><td class="cmd-desc">系统统计信息</td><td><code>/stats</code></td></tr>
               <tr><td><span class="cmd-name">/whoami</span></td><td>—</td><td class="cmd-desc">显示当前身份和模式</td><td><code>/whoami</code></td></tr>
@@ -489,6 +489,8 @@ export function renderHelpModal() {
 
           <dt><code>/status</code> / <code>/s</code></dt>
           <dd>单聊输出角色详情；群聊支持 <code>/status @成员名</code>。输出内容包括情感六维、需求、关系、身体状态（含受伤详情与叙述）、疾病/受伤、记忆条目数等。</dd>
+          <dd><strong>修改数值</strong>：<code>/status 字段 值</code>，例如 <code>/status health 90</code>、<code>/status sleepiness -20</code>。<code>+5</code> / <code>-5</code> 是相对增减，要设成负的绝对值请用 <code>=</code> 前缀（<code>/status valence =-30</code>）。<code>/status fields</code> 列出全部可改字段与值域；只给字段不给值（<code>/status health</code>）则只显示当前值，不会误改。群聊同理：<code>/status @成员名 health 90</code>。</dd>
+          <dd>⚠️ 设定的是「当前值」而非锁定——世界心跳会继续让数值随时间自然演化；疾病未清除时也会继续扣健康。</dd>
 
           <dt><code>/memory</code> / <code>/mem</code></dt>
           <dd>记忆管理：<code>list</code>（列最近 10 条）/ <code>search &lt;关键词&gt;</code>（返回 Top 5）/ <code>clear</code>（需 <code>confirm_clear</code> 二次确认）。</dd>
@@ -859,6 +861,7 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
         <h3>🏃 身体状态引擎</h3>
         <p>模拟角色的精力、睡意、健康、意识状态、睡眠周期、<strong>睡眠债</strong>、疾病、受伤，受时间和情感双重影响。可通过 <code>/wake</code> 命令唤醒睡眠中的角色。</p>
         <p><strong>睡眠债</strong>：清醒时按「每日睡眠需求 ÷ 24」持续累积，睡眠时按「时长 × 睡眠质量」偿还（午休按 80% 效率）。债务会放大困意与疲劳、加快健康衰减；欠债超过每日需求的 1.5 倍后，即使健康值正常也可能病倒。用 <code>/status</code> 查看当前债务。</p>
+        <p><strong>作息与离线推进</strong><span class="new-badge">v3.9.6</span>：睡意达到阈值就会自然入睡（夜间阈值更低，相当于到点就寝），睡够了自行醒来并还债。长时间未打开应用时，离线跨度会按小时<strong>分段推进</strong>——角色在这段时间里照常作息，不会把整段算作一次清醒或一次长睡，也就不会凭空堆出满额债务。</p>
 
         <h4>三大子系统</h4>
         <div class="table-scroll-wrapper">
@@ -1083,7 +1086,7 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
           <dd>在输入框中以 <code>/</code> 开头输入命令，如 <code>/help</code>。执行结果通过"Utopia 控制台"气泡展示。</dd>
 
           <dt><strong>群聊中能用命令吗？</strong></dt>
-          <dd>可以，所有命令在群聊中同样有效。<code>/print</code> 会自动识别群聊模式，<code>/status</code> 支持 <code>@成员</code>。</dd>
+          <dd>可以，所有命令在群聊中同样有效。<code>/print</code> 会自动识别群聊模式，<code>/status</code> 支持 <code>@成员</code> 查看，也支持 <code>@成员 字段 值</code> 修改该成员的状态数值。</dd>
 
           <dt><strong>如何临时调整采样参数？</strong></dt>
           <dd>使用 <code>/temp</code>、<code>/fp</code> 等参数命令，执行后立即生效，刷新后恢复。</dd>
