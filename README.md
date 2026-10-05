@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.6-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.7-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,19 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.7
+
+**移动端微信主题的群聊体验收尾：消息布局对齐微信、顶栏居中、会话操作收进「···」菜单；修复群聊二次进入无响应与两处气泡缺陷。**
+
+- **修复「返回后再进同一个群没反应」**：状态更新对相同值不通知订阅者，从对话页返回列表层时当前群 id 没清空，再点同一个群被判为无变化，页面切不过去（得先随便进个单聊再出来）。补上与单聊同样的置空防呆，群聊的返回手势/返回键也随之生效
+- **消息布局改为微信式**：气泡原本落在头像正下方、与昵称错位。现在是「头像 +（昵称 / 气泡）」并排，昵称与头像顶部对齐，气泡紧贴其下方，尖角尾巴指向头像中部
+- **会话操作收进聊天页「···」**：移动端列表卡片不再挂编辑 / 导出 / 删除按钮（群聊为群设置），统一放在对话页右上角菜单里；群名去掉 👥 前缀
+- **顶栏**：会话名相对整条顶栏横向居中，去掉人物关系 / 群人数行
+- **修复短消息被压成一字一行**：气泡的宽度百分比原本相对「内容自适应宽度」的祖先解析，行宽先按内容算、再被百分比钳回内容宽以下。改为定宽列后恢复
+- **修复深色主题气泡尾巴丢失**：尾巴的形状声明只写在浅色主题下，深色只覆盖颜色——没有 `content` 的伪元素不存在，尾巴整条消失。形状改为两个主题共用
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.6
 
