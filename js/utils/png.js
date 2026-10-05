@@ -101,57 +101,90 @@ export async function embedJSONToPNG(pngBlob, jsonString) {
  */
 export async function extractJSONFromPNG(pngBlob) {
   const arrayBuffer = await pngBlob.arrayBuffer();
-  const data = new Uint8Array(arrayBuffer);
-  
-  let pos = 8;
-  while (pos < data.length) {
-    const length = new DataView(data.buffer, pos).getUint32(0);
+  const text = extractTextChunk(arrayBuffer);
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * 从 PNG 的 tEXt 块提取 JSON 字符串。
+ *
+ * ★ 全项目唯一实现（审计 A-1 / S-3）：此前 js/utils/png.js 与
+ * js/modules/characterAdapter.js 各维护一份 tEXt 扫描与载荷解码，且已经漂移——
+ * 前者只认 `chara\0` / `chara ` 两种前缀，后者还认 `chara` 直连载荷与裸 JSON。
+ * 应用实际导入走的是 characterAdapter 那份，于是「改了一边、另一边没跟上」
+ * 的漂移只会体现在测试里，问题被掩盖。现在两份合并成这一份，两边都调用它。
+ *
+ * @param {ArrayBuffer} buffer
+ * @returns {string|null} JSON 字符串，或 null
+ */
+export function extractTextChunk(buffer) {
+  const view = new DataView(buffer);
+  let offset = 8;
+  while (offset < view.byteLength) {
+    const length = view.getUint32(offset);
     const type = String.fromCharCode(
-      data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]
+      view.getUint8(offset + 4),
+      view.getUint8(offset + 5),
+      view.getUint8(offset + 6),
+      view.getUint8(offset + 7)
     );
     if (type === 'tEXt') {
-      const textData = data.slice(pos + 8, pos + 8 + length);
-      const text = new TextDecoder().decode(textData);
-      // 兼容三种关键字约定：
-      //   'chara\0' + base64(JSON)  —— SillyTavern 规范（本库写入即此格式）
-      //   'chara '  + 原始 JSON      —— 历史版本
-      //   'chara\0' + 原始 JSON      —— 其他工具的变体
+      const data = new Uint8Array(buffer, offset + 8, length);
+      const text = new TextDecoder('utf-8').decode(data);
+
+      // 1. ST 官方：`chara\0{base64}`（null 分隔，载荷是 base64 编码的 JSON）
       if (text.startsWith('chara\0')) {
-        const payload = text.substring(6);
-        return decodeCharaPayload(payload);
+        return decodeCharaText(text.substring(6));
       }
+      // 2. Utopia 历史自产：`chara {json}`（空格分隔，载荷是原始 JSON）
       if (text.startsWith('chara ')) {
-        const payload = text.substring(6);
-        return decodeCharaPayload(payload);
+        return decodeCharaText(text.substring(6));
+      }
+      // 3. 兼容：`chara` 后直接跟分隔符（\0 或空格）或 JSON
+      if (text.startsWith('chara')) {
+        return decodeCharaText(text.substring(5).replace(/^[\0 ]/, ''));
+      }
+      // 4. 裸 JSON（兜底）
+      if (text.startsWith('{')) {
+        return text;
       }
     }
-    pos += 12 + length;
+    offset += 12 + length;
   }
   return null;
 }
 
 /**
- * 解析 chara 关键字后的载荷：优先按 base64 解码，失败则按原始 UTF-8 JSON 解析。
- * @param {string} payload
- * @returns {Object|null}
+ * 解析 chara 关键字后的载荷为 JSON 字符串。
+ *
+ * 写入端（embedJSONToPNG）写的是 `chara\0` + base64(JSON)；若这里不解码，
+ * 上层 JSON.parse(base64) 会抛错，表现为「无法导入自己导出的 PNG 卡」。
+ * 先尝试 base64 解码（返回解码后的 JSON 字符串），失败则视为原始 JSON 原文。
+ *
+ * @param {string} payload - chara 关键字之后的载荷
+ * @returns {string} JSON 字符串（已解码）
  */
-function decodeCharaPayload(payload) {
-  // base64（SillyTavern 规范）
+export function decodeCharaText(payload) {
+  // base64 解码：若解码结果是合法的 JSON（以 { 开头），说明是 ST 规范编码，返回解码结果
   try {
-    const bytes = base64ToBytes(payload);
-    const jsonStr = new TextDecoder().decode(bytes);
-    return JSON.parse(jsonStr);
-  } catch (_) {
-    // 历史/其他工具的原始 JSON
-    try {
-      return JSON.parse(payload);
-    } catch (_) {
-      return null;
+    const decoded = base64ToUtf8(payload.trim());
+    if (decoded.trim().startsWith('{')) {
+      return decoded;
     }
+  } catch (_) {
+    // 不是 base64，落到原始 JSON 分支
   }
+  // 原始 JSON（历史版本 / 其他工具直写明文）
+  return payload;
 }
 
-// ---------- base64 编解码（跨环境安全：Node 无 btoa/atob） ----------
+// ---------- base64 编解码 ----------
+// btoa / atob 在浏览器与 Node 16+ 均已全局可用，无需 polyfill。
 function bytesToBase64(bytes) {
   let binary = '';
   const chunkSize = 0x8000;
@@ -161,13 +194,18 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 
-function base64ToBytes(base64) {
+/**
+ * 把 base64 字符串解码为 UTF-8 字符串。
+ * atob 返回的是 binary string（每个字符对应一个字节），中文等多字节 UTF-8 字符
+ * 必须再经 TextDecoder 才能正确还原，否则会出现乱码。
+ */
+function base64ToUtf8(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes;
+  return new TextDecoder('utf-8').decode(bytes);
 }
 
 // ---------- CRC-32 实现 ----------

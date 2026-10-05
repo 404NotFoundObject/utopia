@@ -2,6 +2,12 @@
 import { getGameTime } from './time.js';
 import { getDefaultEmotionState, getInitialEmotionState } from './emotionEngine.js';
 import { getDefaultBodyState, getInitialBodyState } from './bodyState.js';
+// ★ tEXt 扫描与载荷解码的唯一实现在 utils/png.js（审计 S-3）。此前本文件另有一份
+// 拷贝，两份的关键字覆盖已经漂移。这里改为直接复用同一份，并原样再导出，
+// 保证既有 import 不受影响。
+import { extractTextChunk as extractPngTextChunk } from '../utils/png.js';
+
+export { extractPngTextChunk as extractTextChunk };
 
 // ---------- 格式检测 ----------
 export function detectFormat(data, fileName = '') {
@@ -36,7 +42,7 @@ export async function parsePNG(file) {
     reader.onload = (e) => {
       try {
         const buffer = e.target.result;
-        const data = extractTextChunk(buffer);
+        const data = extractPngTextChunk(buffer);
         if (!data) {
           reject(new Error('未找到文本数据块'));
           return;
@@ -50,87 +56,6 @@ export async function parsePNG(file) {
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
   });
-}
-
-/**
- * 从 PNG 的 tEXt 块提取 JSON 字符串
- * @param {ArrayBuffer} buffer
- * @returns {string|null} JSON 字符串，或 null
- */
-export function extractTextChunk(buffer) {
-  const view = new DataView(buffer);
-  let offset = 8;
-  while (offset < view.byteLength) {
-    const length = view.getUint32(offset);
-    const type = String.fromCharCode(
-      view.getUint8(offset + 4),
-      view.getUint8(offset + 5),
-      view.getUint8(offset + 6),
-      view.getUint8(offset + 7)
-    );
-    if (type === 'tEXt') {
-      const data = new Uint8Array(buffer, offset + 8, length);
-      const text = new TextDecoder('utf-8').decode(data);
-
-      // 1. ST 官方：`chara\0{base64}`（null 分隔，载荷是 base64 编码的 JSON）
-      if (text.startsWith('chara\0')) {
-        return decodeCharaText(text.substring(6));
-      }
-      // 2. Utopia 历史自产：`chara {json}`（空格分隔，载荷是原始 JSON）
-      if (text.startsWith('chara ')) {
-        return decodeCharaText(text.substring(6));
-      }
-      // 3. 兼容：`chara` 后直接跟分隔符（\0 或空格）或 JSON
-      if (text.startsWith('chara')) {
-        return decodeCharaText(text.substring(5).replace(/^[\0 ]/, ''));
-      }
-      // 4. 裸 JSON（兜底）
-      if (text.startsWith('{')) {
-        return text;
-      }
-    }
-    offset += 12 + length;
-  }
-  return null;
-}
-
-/**
- * 解析 chara 关键字后的载荷为 JSON 字符串。
- *
- * 审计 A-1：写入端（png.js embedJSONToPNG）写入 `chara\0` + base64(JSON)，
- * 但此前这里直接返回 base64 字符串、不解码，导致 parsePNG 里 JSON.parse(base64) 抛错，
- * 表现为「无法导入自己导出的 PNG 卡」。这里对齐 png.js 的 decodeCharaPayload：
- * 先尝试 base64 解码（返回解码后的 JSON 字符串），失败则视为原始 JSON 原文返回。
- *
- * @param {string} payload - chara 关键字之后的载荷
- * @returns {string} JSON 字符串（已解码）
- */
-function decodeCharaText(payload) {
-  // base64 解码：若解码结果是合法的 JSON（以 { 开头），说明是 ST 规范编码，返回解码结果
-  try {
-    const decoded = base64ToUtf8(payload.trim());
-    if (decoded.trim().startsWith('{')) {
-      return decoded;
-    }
-  } catch (_) {
-    // 不是 base64，落到原始 JSON 分支
-  }
-  // 原始 JSON（历史版本 / 其他工具直写明文）
-  return payload;
-}
-
-/**
- * 把 base64 字符串解码为 UTF-8 字符串。
- * atob 返回的是 binary string（每个字符对应一个字节），中文等多字节 UTF-8 字符
- * 必须再经 TextDecoder 才能正确还原，否则会出现乱码。
- */
-function base64ToUtf8(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new TextDecoder('utf-8').decode(bytes);
 }
 
 // ---------- 格式转换函数 ----------

@@ -229,12 +229,16 @@ export async function createCharacter(data, opts = {}) {
   // 审计 C-4：角色卡自带性格参数时不再强制量化。
   // force 的语义应是「尚未量化，需要补齐」，而非「无论如何都重掷一次」。
   const hasProvidedPersonality = !!character.personalityParameters;
+  // ★ 动态 import 本身也可能失败（分块加载失败 / 模块链异常），此前只给内层
+  // 的 autoQuantifyIfNeeded 挂了 catch，import 的拒绝会冒成 unhandledrejection。
   import('./personality.js').then(({ autoQuantifyIfNeeded }) => {
     autoQuantifyIfNeeded(character, !hasProvidedPersonality, {
       preserveProfiles: userProvidedProfile,
     }).catch(err => {
       console.warn('后台量化失败:', err);
     });
+  }).catch(err => {
+    console.warn('后台量化模块加载失败:', err);
   });
 
   return character;
