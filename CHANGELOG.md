@@ -5,6 +5,47 @@
 
 ---
 
+## [3.9.6] - 2026-10-05
+
+移动端 PWA 导航与安全区适配、朋友圈交互对齐微信；修复离线长跨度下的睡眠债建模、`/print` 计数恒为 0、`/undo` 与群聊发消息两处实机不可用。
+
+### 移动端 / PWA
+
+- **返回手势与返回键（新增 `js/ui/layout/backNavigation.js`）**：应用是纯 DOM 切屏、不产生历史记录，此前在 PWA 里按返回手势/返回键会直接退到桌面，只能点顶部返回按钮。新增基于 `pushState` 的视图栈并接入两层——`modal.js`（所有模态二级页：朋友圈、设置、世界书…打开即占一条历史记录）与 `wechatTheme.setMobileView`（聊天页 ↔ 列表层）。栈顶 id 校验免疫「关闭后立刻重开」等竞态；UI 上的关闭按钮仍走 `releaseView + history.back()`，行为不变
+- **安全区适配**：`index.html` 补上缺失的 `viewport-fit=cover`（页面延伸进状态栏/手势条的前提）。朋友圈封面高度改为 `calc(240px + env(safe-area-inset-top))`，背景图铺进状态栏（与微信一致），顶栏返回/相机按钮、磨砂栏与标题按 inset 下移；底部 dock 的 `height` / `padding` 加 `env(safe-area-inset-bottom)` 贴到屏幕底缘，消除那条缝隙；列表层与 `#app` 按安全区退让
+
+### 朋友圈
+
+- **发布交互对齐微信**：移除顶部「+ 发布」按钮与整条白色 `social-header`（顶部不再有白条）；**右上角相机按钮改为发表动态**（转发给隐藏的发布按钮，发布框逻辑零改动复用）；**点击封面区域更换背景图**（头像/昵称区除外）
+- **移除机械兜底文案**：AI 调用失败或返回空时，`generateComment` 兜底「哈哈哈，有趣！」、`generatePostContent` 兜底「今天心情不错，发条动态。」——这两句会直接出现在用户的朋友圈里。改为重试 2 次后返回 `null`，调用方跳过（不评论 / 不发帖）；`commandEngine` 的发帖计数与自动发帖循环补上判空，失败不再计入成功数。宁缺毋滥
+
+### 修复
+
+- **离线长跨度下的睡眠债建模（真实缺陷）**：好几天不打开、再次上线持续推进时，角色会一直处于睡觉/昏厥状态并莫名其妙生病。两个缺陷叠加——**(a)「困倦」是死胡同**：全仓唯一的自然入睡通道是 `energy < 10 && sleepiness > 90`，等价于「必须先昏厥才能睡觉」，实测要连续清醒约 58 游戏小时；**(b) 单 tick 巨量 hours 不分段**：`updateBodyByTime` 只在入口做一次 `isSleeping` 判定就把整段 hours 一次性套用，离线 3 天整段算作一次清醒，睡眠债一口气顶到「需求 × 3」的上限，随后每小时按 1.5% 掷缺觉致病。改法：抽出 `simulateBodyStep`，按 `BODY_STEP_HOURS = 1` 分段推进（`BODY_MAX_STEPS = 720` 兜底），每步用**该步自己的游戏时刻**算昼夜节律与时段（`getTimePeriod` 改为接收 date），只在末尾落库一次；补上 困倦 → 浅睡 → 深睡 的自然入睡通道（夜间阈值降到 60，即到点就寝），并保留 `0.05 × neuroticism / 小时` 的失眠概率门控
+  - 实测对照（离线 72h，`sleepNeedHours = 8`）：修复前 → 深睡/昏厥、energy 0、sleepiness 100、health 37.1、债务 24h（上限）；修复后 → 清醒/清醒、energy 89.9、sleepiness 28.7、health 96.9、债务 1.67h
+- **affection 衰减乘数方向相反**：`emotionEngine` 里 `affectionBaseK` **除以** `decayMultiplier`，与六维 `k *= decayMultiplier` 反向，也与注释写的「恢复快」相反。改为相乘；下限 `0.3` 保留作防呆（`emotionalDecayFactor` 为 0 时好感不至于永久冻结）
+- **`/print` 记忆条目数恒为 0**：用 `searchMemories(char.id, '', 1000)` 计数，而该函数对空查询直接返回 `[]` —— 拿检索函数当计数器必然得 0。改用 `getMemoriesByCharacter(char.id)`
+- **`/undo`、`/regen` 恒提示「正在生成回复」**：不是 `sending` 卡死（所有写点都有 `finally` 复位），而是结构性恒真——命令只能在 `sendMessage` / `sendUserGroupMessage` 内部执行（全仓仅两个 `executeCommand` 调用点），那两个入口早已 `state.set('sending', true)`，处理器里再查 `sending` 必然为 true。真正的防重入由发送入口「sending 时直接 return」承担
+- **群聊发消息 `ReferenceError: getGroupMembers is not defined`**：`groupChat.js` 用 `export { getGroupMembers } from './groupMembers.js'` 做再导出，而**纯再导出语法不在本模块作用域创建绑定**，本文件内部 4 处裸调用全部在运行时炸，群聊第一条消息就发不出。改为顶部正常 `import` 再 `export`；顺带修了 `character.js` 动态 import 只给内层挂 catch、模块加载失败会冒 unhandledrejection 的问题
+
+### 新增：`/status` 可修改数值（新增 `js/modules/statusFields.js`）
+
+- 语法：`/status health 90`（绝对值）、`/status health +5`（相对增减）、`/status valence =-50`（`=` 前缀表示绝对值负数，消解与「减 50」的歧义）；`/status fields` 列出全部字段与值域；群聊支持 `/status @成员 字段 值` 指定目标
+- 覆盖 25 个数值字段（`body.*` / `emotion.*` / `needs.*`），越界自动 clamp 并回报；写入走深合并并同步 `lastUpdate` 时间基准，否则下一 tick 会用陈旧时间把新值冲掉
+
+### 内部重构
+
+- **PNG `tEXt` 解码收敛为唯一实现**：`png.js` 与 `characterAdapter.js` 各有一份且**已经漂移**（前者只认 `chara\0` / `chara `，后者还认 `chara` 直连载荷与裸 JSON）。而应用实际走的是 `characterAdapter.parsePNG`，测试却主要覆盖 `png.js` 那份，漂移长期被掩盖。唯一实现下沉到 `utils/png.js`，`extractJSONFromPNG` 改为调它，`characterAdapter` 用别名导入后再导出（既有 import 零改动）
+
+### 测试
+
+- 新增：`tests/unit/modules/statusFields.test.js`（18 例）、`tests/integration/statusCommand.test.js`、`undoRegenCommand.test.js`、`groupChatBinding.test.js`、`pngCardRoundTrip.test.js`（7 例）、`tests/unit/ui/backNavigation.test.js`、`tests/unit/ui/wechatTheme.test.js` 相关例
+- **端到端改走真账**：PNG 测试此前全是自产夹具（手搓 tEXt 字节直接喂给解码函数，从未走过 `parsePNG`）。新增的 `pngCardRoundTrip.test.js` 走真实链路：`embedJSONToPNG` → `File` → `parsePNG`（经 FileReader）→ `detectFormat` → `convertToUtopia` → `importCharacter` 落库，并加结构性防重复守卫 `adapter.extractTextChunk === png.extractTextChunk`（引用相等，谁再抄一份就挂）
+- 反向验证：关闭分段推进 / 入睡通道 / base64 解码、恢复机械兜底文案与纯再导出、恢复 `/undo` 的 sending 检查——五组共 10 处精确失败，还原后全绿
+- 顺带修好一条既有的稳定失败：「朋友圈为页面模式」此前在纯 HEAD 上 3/3 稳定失败——根因是隐藏 header 后 6 帖的滚动余量不足以让封面完全出场，磨砂态永不触发，铺帖加到 12 条后通过
+
+---
+
 ## [3.9.5] - 2026-10-04
 
 世界心跳与版本子系统落地；微信主题样式按需加载、朋友圈视觉统一；修复数据库自愈的「自阻塞」真实缺陷与插件模块链初始化缺陷。

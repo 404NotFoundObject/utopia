@@ -89,7 +89,7 @@ export function renderHelpModal() {
       </style>
 
       <h1>📖 Utopia 使用指南</h1>
-      <p class="note">版本 v3.9.5 · 文档更新于 2026-10-04</p>
+      <p class="note">版本 v3.9.6 · 文档更新于 2026-10-05</p>
 
       <section>
         <h2>✨ 概述</h2>
@@ -1174,7 +1174,7 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
       </section>
 
       <div style="text-align:right;font-size:0.8rem;color:var(--color-text-muted);margin-top:1rem;border-top:1px solid var(--color-border);padding-top:0.5rem;">
-        Utopia v3.9.5 · 2026-10-04
+        Utopia v3.9.6 · 2026-10-05
       </div>
     </div>
   `;

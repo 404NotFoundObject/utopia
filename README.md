@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.5-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.6-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,23 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.6
+
+**移动端返回手势与安全区适配、朋友圈交互对齐微信；修复离线长跨度下的睡眠债建模与两处实机不可用。**
+
+- **返回手势 / 返回键**：此前在 PWA 里按返回会直接退到桌面，只能点顶部返回按钮。新增基于历史记录的视图栈，模态二级页（朋友圈、设置、世界书…）与微信聊天页各占一条记录，返回键逐级返回；顶部按钮行为不变
+- **安全区适配**：补上缺失的 `viewport-fit=cover`。朋友圈背景图铺进状态栏（与微信一致），顶栏按钮与标题按安全区下移；底部导航栏贴合屏幕底缘，消除缝隙
+- **朋友圈交互对齐微信**：去掉顶部「+ 发布」按钮与白色标题条；**相机按钮改为发表动态**；**点击背景图区域更换封面**
+- **去掉机械文案**：AI 生成失败时不再往朋友圈里塞「哈哈哈，有趣！」「今天心情不错」这类兜底句，改为直接跳过（宁缺毋滥）
+- **修复长离线后的状态异常**：好几天不打开再上线，角色会一直昏睡并莫名其妙生病。根因是「困倦」状态没有入睡通道（必须先昏厥才能睡觉），且离线补偿一次性套用整段时间、睡眠债直接顶满。现在按游戏小时分段推进，并按昼夜节律自然入睡与醒来
+- **修复 `/print` 记忆条目数恒为 0**：拿检索函数当计数器，空查询必然返回 0
+- **修复 `/undo` 恒提示「正在生成回复」**：命令只能在发送流程内部执行，处理器里再查 `sending` 恒为真，永远自挡
+- **修复群聊发消息报错**：`getGroupMembers is not defined`（纯再导出语法不在本模块创建绑定），群聊第一条消息就发不出
+- **`/status` 现在可以改数值**：`/status health 90`、`/status health +5`、`/status valence =-50`，群聊支持 `/status @成员 字段 值`，覆盖 25 个数值字段
+- **内部**：PNG 角色卡解码的两份实现收敛为一份（已漂移，且应用实际走的那份没被测试覆盖）；新增端到端真实链路测试
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.5
 
