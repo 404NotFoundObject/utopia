@@ -167,6 +167,116 @@ function updateUserAvatar(img) {
   el.src = avatar || USER_AVATAR_PLACEHOLDER;
 }
 
+/**
+ * 对话页操作菜单项：按当前会话动态生成。
+ *
+ * 移动端微信主题下，会话列表卡片上的操作按钮（角色的编辑/导出/删除、
+ * 群组的设置/进入群聊）随列表层一起被隐藏，这些操作在对话页里就够不着了。
+ * 这里把它们搬进对话页右上角「···」，与微信一致。
+ *
+ * 每项优先转发会话列表里对应按钮的 click（逻辑仍在 sidebar 侧，转发即可
+ * 复用，含删除的二次确认）；列表里找不到对应按钮时才走 fallback。
+ *
+ * @returns {Array<{icon:string,label:string,selector?:string,fallback?:Function}>}
+ */
+function buildChatMoreMenuItems() {
+  const mode = state.get('currentMode');
+  const q = (sel) => {
+    try {
+      return document.querySelector(sel);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  if (mode === 'group') {
+    const gid = state.get('currentGroupId');
+    if (!gid) return [];
+    const settingsSel = `.group-item[data-id="${gid}"] .settings-btn`;
+    // 「进入群聊」不放进菜单：这里本身就是该群的对话页，再进入一次没有意义，
+    // 要进群在列表层点条目即可。列表中该群条目缺失（未渲染）时无从转发，
+    // 菜单会显示空态提示。
+    return q(settingsSel) ? [{ icon: 'fa-cog', label: '群设置', selector: settingsSel }] : [];
+  }
+
+  const cid = state.get('currentCharacterId');
+  if (!cid) return [];
+  const scope = `.character-item:not(.group-item)[data-id="${cid}"]`;
+  return [
+    { icon: 'fa-edit', label: '编辑', selector: `${scope} .edit-btn` },
+    { icon: 'fa-download', label: '导出', selector: `${scope} .export-btn` },
+    { icon: 'fa-trash', label: '删除', selector: `${scope} .delete-btn` },
+  ].filter((item) => q(item.selector));
+}
+
+/** 对话页右上角注入「···」按钮与下拉菜单（幂等） */
+function ensureChatMoreMenu() {
+  const actions = document.querySelector('#chatHeader .header-actions');
+  if (!actions) return;
+
+  if (!document.getElementById('wxChatMoreBtn')) {
+    const btn = document.createElement('button');
+    btn.id = 'wxChatMoreBtn';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '更多操作');
+    btn.title = '更多操作';
+    btn.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('wxChatMoreMenu');
+      if (!menu) return;
+      if (menu.classList.contains('open')) {
+        closeChatMoreMenu();
+        return;
+      }
+      renderChatMoreMenu(menu);
+      menu.classList.add('open');
+    });
+    actions.appendChild(btn);
+  }
+
+  if (!document.getElementById('wxChatMoreMenu')) {
+    const menu = document.createElement('div');
+    menu.id = 'wxChatMoreMenu';
+    actions.appendChild(menu);
+  }
+}
+
+/** 每次展开时重建菜单项（会话可能已切换） */
+function renderChatMoreMenu(menu) {
+  const items = buildChatMoreMenuItems();
+  menu.innerHTML = '';
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'wx-menu-item wx-menu-empty';
+    empty.textContent = '当前会话无可操作项';
+    menu.appendChild(empty);
+    return;
+  }
+  for (const item of items) {
+    const entry = document.createElement('div');
+    entry.className = 'wx-menu-item';
+    entry.innerHTML = `<i class="fas ${item.icon}"></i><span>${item.label}</span>`;
+    entry.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeChatMoreMenu();
+      const target = item.selector ? document.querySelector(item.selector) : null;
+      if (target) {
+        target.click();
+      } else if (typeof item.fallback === 'function') {
+        item.fallback();
+      } else {
+        showToast('该操作当前不可用', 'warning');
+      }
+    });
+    menu.appendChild(entry);
+  }
+}
+
+function closeChatMoreMenu() {
+  document.getElementById('wxChatMoreMenu')?.classList.remove('open');
+}
+
 /** 列表层右上角注入「+」按钮与折叠菜单（幂等） */
 function ensurePlusMenu() {
   const header = document.querySelector('#sidebar .sidebar-header');
@@ -378,10 +488,15 @@ function unbindCoverScroll() {
 function bindPlusMenuDismiss() {
   const onDocumentClick = (e) => {
     const menu = document.getElementById('wxPlusMenu');
-    if (!menu || !menu.classList.contains('open')) return;
-    const plus = document.getElementById('wxPlusBtn');
-    if (menu.contains(e.target) || plus?.contains(e.target)) return;
-    closePlusMenu();
+    if (menu && menu.classList.contains('open')) {
+      const plus = document.getElementById('wxPlusBtn');
+      if (!menu.contains(e.target) && !plus?.contains(e.target)) closePlusMenu();
+    }
+    const chatMenu = document.getElementById('wxChatMoreMenu');
+    if (chatMenu && chatMenu.classList.contains('open')) {
+      const more = document.getElementById('wxChatMoreBtn');
+      if (!chatMenu.contains(e.target) && !more?.contains(e.target)) closeChatMoreMenu();
+    }
   };
   document.addEventListener('click', onDocumentClick);
   return () => document.removeEventListener('click', onDocumentClick);
@@ -393,6 +508,7 @@ export function ensureInjectedNodes() {
   ensureDockChatButton();
   ensureUserAvatar();
   ensurePlusMenu();
+  ensureChatMoreMenu();
 }
 
 // ============================================================
@@ -435,7 +551,7 @@ function runDisposers() {
 
 /** 移除全部注入节点（与 ensureInjectedNodes 一一对应） */
 function removeInjectedNodes() {
-  for (const id of ['wxBackBtn', 'wxDockChatBtn', 'wxUserAvatar', 'wxPlusBtn', 'wxPlusMenu']) {
+  for (const id of ['wxBackBtn', 'wxDockChatBtn', 'wxUserAvatar', 'wxPlusBtn', 'wxPlusMenu', 'wxChatMoreBtn', 'wxChatMoreMenu']) {
     document.getElementById(id)?.remove();
   }
 }

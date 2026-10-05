@@ -129,6 +129,15 @@ export async function openGroupChat(groupId) {
 
   var state = getAppState();
   state.set('currentMode', 'group');
+
+  // 与 selectCharacter 一致的防呆：state 对「相同值」直接 return、不通知订阅者。
+  // 从对话页返回列表层时 currentGroupId 并未清空，此时再点同一个群，
+  // set 会被判定为无变化 → 订阅者（含 wechatTheme 的进入对话页）全部不触发
+  // → 停在列表层，表现为「点群聊没反应，先进单聊再回来才正常」。
+  // 先置 null 再设值，强制走一次完整的通知链路。
+  if (state.get('currentGroupId') === groupId) {
+    state.set('currentGroupId', null);
+  }
   state.set('currentGroupId', groupId);
 
   var members = await getGroupMembers(groupId);
@@ -330,25 +339,32 @@ export async function renderMessages(groupId, opts = {}) {
       speakBtnHtml = '<button class="speak-btn" style="flex-shrink:0;align-self:center;width:28px;height:28px;font-size:0.75rem;color:var(--color-text-muted);opacity:0.4;transition:opacity 0.2s,color 0.2s,transform 0.15s;background:var(--color-bg-secondary);border:1px solid var(--color-border);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="朗读此消息"><i class="fas fa-volume-up"></i></button>';
     }
 
+    // 微信式结构：头像与「昵称+气泡」列并排（align-items:flex-start）。
+    // 昵称与头像顶对齐，气泡紧贴昵称下方（昵称行高 14px + 1px 间距）
+    // → 气泡顶边约在 15px，尾巴贴在气泡顶边时正好落在头像中部。
+    // 容器必须横向铺满：若为内容自适应宽度，「max-width: calc(100% - 40px)」
+    // 这类缩进会从气泡自身宽度里扣，把「怎么了」这类短消息压成一字一行。
     html += '<div class="group-message ' + (isOwn ? 'own' : '') + '" ' +
       'data-id="' + safeMsgId + '" ' +
       'data-plugin-slot="message" ' +
       'data-message-id="' + safeMsgId + '" ' +
       'data-message-role="' + safeMessageRole + '" ' +
-      'style="display:flex;flex-direction:column;align-items:' + (isOwn ? 'flex-end' : 'flex-start') + ';width:100%;">';
+      'style="display:flex;flex-direction:row;align-items:flex-start;gap:8px;width:100%;' + (isOwn ? 'flex-direction:row-reverse;' : '') + '">';
 
-    html += '<div style="display:flex;align-items:center;gap:0.5rem;' + (isOwn ? 'flex-direction:row-reverse;' : '') + '">';
     html += '<img class="avatar" src="' + safeAvatar + '" alt="' + safeSenderName + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--color-border);flex-shrink:0;border:1px solid var(--color-border-light);">';
-    html += '<span class="sender-name" style="font-size:0.75rem;font-weight:var(--font-weight-medium);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">' + safeSenderName + '</span>';
-    html += '</div>';
-
-    html += '<div style="display:flex;align-items:center;gap:4px;max-width:80%;' + (isOwn ? 'flex-direction:row-reverse;' : '') + '">';
+    // main 列与气泡行必须定宽：主题 CSS 给气泡的 max-width 百分比
+    // （如微信主题的 72%）只在定宽祖先上才能正确解析；若祖先是
+    // fit-content，行宽先按内容算、百分比再钳回内容宽以下，短消息会被压成一字一行。
+    html += '<div class="group-message-main" style="display:flex;flex-direction:column;align-items:' + (isOwn ? 'flex-end' : 'flex-start') + ';width:calc(100% - 40px);min-width:0;">';
+    html += '<span class="sender-name" style="font-size:0.75rem;line-height:14px;height:14px;font-weight:var(--font-weight-medium);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">' + safeSenderName + '</span>';
+    html += '<div class="group-message-bubble-row" style="display:flex;align-items:center;gap:4px;margin-top:1px;width:100%;' + (isOwn ? 'justify-content:flex-end;' : '') + '">';
     html += '<div class="group-message-bubble" data-plugin-slot="message-bubble" style="background:' + (isOwn ? 'var(--color-primary-gradient)' : 'var(--color-bg-primary)') + ';padding:0.4rem 0.7rem 0.2rem 0.7rem;border-radius:var(--radius-lg);' + (isOwn ? 'border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-xs);' : 'border-bottom-left-radius:var(--radius-xs);') + 'box-shadow:var(--shadow-sm);border:1px solid ' + (isOwn ? 'var(--color-primary)' : 'var(--color-border-light)') + ';word-wrap:break-word;max-width:100%;color:' + (isOwn ? '#fff' : 'var(--color-text-primary)') + ';">';
     html += '<div class="content" style="font-size:inherit;line-height:1.5;word-break:break-word;">' + content + '</div>';
     html += '<div class="timestamp" style="font-size:0.55rem;color:' + (isOwn ? 'rgba(255,255,255,0.7)' : 'var(--color-text-muted)') + ';margin-top:0.1rem;text-align:right;">' + safeTime + '</div>';
     html += '</div>';
     if (speakBtnHtml) html += speakBtnHtml;
     html += '<div class="message-plugin-actions" data-plugin-slot="message-actions" style="display:contents;"></div>';
+    html += '</div>';
     html += '</div>';
     html += '</div>';
   }
@@ -436,7 +452,8 @@ function updateHeader(group, memberCount) {
   var nameEl = document.getElementById('charName');
   var relationEl = document.getElementById('charRelation');
   var avatarEl = document.getElementById('charAvatar');
-  if (nameEl) nameEl.textContent = '👥 ' + group.name;
+  // 微信式顶栏：群名不带前缀图标（与 app.js updateHeader 保持一致）
+  if (nameEl) nameEl.textContent = group.name;
   if (relationEl) relationEl.textContent = (memberCount ?? 0) + ' 人';
   if (avatarEl) avatarEl.src = group.avatar || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 40 40\'%3E%3Ccircle cx=\'20\' cy=\'20\' r=\'20\' fill=\'%236c5ce7\'/%3E%3Ctext x=\'20\' y=\'26\' text-anchor=\'middle\' fill=\'%23fff\' font-size=\'18\' font-family=\'sans-serif\'%3E👥%3C/text%3E%3C/svg%3E';
 }
@@ -468,23 +485,25 @@ export function appendGroupMessage(msg) {
   var safeTime = escapeHtml(time);
   var safeMessageRole = escapeHtml(messageRole);
 
+  // 微信式结构（与 renderGroupMessages 一致）：头像与「昵称+气泡」列并排
   var html = '<div class="group-message ' + (isOwn ? 'own' : '') + '" ' +
     'data-id="' + safeMsgId + '" ' +
     'data-temp="true" ' +
     'data-plugin-slot="message" ' +
     'data-message-id="' + safeMsgId + '" ' +
     'data-message-role="' + safeMessageRole + '" ' +
-    'style="display:flex;flex-direction:column;align-items:' + (isOwn ? 'flex-end' : 'flex-start') + ';width:100%;">';
-  html += '<div style="display:flex;align-items:center;gap:0.5rem;' + (isOwn ? 'flex-direction:row-reverse;' : '') + '">';
+    'style="display:flex;flex-direction:row;align-items:flex-start;gap:8px;width:100%;' + (isOwn ? 'flex-direction:row-reverse;' : '') + '">';
   html += '<img class="avatar" src="' + safeAvatar + '" alt="' + safeSenderName + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--color-border);flex-shrink:0;border:1px solid var(--color-border-light);">';
-  html += '<span class="sender-name" style="font-size:0.75rem;font-weight:var(--font-weight-medium);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">' + safeSenderName + '</span>';
-  html += '</div>';
-  html += '<div style="display:flex;align-items:center;gap:4px;max-width:80%;' + (isOwn ? 'flex-direction:row-reverse;' : '') + '">';
+  // 定宽 main 列与气泡行（理由同 renderGroupMessages）
+  html += '<div class="group-message-main" style="display:flex;flex-direction:column;align-items:' + (isOwn ? 'flex-end' : 'flex-start') + ';width:calc(100% - 40px);min-width:0;">';
+  html += '<span class="sender-name" style="font-size:0.75rem;line-height:14px;height:14px;font-weight:var(--font-weight-medium);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">' + safeSenderName + '</span>';
+  html += '<div class="group-message-bubble-row" style="display:flex;align-items:center;gap:4px;margin-top:1px;width:100%;' + (isOwn ? 'justify-content:flex-end;' : '') + '">';
   html += '<div class="group-message-bubble" data-plugin-slot="message-bubble" style="background:' + (isOwn ? 'var(--color-primary-gradient)' : 'var(--color-bg-primary)') + ';padding:0.4rem 0.7rem 0.2rem 0.7rem;border-radius:var(--radius-lg);' + (isOwn ? 'border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-xs);' : 'border-bottom-left-radius:var(--radius-xs);') + 'box-shadow:var(--shadow-sm);border:1px solid ' + (isOwn ? 'var(--color-primary)' : 'var(--color-border-light)') + ';word-wrap:break-word;max-width:100%;color:' + (isOwn ? '#fff' : 'var(--color-text-primary)') + ';">';
   html += '<div class="content" style="font-size:inherit;line-height:1.5;word-break:break-word;">' + renderMarkdown(content) + '</div>';
   html += '<div class="timestamp" style="font-size:0.55rem;color:' + (isOwn ? 'rgba(255,255,255,0.7)' : 'var(--color-text-muted)') + ';margin-top:0.1rem;text-align:right;">' + safeTime + '</div>';
   html += '</div>';
   html += '<div class="message-plugin-actions" data-plugin-slot="message-actions" style="display:contents;"></div>';
+  html += '</div>';
   html += '</div>';
   html += '</div>';
 

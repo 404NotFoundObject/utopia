@@ -378,7 +378,8 @@ function updateHeader() {
       try {
         const group = await m.getGroup(groupId);
         if (group) {
-          nameEl.textContent = `👥 ${group.name}`;
+          // 微信式顶栏：群名不带任何前缀图标（原为「👥 群名」）
+          nameEl.textContent = group.name;
           relationEl.textContent = '群聊';
           avatarEl.src = group.avatar || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 40 40\'%3E%3Ccircle cx=\'20\' cy=\'20\' r=\'20\' fill=\'%236c5ce7\'/%3E%3Ctext x=\'20\' y=\'26\' text-anchor=\'middle\' fill=\'%23fff\' font-size=\'18\' font-family=\'sans-serif\'%3E👥%3C/text%3E%3C/svg%3E';
           header.style.display = 'flex';
