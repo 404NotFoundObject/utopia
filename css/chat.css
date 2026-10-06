@@ -150,6 +150,42 @@
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
+
+/* 输入框包裹层（app.js 注入语音按钮时创建，内含 textarea 与麦克风按钮）：
+   默认 display:contents —— 包裹层自身不产生盒子，布局与按钮直连 #chatInput
+   完全一致；移动端（见下方媒体查询）转为定位基准层，把麦克风框进输入框内。 */
+#chatInput .input-wrap {
+  display: contents;
+}
+
+/* 移动端（全主题统一，微信手机版样式）：语音按钮框进输入框内右端 */
+@media (max-width: 768px) {
+  #chatInput .input-wrap {
+    display: flex;
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+  /* 右侧留出语音按钮的宽度，文字不压在图标下 */
+  #chatInput .input-wrap #messageInput {
+    padding-right: 42px;
+  }
+  #chatInput .mic-btn {
+    position: absolute !important;
+    right: 6px !important;
+    left: auto !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--color-text-muted) !important;
+    font-size: 16px !important;
+    z-index: 2;
+  }
+}
 .send-btn {
   width: 44px;
   height: 44px;

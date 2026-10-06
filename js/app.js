@@ -12,6 +12,7 @@ import { checkDatabase, deleteDatabase, getStores } from './core/db.js';
 import { generateUUID } from './core/utils.js';
 import { openModal, closeModal } from './ui/components/modal.js';
 import { showToast } from './ui/components/toast.js';
+import { ensureEmojiButton } from './ui/components/emojiPicker.js';
 
 // 版本号单一真源：ui / sw / 更新检查都从这里取，避免各存一份
 import { APP_VERSION, STORAGE_VERSION_KEY } from './core/appMeta.js';
@@ -456,8 +457,18 @@ function bindUIEvents() {
     micBtn.title = '按住说话 (Ctrl/Alt)';
     const micIcon = micBtn.querySelector('i');
 
+    // 包一层 .input-wrap（内含 textarea + 麦克风）：移动端全主题统一把语音按钮
+    // 框进输入框内右端，需要这层做定位基准；非移动端该层 display:contents
+    // （css/chat.css），布局与按钮直连 #chatInput 时完全一致。
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'input-wrap';
     const inputContainer = newInput.parentNode;
-    inputContainer.insertBefore(micBtn, newSendBtn);
+    inputContainer.insertBefore(inputWrap, newInput);
+    inputWrap.appendChild(newInput);
+    inputWrap.appendChild(micBtn);
+
+    // 表情托盘入口：落在语音按钮与发送按钮之间（位置随 CSS 按主题/视口调整）
+    ensureEmojiButton();
 
     let isMicActive = false;
     let isKeyActive = false;

@@ -365,8 +365,8 @@
      这里显式归位到右侧工具行，落在发送按钮左边；内联样式须用 !important 覆盖。 */
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput .mic-btn {
     order: 3;
-    /* 独占 auto margin：把右侧工具行推到左，麦克风与发送按钮紧挨在最右 */
-    margin: 0 0 0 auto !important;
+    /* 靠右对齐由表情按钮的 margin-right:auto 承担（表情在最左，微信桌面版布局） */
+    margin: 0 !important;
     width: 30px !important;
     height: 30px !important;
     border: none !important;
@@ -374,6 +374,17 @@
     background: transparent !important;
     color: var(--color-text-muted) !important;
     font-size: 15px !important;
+  }
+  /* 表情入口：输入面板左下角行首（参考微信桌面版），与语音/发送同处右下工具行。
+     order 取 2（与 textarea 同级，DOM 序保证排在其后）：order 只接受整数，
+     写 2.5 会导致整条声明被丢弃、按钮掉回 order 0 独占一行。 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput .emoji-btn {
+    order: 2;
+    margin-right: auto !important;
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 20px !important;
+    border-radius: 4px !important;
   }
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-left"],
   :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput [data-plugin-slot="input-actions-right"] {
@@ -720,6 +731,154 @@
     padding: 10px;
   }
 
+  /* ---- 输入栏（微信手机版）：语音按钮框进输入框内左侧，表情在语音与发送之间 ---- */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput {
+    position: relative;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent !important;
+    min-height: 0;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #messageInput {
+    background: var(--color-bg-input);
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    /* 左 12px 提示文字缩进；右 44px 给框进输入框内的语音按钮 */
+    padding: 8px 44px 8px 12px !important;
+    min-height: 40px;
+    max-height: 120px;
+    flex: 1;
+    width: auto;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #messageInput:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  /* 语音按钮：框进输入框内右端（微信手机版；内联样式须 !important 覆盖） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput .mic-btn {
+    position: absolute !important;
+    right: 7px !important;
+    left: auto !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--color-text-primary) !important;
+    font-size: 16px !important;
+    z-index: 2;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput .emoji-btn {
+    width: 34px !important;
+    height: 34px !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--color-text-primary) !important;
+    font-size: 21px !important;
+    border-radius: 50% !important;
+  }
+  /* 底部主按钮（微信手机版）：空输入显示 ⊕（圆圈+十字），有内容变绿色「发送」；
+     等待角色回复时沿用既有逻辑保持禁用（浅绿「发送」），不随内容切回 ⊕。
+     空态判定用 :has(#messageInput:not(:placeholder-shown))——textarea 与发送按钮
+     中隔着 .input-wrap，兄弟选择器 ~ 已不可用。 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn {
+    order: 0;
+    position: relative;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 0;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    flex-shrink: 0;
+    transition: none;
+  }
+  /* ⊕ 图标：::before 画圆圈，::after 用双向渐变画十字（微信式线性图标） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1.5px solid var(--color-text-secondary);
+    border-radius: 50%;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    color: var(--color-text-secondary);
+    background:
+      linear-gradient(currentColor, currentColor) center / 12px 1.5px no-repeat,
+      linear-gradient(currentColor, currentColor) center / 1.5px 12px no-repeat;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn i {
+    display: none;
+  }
+  /* 有内容（且未禁用）→ 绿色「发送」文字块 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput:has(#messageInput:not(:placeholder-shown)) #sendBtn:not(:disabled) {
+    width: auto !important;
+    padding: 0 14px !important;
+    border-radius: 4px !important;
+    background: var(--color-primary) !important;
+    color: #fff !important;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput:has(#messageInput:not(:placeholder-shown)) #sendBtn:not(:disabled)::before {
+    content: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput:has(#messageInput:not(:placeholder-shown)) #sendBtn:not(:disabled)::after {
+    content: '发送';
+    position: static;
+    inset: auto;
+    border-radius: 0;
+    background: none;
+    color: #fff;
+    font-size: 14px;
+    line-height: 32px;
+  }
+  /* 禁用态（发送后等待角色回复）：浅绿「发送」，尺寸不塌缩 */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn:disabled {
+    width: auto !important;
+    padding: 0 14px !important;
+    border-radius: 4px !important;
+    background: var(--color-primary-light) !important;
+    color: #fff !important;
+    opacity: 1;
+    cursor: not-allowed;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn:disabled::before {
+    content: none;
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #chatInput #sendBtn:disabled::after {
+    content: '发送';
+    position: static;
+    inset: auto;
+    border-radius: 0;
+    background: none;
+    color: #fff;
+    font-size: 14px;
+    line-height: 32px;
+  }
+
+  /* 表情托盘（移动端流式展开，面板 DOM 由 emojiPicker.js 挂在 #chatInput 之后） */
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #emojiPanel.mobile {
+    background: var(--color-bg-secondary);
+  }
+  :is([data-theme="wechat"], [data-theme="wechat-dark"]) #emojiPanel.mobile .emoji-del-key {
+    background: var(--color-bg-input);
+    border: none;
+  }
+
 }
 
 /* ============================================================
@@ -809,6 +968,27 @@
 }
 [data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-header {
   background: #1f1f1f;
+}
+/* 发布框（微信主题）：封面留白区内的卡片式输入面板。
+   封面 margin-bottom 已保证头像（突出 26px）不压框；整框描边替代
+   原 border-bottom 分隔线，textarea 抬到 min-height 96px 保证足够输入空间 */
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-publish-box {
+  margin: 0 12px 12px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+:is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-publish-box textarea {
+  min-height: 96px;
+  font-size: 15px;
+  line-height: 1.55;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-bg-tertiary, #f7f7f7);
+}
+[data-theme="wechat-dark"] #modalOverlay:has(.social-feed) .social-publish-box textarea {
+  background: #2c2c2c;
 }
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) #modalOverlay:has(.social-feed) .social-posts {
   display: block;
@@ -906,6 +1086,9 @@
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .wx-social-cover {
   position: relative;
   height: calc(240px + env(safe-area-inset-top, 0px));
+  /* 封面与下方内容（发布框 / 帖子）的留白：头像（58px，突出封面底 26px）
+     之下再留呼吸空间；发布框展开时也不会被头像压住 */
+  margin-bottom: 44px;
   background: #c8ccd4;
   overflow: visible;
   cursor: pointer;

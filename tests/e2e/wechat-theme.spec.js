@@ -680,4 +680,90 @@ test.describe('微信主题 · 移动端', () => {
     await page.goBack();
     await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'list');
   });
+
+  test('输入栏：麦克风框进输入框右端；发送/⊕ 按内容切换', async ({ page }) => {
+    await openWithTheme(page, 'wechat');
+
+    // 移动端须真正进入对话层（data-wx-mobile-view=chat），否则容器零尺寸测不到几何
+    await page.evaluate(async () => {
+      const { setMobileView } = await import('/js/ui/layout/wechatTheme.js');
+      setMobileView('chat');
+      document.getElementById('welcomePage').style.display = 'none';
+      document.getElementById('chatContainer').style.display = 'flex';
+    });
+    await page.waitForTimeout(300);
+
+    // 空输入：⊕（圆圈+十字）
+    const empty = await page.evaluate(() => {
+      const send = document.getElementById('sendBtn');
+      const s = send.getBoundingClientRect();
+      const mic = document.querySelector('#chatInput .mic-btn');
+      const m = mic.getBoundingClientRect();
+      const ta = document.getElementById('messageInput').getBoundingClientRect();
+      return {
+        sendRadius: getComputedStyle(send).borderRadius,
+        sendWidth: s.width,
+        circleBorder: getComputedStyle(send, '::before').borderTopWidth,
+        circleRadius: getComputedStyle(send, '::before').borderRadius,
+        crossContent: getComputedStyle(send, '::after').content,
+        // 麦克风在 textarea 水平范围内（框进输入框），且贴右端
+        micInTextarea: m.left > ta.left && m.right < ta.right - 4,
+        micRightGap: Math.round(ta.right - m.right),
+      };
+    });
+    expect(empty.sendRadius).toBe('50%');
+    expect(empty.sendWidth).toBeLessThan(40);
+    // 圆圈描边存在（高 DPR 屏上 1.5px 计算值会取整，不锁死具体宽度）
+    expect(['1px', '1.5px', '2px']).toContain(empty.circleBorder);
+    expect(empty.circleRadius).toBe('50%');
+    // ⊕ 态不显示「发送」文字（::after content 为空串，十字由 background 渐变绘制）
+    expect(empty.crossContent).not.toBe('"发送"');
+    expect(empty.micInTextarea).toBe(true);
+    expect(empty.micRightGap).toBeLessThanOrEqual(12);
+
+    // 有内容：绿色「发送」文字块
+    await page.fill('#messageInput', '你好');
+    const filled = await page.evaluate(() => {
+      const send = document.getElementById('sendBtn');
+      return {
+        bg: getComputedStyle(send).backgroundColor,
+        radius: getComputedStyle(send).borderRadius,
+        label: getComputedStyle(send, '::after').content,
+        circle: getComputedStyle(send, '::before').content,
+        width: send.getBoundingClientRect().width,
+      };
+    });
+    expect(filled.bg).toBe('rgb(7, 193, 96)');
+    expect(filled.radius).toBe('4px');
+    expect(filled.label).toBe('"发送"');
+    expect(filled.circle).toBe('none');
+    expect(filled.width).toBeGreaterThan(50);
+
+    // 清空 → 回到 ⊕
+    await page.fill('#messageInput', '');
+    const cleared = await page.evaluate(() => {
+      const send = document.getElementById('sendBtn');
+      return {
+        radius: getComputedStyle(send).borderRadius,
+        label: getComputedStyle(send, '::after').content,
+      };
+    });
+    expect(cleared.radius).toBe('50%');
+
+    // 等待角色回复（disabled）：保持「发送」不塌缩（沿用既有禁用逻辑）
+    const dis = await page.evaluate(() => {
+      const send = document.getElementById('sendBtn');
+      send.disabled = true;
+      const out = {
+        label: getComputedStyle(send, '::after').content,
+        bg: getComputedStyle(send).backgroundColor,
+        width: send.getBoundingClientRect().width,
+      };
+      send.disabled = false;
+      return out;
+    });
+    expect(dis.label).toBe('"发送"');
+    expect(dis.bg).not.toBe('rgba(0, 0, 0, 0)');
+    expect(dis.width).toBeGreaterThan(50);
+  });
 });
