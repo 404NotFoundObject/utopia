@@ -1,0 +1,128 @@
+/**
+ * Emoji 托盘通用样式（所有主题）。
+ *
+ * PC：#emojiPanel 挂 body，JS 按 #emojiBtn 的 rect 定位（fixed），
+ *     弹出在按钮上方 —— 微信桌面版样式。
+ * 移动端（.mobile）：面板挂 #chatContainer（#chatInput 之后）流式展开，
+ *     占据输入栏下方空间，右下角删除键 —— 微信手机版样式。
+ * 微信主题的差异化样式在 css/wechat.css（该文件动态注入、顺序在其后）。
+ */
+
+/* ---- 入口按钮（语音按钮与发送按钮之间） ---- */
+.emoji-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 6px;
+  padding: 0;
+  user-select: none;
+}
+.emoji-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+}
+
+/* ---- 面板：PC 弹出卡片 ---- */
+#emojiPanel {
+  position: fixed;
+  width: 420px;
+  max-width: calc(100vw - 16px);
+  height: 420px;
+  max-height: min(480px, calc(100vh - 120px));
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  overflow: hidden;
+}
+#emojiPanel[hidden] {
+  display: none;
+}
+
+.emoji-panel-body {
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+}
+
+.emoji-section {
+  margin-bottom: 10px;
+}
+.emoji-section-title {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 4px 2px 8px;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+.emoji-cell {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1.2;
+  padding: 4px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+}
+.emoji-cell:hover {
+  background: var(--color-bg-secondary);
+}
+.emoji-cell:active {
+  transform: scale(0.92);
+}
+
+/* ---- 删除键：仅移动端托盘显示 ---- */
+.emoji-del-key {
+  display: none;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 44px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- 面板：移动端流式托盘 ---- */
+#emojiPanel.mobile {
+  position: relative;
+  left: auto !important;
+  top: auto !important;
+  width: 100%;
+  max-width: none;
+  height: 42vh;
+  max-height: none;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+#emojiPanel.mobile.open {
+  display: block;
+}
+#emojiPanel.mobile .emoji-del-key {
+  display: flex;
+}
