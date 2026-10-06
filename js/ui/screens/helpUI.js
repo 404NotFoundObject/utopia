@@ -89,7 +89,7 @@ export function renderHelpModal() {
       </style>
 
       <h1>📖 Utopia 使用指南</h1>
-      <p class="note">版本 v3.9.7 · 文档更新于 2026-10-05</p>
+      <p class="note">版本 v3.9.8 · 文档更新于 2026-10-07</p>
 
       <section>
         <h2>✨ 概述</h2>
@@ -107,6 +107,9 @@ export function renderHelpModal() {
           <li><strong>统一右键菜单</strong>：核心菜单与插件菜单自动合并，按优先级排列。</li>
           <li><strong>朋友圈社交</strong>：角色和用户可发布动态，AI 自动互动。界面已对齐微信风格——方形圆角头像、蓝色昵称、九宫格图片（单图大图 / 4 图 2×2 / 其余九宫格）、赞与评论合并在同一灰底容器，评论采用「A 回复 B：内容」格式。微信主题下与微信操作一致：<strong>右上角相机按钮发表动态</strong>，<strong>点击顶部背景图区域更换封面</strong>；手机上支持<strong>系统返回手势/返回键</strong>逐级返回（朋友圈、聊天页等二级页面）。微信主题的手机端会话列表不再挂操作按钮，角色的<strong>编辑 / 导出 / 删除</strong>与群组的<strong>群设置</strong>统一收进聊天页右上角的<strong>「···」菜单</strong>。</li>
           <li><strong>群聊支持</strong><span class="new-badge">v3.9.7</span>：多角色同屏对话，@提及、@触发回复、自动发言轮询。手机端微信主题采用微信式消息布局——头像与「昵称 + 气泡」列并排，昵称与头像顶部对齐，气泡紧贴其下方且尖角指向头像中部；顶栏只显示居中的会话名。</li>
+          <li><strong>😊 表情托盘</strong><span class="new-badge">v3.9.8</span>：电脑上点输入框左下角的笑脸图标弹出面板，「最近使用」+「所有表情」两节网格，Esc 或点外部关闭；手机上点语音与发送之间的表情键，托盘从输入栏下方展开，右下角带删除键。选中的表情插入到<strong>光标处</strong>，「最近使用」记在本地（去重置顶、上限 24 个）。所有主题可用。</li>
+          <li><strong>手机端输入栏对齐微信</strong><span class="new-badge">v3.9.8</span>：语音（麦克风）按钮移进输入框内部右端（各主题统一），发送按钮<strong>只在有内容时才显示为绿色「发送」</strong>，空输入时显示为 <strong>⊕ 圆圈十字</strong>（角色回复期间保持禁用的「发送」，与原先一致）。</li>
+          <li><strong>朋友圈留白</strong><span class="new-badge">v3.9.8</span>：背景图与帖子之间的距离加大，发表动态的输入框展开后不再被自己的头像压住，输入区也更高一些。</li>
           <li><strong>🔊 语音合成 (TTS)</strong>：Web Speech API / Kokoro，每角色可独立配置音色。</li>
           <li><strong>🎤 语音输入 (STT)</strong>：长按麦克风或按住 Ctrl/Alt 说话。</li>
           <li><strong>📞 主动语音通话</strong>：状态机驱动的交替对话，字幕显示。通话结束具备补偿机制。</li>
@@ -1174,7 +1177,7 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
       </section>
 
       <div style="text-align:right;font-size:0.8rem;color:var(--color-text-muted);margin-top:1rem;border-top:1px solid var(--color-border);padding-top:0.5rem;">
-        Utopia v3.9.7 · 2026-10-05
+        Utopia v3.9.8 · 2026-10-07
       </div>
     </div>
   `;

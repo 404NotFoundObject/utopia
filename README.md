@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.7-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.8-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,17 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.8
+
+**新增表情托盘；手机端输入栏（麦克风入框、发送/⊕ 切换）与朋友圈留白对齐微信。**
+
+- **😊 表情托盘**：电脑点输入框左下角笑脸弹出面板（最近使用 + 所有表情），手机点语音与发送之间的表情键从底部展开，右下角带删除键。表情插到光标处，「最近使用」记在本地
+- **麦克风框进输入框**：手机端语音按钮移入输入框内部右端，各主题统一；桌面布局不受影响
+- **发送 / ⊕**：微信主题手机端，只有输入了内容才显示绿色「发送」，空着就是微信那个 ⊕ 圆圈十字；角色回复期间照旧禁用
+- **朋友圈留白**：背景图与帖子之间的距离加大，发表动态的输入框不再被自己头像压住，输入区也更高
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.7
 
