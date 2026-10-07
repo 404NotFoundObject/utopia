@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   ensureEmojiButton,
   isEmojiPanelOpen,
@@ -193,5 +193,137 @@ describe('移动端挂载形态（≤768px）', () => {
     expect(panel.classList.contains('mobile')).toBe(true);
     closeEmojiPanel();
     vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * 移动端「托盘 ↔ 软键盘」焦点治理。
+ *
+ * 背景：移动端面板是流式占位（42vh），收起会立刻回流把输入栏移走；而移动端点一次
+ * 输入框才拿到焦点这件事，会被这次回流打断 —— 表现为托盘关了却要再点一次才能打字。
+ * 这组用例把「一次点击 = 关闭面板 + 拿到焦点」和「托盘与键盘互斥」钉死。
+ */
+describe('移动端焦点治理（托盘与软键盘互斥）', () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const stubMobile = () => {
+    vi.stubGlobal('matchMedia', (query) => ({
+      matches: query === '(max-width: 768px)',
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  };
+
+  /** 改 JS 侧视口宽度（面板的 resize 判定依赖它），返回还原函数 */
+  const setViewportWidth = (value) => {
+    Object.defineProperty(window, 'innerWidth', {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  };
+
+  let originalWidth;
+
+  beforeEach(() => {
+    stubMobile();
+    originalWidth = window.innerWidth;
+  });
+
+  afterEach(() => {
+    setViewportWidth(originalWidth);
+    closeEmojiPanel();
+    vi.unstubAllGlobals();
+  });
+
+  it('托盘开着点输入框：一次点击即收面板，且焦点已落在输入框', () => {
+    const input = document.getElementById('messageInput');
+    ensureEmojiButton().click();
+    expect(isEmojiPanelOpen()).toBe(true);
+    input.blur();
+
+    input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+    expect(isEmojiPanelOpen()).toBe(false);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('包裹层内的点击（如浮在 textarea 上的麦克风）同样按输入处理', () => {
+    const input = document.getElementById('messageInput');
+    const wrap = document.querySelector('#chatInput .input-wrap');
+    ensureEmojiButton().click();
+    input.blur();
+
+    wrap.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+    expect(isEmojiPanelOpen()).toBe(false);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('点面板以外的空白处仍然只关面板、不抢焦点', () => {
+    ensureEmojiButton().click();
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    expect(isEmojiPanelOpen()).toBe(false);
+    expect(document.activeElement).not.toBe(document.getElementById('messageInput'));
+  });
+
+  it('托盘开着点表情：不拉起焦点（避免键盘与托盘互相挤位）', () => {
+    const input = document.getElementById('messageInput');
+    input.blur();
+    ensureEmojiButton().click();
+
+    const cell = document.querySelector('[data-grid="all"] .emoji-cell');
+    const emoji = cell.textContent;
+    cell.click();
+
+    expect(input.value).toBe(emoji);
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it('PC 浮层模式下点表情仍然保持输入框焦点（保住光标与组字状态）', () => {
+    vi.unstubAllGlobals(); // 回到 PC：matchMedia 垫片默认 matches:false
+    const input = document.getElementById('messageInput');
+    input.focus();
+    ensureEmojiButton().click();
+
+    const cell = document.querySelector('[data-grid="all"] .emoji-cell');
+    const emoji = cell.textContent;
+    cell.click();
+
+    expect(input.value).toBe(emoji);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('打开托盘时收起软键盘（输入框已有焦点则失焦）', () => {
+    const input = document.getElementById('messageInput');
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    ensureEmojiButton().click();
+
+    expect(isEmojiPanelOpen()).toBe(true);
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it('软键盘引起的高度变化不会被当成转屏', async () => {
+    ensureEmojiButton().click();
+    expect(isEmojiPanelOpen()).toBe(true);
+
+    // 仅高度变化（innerWidth 不变）→ 面板应照旧开着
+    window.dispatchEvent(new Event('resize'));
+    await sleep(220);
+    expect(isEmojiPanelOpen()).toBe(true);
+  });
+
+  it('宽度确实变化时仍会重挂载（保留原有转屏行为）', async () => {
+    ensureEmojiButton().click();
+    expect(isEmojiPanelOpen()).toBe(true);
+
+    setViewportWidth(500);
+    window.dispatchEvent(new Event('resize'));
+    await sleep(220);
+    expect(isEmojiPanelOpen()).toBe(false);
   });
 });

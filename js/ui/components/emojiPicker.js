@@ -76,8 +76,35 @@ function pushRecent(emoji) {
 
 // ---- 输入框操作 ----
 
+/** 输入句柄；移动端「托盘/软键盘」切换围绕它做焦点管理 */
+function getMessageInput() {
+  return document.getElementById('messageInput');
+}
+
+/**
+ * 点击目标是否落在输入区内（textarea 本身或其 .input-wrap 包裹层）。
+ * 判定时要连带包裹层一起认：麦克风按钮等是绝对定位在 textarea 矩形内的兄弟节点。
+ */
+function isInputAreaTarget(t) {
+  if (!t || typeof t.closest !== 'function') return false;
+  const input = getMessageInput();
+  if (input && (input === t || input.contains(t))) return true;
+  return !!t.closest('#chatInput .input-wrap');
+}
+
+/**
+ * 插入后是否要把焦点抢回输入框。
+ *
+ * 移动端托盘是流式占位（42vh），和软键盘共享同一块底部空间——两者同时出现会
+ * 把输入栏顶到屏幕中上部。所以移动端托盘开着时**故意不 focus**：用户可以连着
+ * 点好几个表情，键盘不会被反复弹出/收起。PC 端面板是浮层，必须保持焦点与光标位。
+ */
+function shouldKeepInputFocus() {
+  return !(isMobileViewport() && state.open);
+}
+
 function insertEmoji(emoji) {
-  const input = document.getElementById('messageInput');
+  const input = getMessageInput();
   if (!input) return;
   const start = input.selectionStart ?? input.value.length;
   const end = input.selectionEnd ?? start;
@@ -86,14 +113,14 @@ function insertEmoji(emoji) {
   } else {
     input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
   }
-  input.focus();
+  if (shouldKeepInputFocus()) input.focus();
   // 触发输入框自动增高、@提及检测等既有 input 监听
   input.dispatchEvent(new Event('input', { bubbles: true }));
   pushRecent(emoji);
 }
 
 function deleteOneChar() {
-  const input = document.getElementById('messageInput');
+  const input = getMessageInput();
   if (!input) return;
   const start = input.selectionStart ?? input.value.length;
   const end = input.selectionEnd ?? start;
@@ -113,7 +140,7 @@ function deleteOneChar() {
     }
     input.setRangeText('', delStart, start, 'end');
   }
-  input.focus();
+  if (shouldKeepInputFocus()) input.focus();
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
@@ -177,7 +204,12 @@ function buildPanel() {
   delKey.addEventListener('click', deleteOneChar);
   panel.appendChild(delKey);
 
-  panel.addEventListener('mousedown', (e) => e.stopPropagation());
+  // 面板内的按钮默认会抢走输入框焦点，进而打断 IME 组字与光标位置。
+  // 注：document 的关闭监听跑在捕获阶段（早于此处），这条 stopPropagation 只是保险。
+  panel.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('button')) e.preventDefault();
+    e.stopPropagation();
+  });
   return panel;
 }
 
@@ -249,9 +281,16 @@ export function isEmojiPanelOpen() {
 
 function openPanel() {
   if (!state.panel) return;
+  const mobile = isMobileViewport();
+  if (mobile) {
+    // 移动端：托盘与软键盘抢占同一块底部空间，开托盘前先收起键盘。
+    // 不这么做的话会出现「面板浮在键盘上方」的堆叠态。
+    const input = getMessageInput();
+    if (input && document.activeElement === input) input.blur();
+  }
   mountPanel();
   renderRecent();
-  if (isMobileViewport()) {
+  if (mobile) {
     state.panel.classList.add('open');
     state.panel.hidden = false;
   } else {
@@ -282,6 +321,20 @@ function onDocMouseDown(e) {
   const t = e.target;
   if (state.panel && state.panel.contains(t)) return;
   if (state.btn && state.btn.contains(t)) return;
+
+  // 点输入框：先把焦点还给输入框，再收面板。
+  //
+  // 移动端面板是流式占位（42vh），收起会立刻触发一次布局回流把输入栏移走。
+  // 若把聚焦交给浏览器在这一次点击的默认行为里完成，移动端实现会因布局突变
+  // 丢掉这次 focus（表现为「托盘关了，但还得再点一次输入框才能打字」）。
+  // 这里在用户手势上下文中同步 focus()，焦点先落定，回流便抢不走它。
+  // 不 preventDefault：后续的光标定位等默认行为照旧。
+  if (isInputAreaTarget(t)) {
+    const input = getMessageInput();
+    if (input) input.focus();
+    closeEmojiPanel();
+    return;
+  }
   closeEmojiPanel();
 }
 
@@ -292,8 +345,15 @@ function onEscKey(e) {
 // ---- 视口切换：重新挂载（PC 弹出 / 移动端流式），开着就先收起 ----
 
 let resizeTimer = null;
+let lastViewportWidth = window.innerWidth;
+
 function onResize() {
   if (!state.panel) return;
+  // 只看宽度。软键盘弹出/收起只改视口高度，却同样会触发 resize ——
+  // 若把它当成转屏/改窗宽，会在用户点输入框敲字的瞬间把面板重新挂载一次。
+  const width = window.innerWidth;
+  if (width === lastViewportWidth) return;
+  lastViewportWidth = width;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (state.open) closeEmojiPanel();
