@@ -66,7 +66,7 @@
 
 /* 尾巴：用户气泡（绿）朝右，对方气泡（白 / 深灰）朝左。
    形状（content / 定位 / 尺寸）必须对 wechat 与 wechat-dark 同时生效：
-   此前形状只写在 [data-theme="wechat"] 下，深色只覆盖了颜色 ——
+   形状只写在 [data-theme="wechat"] 下、深色只覆盖颜色的话 ——
    没有 content 的伪元素根本不存在，深色主题的尾巴整条消失。 */
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .message.user .bubble::after,
 :is([data-theme="wechat"], [data-theme="wechat-dark"]) .group-message.own .group-message-bubble::after {
@@ -750,6 +750,9 @@
     box-shadow: none;
     /* 左 12px 提示文字缩进；右 44px 给框进输入框内的语音按钮 */
     padding: 8px 44px 8px 12px !important;
+    /* 一行高：rows="2" 会把初始高度撑成两行（约 61px）。
+       autoResize 写入的 inline height 优先级更高，不影响后续自动增高 */
+    height: 40px;
     min-height: 40px;
     max-height: 120px;
     flex: 1;

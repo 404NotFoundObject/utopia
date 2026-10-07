@@ -169,6 +169,10 @@
   /* 右侧留出语音按钮的宽度，文字不压在图标下 */
   #chatInput .input-wrap #messageInput {
     padding-right: 42px;
+    /* 默认一行高（textarea 的 rows="2" 会撑出两行，移动端不需要）。
+       与 min-height 取齐，避免初次渲染与聚焦后（autoResize 写入 inline
+       height）出现跳动；多行输入仍会由 autoResize 自动增高到 max-height。 */
+    height: 36px;
   }
   #chatInput .mic-btn {
     position: absolute !important;

@@ -49,11 +49,11 @@ let _hangupCurrentCall = null;
 let _hangupCurrentCallSync = null;
 
 /**
- * 启动更新守护（替代原 checkAppVersion）。
+ * 启动更新守护。
  *
- * 原实现拿「已加载代码里的 APP_VERSION」去比对 localStorage，
- * 而 Service Worker 对静态资源是 stale-while-revalidate —— 长期不关页面时
- * 跑的一直是旧代码，版本号也是旧的，于是永远既不提示也装不上新版。
+ * 版本号不能取自「已加载代码里的 APP_VERSION」：Service Worker 对静态资源是
+ * stale-while-revalidate —— 长期不关页面时跑的一直是旧代码，版本号也是旧的，
+ * 于是永远既不提示也装不上新版。
  * 现在改由独立通道 version.json 探测（不进缓存），并用非阻塞横幅提示。
  */
 function startVersionWatch() {
@@ -208,9 +208,9 @@ async function recoverPendingCallEnd() {
 // ============================================================
 // 周期性世界任务
 //
-// character / social / group 三者的轮询此前各自持有独立 setInterval
-// （registerInterval），相位不统一、后台跳过也不顺延，切回前台后世界状态
-// 要滞后一个周期才追上。统一收编到 worldTick 的单一心跳上，按「距上次
+// character / social / group 三者若各自持有独立 setInterval，相位不统一、
+// 后台跳过也不顺延，切回前台后世界状态要滞后一个周期才追上。统一收编到
+// worldTick 的单一心跳上，按「距上次
 // 执行已过去多久」判定到期，隐藏页只走时间、不执行，回前台即补跑。
 // ============================================================
 const WORLD_TICK_INTERVALS = {
@@ -379,7 +379,7 @@ function updateHeader() {
       try {
         const group = await m.getGroup(groupId);
         if (group) {
-          // 微信式顶栏：群名不带任何前缀图标（原为「👥 群名」）
+          // 微信式顶栏：群名不带任何前缀图标
           nameEl.textContent = group.name;
           relationEl.textContent = '群聊';
           avatarEl.src = group.avatar || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 40 40\'%3E%3Ccircle cx=\'20\' cy=\'20\' r=\'20\' fill=\'%236c5ce7\'/%3E%3Ctext x=\'20\' y=\'26\' text-anchor=\'middle\' fill=\'%23fff\' font-size=\'18\' font-family=\'sans-serif\'%3E👥%3C/text%3E%3C/svg%3E';
@@ -420,6 +420,11 @@ function bindUIEvents() {
     input.parentNode?.replaceChild(newInput, input);
 
     function autoResize() {
+      // 移动端输入框默认一行高：先把 height 置 auto 再测 scrollHeight，而
+      // textarea 的 rows="2" 会让这一步回落到两行高度（约 61px）——结果是
+      // 「首次渲染一行、一聚焦就变两行」。测量前按视口校正 rows，桌面端
+      // 保持原样（两行）。
+      newInput.rows = window.matchMedia('(max-width: 768px)').matches ? 1 : 2;
       newInput.style.height = 'auto';
       const maxHeight = parseInt(getComputedStyle(newInput).maxHeight) || 120;
       const scrollHeight = newInput.scrollHeight;
@@ -1103,7 +1108,7 @@ async function init() {
     checkAutoPost().catch(err => console.warn('[Social] 自动发帖失败:', err));
   }, WORLD_TICK_INTERVALS.social);
 
-  // 重建上次会话遗留的评论/回复延时调度（P2-5）
+  // 重建上次会话遗留的评论/回复延时调度
   rebuildSocialSchedule().catch(err => console.warn('[Social] 重建调度失败:', err));
 
   registerWorldTask('group', () => {
