@@ -1,9 +1,9 @@
 /**
- * 朋友圈调度持久化（审计 A-3）。
+ * 朋友圈调度持久化。
  *
- * 原缺陷：_writeSchedule 用 time_state.add(schedule)（无主键），而 time_state
- * 的 keyPath 是 'id'，add 不注入主键 → DataError 被 catch 吞掉 → get('social_schedule')
- * 永远 undefined → 关标签页丢调度。
+ * 调度写入必须带主键：time_state 的 keyPath 是 'id'，用 add(schedule) 不注入主键时
+ * 会抛 DataError，被 catch 吞掉后 get('social_schedule') 永远 undefined，
+ * 关标签页就丢调度。
  *
  * 本测试验证：publishPostByUser 触发调度后，调度能真正写入并读回。
  */

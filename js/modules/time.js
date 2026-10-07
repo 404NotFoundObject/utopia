@@ -90,9 +90,9 @@ async function fetchNetworkTime() {
 /**
  * 分段积分：把一段真实时间按速度变更历史拆成多段累加游戏时长。
  *
- * 审计 P2-13：原实现用关闭时的单一 `state.speed` 乘整段离线时长，丢失了
- * 用户在离线期间对倍速的修改（例如关闭时 1x、重开前已改 48x → 整段按 48x 推进）。
- * 这里改为按 `speedHistory`（按时间升序）分段：每段用「该时段生效的速度」× 该段时长。
+ * 用关闭时的单一 `state.speed` 乘整段离线时长会丢失用户在离线期间的倍速修改
+ * （例如关闭时 1x、重开前已改 48x → 整段按 48x 推进）。
+ * 因此按 `speedHistory`（按时间升序）分段：每段用「该时段生效的速度」× 该段时长。
  *
  * @param {number} fromReal - 段起始真实时间戳（ms）
  * @param {number} toReal   - 段结束真实时间戳（ms）
@@ -415,7 +415,7 @@ export async function setTimeSpeed(speed) {
     throw new Error(`时间流速必须在 ${MIN_SPEED} 到 ${MAX_SPEED} 之间`);
   }
   await syncTime();
-  // 审计 P2-13：记录「旧速度段的结束时间」，供离线/同步推进做分段积分
+  // 记录「旧速度段的结束时间」，供离线/同步推进做分段积分
   if (speed !== timeState.speed) {
     recordSpeedChange(timeState);
   }

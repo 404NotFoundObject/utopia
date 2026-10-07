@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { isValidColorValue, validateImportedTheme } from '../../../js/ui/themes/themeMaker.js';
 
-describe('modules/themeMaker · 主题导入校验 (P2-22)', () => {
+describe('modules/themeMaker · 主题导入校验', () => {
   describe('isValidColorValue', () => {
     it('接受 hex 颜色', () => {
       expect(isValidColorValue('#ffffff')).toBe(true);

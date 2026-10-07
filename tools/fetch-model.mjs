@@ -2,7 +2,7 @@
 /**
  * 一键下载语义模型到 lib/models/，使语义检索在「服务器侧」真正可用。
  *
- * 背景（审计报告 P1-1）：
+ * 背景：
  *   - lib/models/ 整个目录被 .gitignore 忽略，全新克隆里只有 README.md，没有 onnx。
  *   - checkLocalModel 通过 HEAD 探测 /lib/models/<model>/onnx/<dtype 文件>，
  *     全新克隆里必然 404，语义引擎永远起不来。

@@ -22,7 +22,7 @@ import { APP_VERSION, STORAGE_VERSION_KEY, DISMISSED_UPDATE_KEY } from '../../..
 /**
  * 版本检测的一条主线：不依赖「已加载代码里的版本号」。
  *
- * 历史缺陷（P3-10 阶段 B）：checkAppVersion 用 APP_VERSION 比对 localStorage，
+ * checkAppVersion 若用 APP_VERSION 比对 localStorage，
  * 而 SW 静态资源走 stale-while-revalidate、CACHE_VERSION 又常年不变 ——
  * 长期不关页面时跑的一直是旧代码，版本号同样是旧的，于是永远不提示。
  */
@@ -124,7 +124,7 @@ describe('状态与落成', () => {
     globalThis.fetch = mockVersionJson({ version: '9.9.9' });
     await checkForUpdate();
 
-    // 清空此前为该用例建立的 SW 桩（jsdom 没有 Cache Storage）
+    // 清空本用例开头建立的 SW 桩（jsdom 没有 Cache Storage）
     delete globalThis.caches;
     globalThis.caches = {
       keys: async () => ['utopia-static-v3-9-4', 'other-cache'],

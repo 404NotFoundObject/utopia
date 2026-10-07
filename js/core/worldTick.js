@@ -22,8 +22,8 @@
 // 边界：
 // - 任务回调抛错不会连坐其他任务，也不会中断心跳；错误计数到 snapshot 里，
 //   便于观察长期失败的任务。
-// - 同一任务在上一拍尚未结束时不重入（`running` 标志）。原先的独立
-//   setInterval 没有这层保护，慢任务可能重叠执行。
+// - 同一任务在上一拍尚未结束时不重入（`running` 标志）：没有这层保护时，
+//   慢任务会重叠执行。
 
 /** 心跳基准间隔：所有到期判定都挂在它上面 */
 export const HEARTBEAT_MS = 1000;
@@ -106,8 +106,8 @@ export function registerWorldTask(name, fn, intervalMs) {
     throw new RangeError(`[WorldTick] 任务 ${name} 的间隔必须为正数`);
   }
 
-  // 从注册时刻起算：保证「注册后满一个间隔才首次执行」，与原先每个
-  // setInterval 各自的首次触发时机一致。
+  // 从注册时刻起算：保证「注册后满一个间隔才首次执行」，与各自独立
+  // setInterval 的首次触发时机一致。
   tasks.set(name, {
     name,
     fn,

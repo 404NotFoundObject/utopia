@@ -119,10 +119,9 @@ function ensureSchema(db, transaction) {
     }
   }
 
-  // ★ 审计 A-2：主键迁移的写回必须与 deleteObjectStore/createObjectStore 处于
-  // 同一个 versionchange 事务内。此前是在 upgrade 完成后再开独立 readwrite 事务写回，
-  // 两阶段之间无原子性——写回失败时旧数据已随 deleteObjectStore 消失，却提示「删除并重建」。
-  // 现在在 onupgradeneeded 的同一事务里直接把缓存数据 put 回去：
+  // ★ 主键迁移的写回必须与 deleteObjectStore/createObjectStore 处于同一个
+  // versionchange 事务内：分两阶段会丧失原子性——写回失败时旧数据已随
+  // deleteObjectStore 消失。因此在 onupgradeneeded 的同一事务里直接把缓存数据 put 回去：
   //   - 成功：结构 + 数据一步到位，事务原子提交
   //   - 失败：整个 versionchange 事务回滚，旧 store 及其数据原样保留，无数据丢失
   for (const storeName of _migratedStoreNames) {
@@ -198,7 +197,7 @@ async function inspectSchema(db) {
     }
   }
 
-  // ★ 修复「自愈自阻塞」：必须等本探测事务真正提交后再返回。
+  // ★ 必须等本探测事务真正提交后再返回：
   // 调用方 ensureSchemaCompatible 紧接着会 db.close() 并以更高版本重开；
   // 若此时该连接仍有未完成的事务，close() 会被推迟、连接继续占位，
   // 于是紧随其后的升版 open 触发 onblocked —— 表现为「数据库被其他页面阻塞」的误报，
@@ -278,10 +277,10 @@ function openAtVersion(version) {
     request.onerror = () => finish(reject, request.error);
     request.onblocked = () => {
       // blocked 是**可恢复的中间态**：其他连接释放后，本请求会继续走
-      // upgradeneeded/success。此前在此直接 reject，会把「本应用自己刚关闭的
-      // 连接尚未完全释放」这类瞬时阻塞变成硬失败——用户被引导去执行
+      // upgradeneeded/success。因此这里只告警并等待：若直接 reject，「本应用自己
+      // 刚关闭的连接尚未完全释放」这类瞬时阻塞会变成硬失败，把用户推向
       // 「删除所有数据并重建（不可恢复）」，代价与问题严重不匹配。
-      // 现改为只告警并等待；只有长时间仍未解除（确实有其他标签页占用）才报错。
+      // 只有长时间仍未解除（确实有其他标签页占用）才报错。
       console.warn('[DB] 打开被阻塞：等待其他连接释放…');
       timer = setTimeout(() => {
         finish(reject, new Error('数据库被其他页面阻塞，请关闭其他标签页后重试'));
@@ -305,8 +304,8 @@ async function ensureSchemaCompatible(db) {
   const first = await inspectSchema(db);
 
   if (first.keyPathMismatches.length > 0) {
-    // 记录级迁移（审计 P1-13）：不再直接删整库，而是先读出旧数据，
-    // 触发 upgrade 重建主键，再把数据无损写回。迁移失败才降级报错。
+    // 记录级迁移：先读出旧数据，触发 upgrade 重建主键，再把数据无损写回。
+    // 迁移失败才降级报错——直接删整库会毁掉可挽救的数据。
     const migrated = await migrateKeyPaths(db, first.keyPathMismatches);
     if (migrated) {
       return openDB(); // 迁移完成，重新走一次兼容校验
@@ -368,8 +367,8 @@ async function migrateKeyPaths(db, mismatches) {
         req.onerror = () => reject(req.error);
       });
 
-      // ★ 审计 A-2 缺陷③：空的错配 store 同样应无损重建（重建是零风险的），
-      // 不再因「无数据」而走报错路径。
+      // ★ 空的错配 store 同样应无损重建（重建是零风险的），
+      // 不因「无数据」而走报错路径。
       if (all.length === 0) {
         records[m.store] = [];
         continue;
@@ -401,8 +400,8 @@ async function migrateKeyPaths(db, mismatches) {
     throw e;
   }
 
-  // ★ 审计 A-2：写回已移到 ensureSchema（onupgradeneeded 的同一 versionchange 事务内），
-  // 此处不再有独立的写回阶段。upgrade 成功即意味着结构 + 数据已原子提交。
+  // ★ 写回在 ensureSchema 内完成（onupgradeneeded 的同一 versionchange 事务），
+  // 此处没有独立的写回阶段：upgrade 成功即意味着结构 + 数据已原子提交。
   _pendingMigrations.clear();
   _migratedStoreNames.clear();
   console.log(`[DB] 主键迁移完成，共 ${Object.keys(records).length} 张表数据无损保留`);

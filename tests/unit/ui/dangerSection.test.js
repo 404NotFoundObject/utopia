@@ -1,5 +1,5 @@
 /**
- * js/ui/screens/settingsUI/sections/dangerSection 单元测试：备份与恢复（审计 C-8）。
+ * js/ui/screens/settingsUI/sections/dangerSection 单元测试：备份与恢复。
  *
  * 覆盖四个子问题：① 漏无前缀的 localStorage 键 ② 漏插件 VFS 库
  * ③ 无版本头（无法校验）④ 无恢复路径
@@ -19,7 +19,7 @@ import {
   deleteVfsDatabase,
 } from '../../../js/plugins/pluginVfs.js';
 
-describe('ui/dangerSection · 备份与恢复（审计 C-8）', () => {
+describe('ui/dangerSection · 备份与恢复', () => {
   beforeEach(async () => {
     localStorage.clear();
     await deleteVfsDatabase();

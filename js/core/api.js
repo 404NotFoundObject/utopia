@@ -8,7 +8,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
   // 注意：此超时只保护「建立连接 + 收到响应头」阶段（首字节超时）。
   // 一旦 await fetch() resolve（响应头到达），下方 finally 立即清除 timer，
   // 因此流式 body 的读取完全不受此超时影响——长回复不会被中途 abort。
-  // （审计 P2-15：慢模型/长上下文的首字节可能超过 60s，流式路径用更长的首字节超时兜底。）
+  // （慢模型/长上下文的首字节可能超过 60s，流式路径用更长的首字节超时兜底。）
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   const externalSignal = options.signal;
@@ -71,7 +71,7 @@ function toFiniteNumber(v) {
 export function getModelCapabilities(modelName) {
   const lower = (modelName || '').toLowerCase();
 
-  // 审计 C-2：带供应商前缀的 id（如 openai/o3-mini、anthropic/claude-4）匹配不上推理模型模式——
+  // 带供应商前缀的 id（如 openai/o3-mini、anthropic/claude-4）匹配不上推理模型模式——
   // 模式的边界字符类是 [-_.]，不含 '/'，前缀与模型名之间的 '/' 断裂了匹配。
   // 先剥掉最后一段 '/' 之前的前缀，让判定只看模型名本身。
   const slashIdx = lower.lastIndexOf('/');
@@ -89,7 +89,7 @@ export function getModelCapabilities(modelName) {
   // 推理模型：不支持采样参数（temperature/top_p/penalties/top_k）。
   // 覆盖 OpenAI o 系列、DeepSeek reasoner/r1、Qwen thinking、GLM reasoning、
   // 以及带版本号/日期后缀的变体（如 o4-mini-2026-xx、deepseek-reasoner-v3.1）。
-  // 审计 P2-14：原硬编码正则只认 o[134] 与 claude-4，漏掉新推理模型 → 发 sampling 参数 → 400。
+  // 正则必须覆盖带版本号/日期后缀的推理模型变体：漏判就会向厂商发出 sampling 参数，返回 400。
   const reasoningPatterns = [
     /^o[0-9]+(?:[a-z]*)?(?:[-_.][0-9a-z.-]*)*$/i,            // o1/o3/o4/o4-mini/o4-mini-2026-xx-xx
     /(?:^|[-_.])(?:o1|o3|o4)(?:[-_.]|$)/i,                    // 任意位置带 o1/o3/o4 标识
@@ -109,9 +109,8 @@ export function getModelCapabilities(modelName) {
     caps.frequency_penalty = false;
     caps.presence_penalty = false;
     caps.top_k = false;
-    // 审计 C-3：日志原写「penalties」，未说明是否含 repetition_penalty，而后者
-    // 实际并未被禁用（它是厂商特定参数，由适配器的 requestMapping 决定是否发送）。
-    // 改为逐项列举，让日志与实际禁用的字段完全一致。
+    // 日志逐项列举实际禁用的字段：repetition_penalty 是厂商特定参数，由适配器的
+    // requestMapping 决定是否发送，笼统写成「penalties」会与实情不符。
     console.log(
       `[API] 检测到推理模型 "${modelName}"，禁用采样参数` +
       `（temperature/top_p/frequency_penalty/presence_penalty/top_k）`
@@ -233,10 +232,10 @@ function extractTextContent(content) {
 /**
  * 构造 Google Gemini 流式请求 URL。
  *
- * 审计 B-2：旧实现把 alt=sse 嵌在 `if (replaced !== finalUrl)` 内，导致
- * 自定义 baseUrl 已含 :streamGenerateContent、或已带 alt= 时跳过 alt=sse，
+ * 两步都无条件执行：先替换方法名（若存在），再补 alt=sse（若尚未存在）。
+ * 把 alt=sse 嵌在 `if (replaced !== finalUrl)` 内的话，自定义 baseUrl 已含
+ * :streamGenerateContent、或已带 alt= 时就会跳过 alt=sse，
  * Gemini 会返回 JSON 数组（无 data: 行）→ 零事件 → 空回复。
- * 现在两步都无条件执行：先替换方法名（若存在），再补 alt=sse（若尚未存在）。
  *
  * @param {string} url 原始 URL
  * @returns {string} 流式 URL

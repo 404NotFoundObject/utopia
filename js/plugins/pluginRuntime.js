@@ -36,7 +36,7 @@ setWorkerResolver((pluginId) => {
 });
 
 // 注入事件广播器：把主线程 emit 的事件回传给订阅了该事件的 Worker，
-// 修复审计 P1-4「Worker 事件系统没有发送方」。
+// 把主线程 emit 的事件回传给订阅方，Worker 事件系统才有发送方。
 setEventBroadcaster((event, args) => {
   for (const [pluginId, state] of workers.entries()) {
     const subscribed = getPluginSubscribedEvents(pluginId);

@@ -60,8 +60,8 @@ export function getEligibleCharacters(characters) {
 
   return characters.filter(char => {
     const sleepStatus = char.bodyState?.sleepStatus;
-    // 审计 P3-8：bodyState 从不产生 sleepStatus==='昏厥'（昏厥记在 consciousness），
-    // 移除死分支，只拦真实睡眠状态。
+    // bodyState 不产生 sleepStatus==='昏厥'（昏厥记在 consciousness），
+    // 因此只拦真实睡眠状态。
     if (sleepStatus === '深睡' || sleepStatus === '浅睡') return false;
 
     const last = char.lastInteraction;
@@ -240,7 +240,7 @@ export async function generateProactiveMessage(character, extraContext = {}, cus
     systemMessages.push(systemMsg(`【最近对话摘要】${summary}`, 'summary', PRIORITY.SUMMARY));
   }
 
-  // 朋友圈回流（审计 B-5）：主动对话时角色也应能「看到」好友动态与评论，
+  // 朋友圈回流：主动对话时角色也应能「看到」好友动态与评论，
   // 让主动发言能自然地提及最近的朋友圈内容
   try {
     const socialPrompt = await buildSocialContext(character);
@@ -358,7 +358,7 @@ export async function insertProactiveMessage(character, content, convId, options
   };
   await addMessageToConversation(conv.id, msg);
 
-  // 情感回路闭合（审计 B-6）：角色主动发言后做一次轻微的「主动分享」情感演化。
+  // 情感回路闭合：角色主动发言后做一次轻微的「主动分享」情感演化。
   // 与单聊/群聊的 applyEngineEffects（响应用户输入）不同，这里没有用户输入可分类，
   // 用专门的 proactive_share 事件模拟「分享欲得到满足」的微小正向波动。
   try {

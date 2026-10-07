@@ -12,7 +12,7 @@ import { THEME_PRESETS } from '../../../js/ui/themes/themePresets.js';
  *
  * 主题变量通过内联样式写在 :root 上，优先级高于任何 stylesheet。
  * 键集合不一致 + 只写不清 ⇒ 从键多的主题切回键少的主题时，多出来的键会带着
- * 上一个主题的颜色留在 :root（历史缺陷：light/dark/cyberpunk 缺
+ * 上一个主题的颜色留在 :root（例如 light/dark/cyberpunk 缺
  * --color-bg-card / --color-border-focus，从 wechat 切回后 .card 背景与
  * input:focus 边框仍是微信绿 / 微信白）。
  */

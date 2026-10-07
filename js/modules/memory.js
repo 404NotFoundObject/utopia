@@ -329,7 +329,7 @@ export async function initSemanticEngine(modelId) {
 
       // 优先读本地（服务器侧 lib/models/）；若本地不存在，则回退到远程模式，
       // 使「浏览器端 downloadModel 下载到 Cache 的模型」能被复用，
-      // 避免「下载了却加载不了」的割裂（审计 P1-1 的浏览器侧修复）。
+      // 避免「下载了却加载不了」的割裂。
       env.localModelPath = '/lib/models/';
       env.allowLocalModels = true;
       env.allowRemoteModels = !(await checkLocalModel(modelId));
@@ -514,10 +514,10 @@ async function hybridSearch(characterId, query, limit = 5) {
   const keywordResults = keywordSearch(query, characterId, limit * 2);
   const semanticResults = await searchVectors(query, characterId, limit * 2);
 
-  // 审计 P2-1：原实现是「拼接」而非「融合」——关键词结果全部排前，
+  // 用 RRF（Reciprocal Rank Fusion）而非拼接：拼接会让关键词结果全部排前，
   // limit=5 时只要关键词 ≥5 条，语义结果 100% 被砍掉。
-  // 改为 RRF（Reciprocal Rank Fusion）：两路结果按各自排名打分累加，
-  // 两路都命中的记忆排最前，同时保证语义结果也有机会进入前 limit。
+  // RRF 让两路结果按各自排名打分累加，两路都命中的记忆排最前，
+  // 同时保证语义结果也有机会进入前 limit。
   const K = 60;
   const fused = new Map();
 

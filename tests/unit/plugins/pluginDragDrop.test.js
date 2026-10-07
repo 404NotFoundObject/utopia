@@ -1,15 +1,15 @@
 /**
- * js/plugins/pluginDragDrop.js · destroy() 修复验证（审计 C-9）。
+ * js/plugins/pluginDragDrop.js · destroy() 的清理语义。
  *
- * 原缺陷：ghostEl 声明在 customDrag() 方法体内，而 destroy() 是同一对象的
- * 另一个方法，引用它会抛 ReferenceError: ghostEl is not defined。
+ * ghostEl 若声明在 customDrag() 方法体内，destroy() 作为同一对象的
+ * 另一个方法引用它会抛 ReferenceError: ghostEl is not defined。
  * 该错误被 uiBridge 的 try/catch 吞掉，表现为插件卸载时幽灵节点与监听器泄漏，
  * 且 `if (ghostEl)` 守卫挡不住——访问未声明变量在求值时即抛错。
  */
 import { describe, it, expect } from 'vitest';
 import { createPluginDragDrop } from '../../../js/plugins/pluginDragDrop.js';
 
-describe('plugins/pluginDragDrop · destroy（审计 C-9）', () => {
+describe('plugins/pluginDragDrop · destroy', () => {
   it('destroy() 不抛 ReferenceError', () => {
     const dd = createPluginDragDrop('test-plugin');
     // 旧实现在此处抛 ReferenceError（被上层 try/catch 吞掉）

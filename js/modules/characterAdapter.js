@@ -2,9 +2,8 @@
 import { getGameTime } from './time.js';
 import { getDefaultEmotionState, getInitialEmotionState } from './emotionEngine.js';
 import { getDefaultBodyState, getInitialBodyState } from './bodyState.js';
-// ★ tEXt 扫描与载荷解码的唯一实现在 utils/png.js（审计 S-3）。此前本文件另有一份
-// 拷贝，两份的关键字覆盖已经漂移。这里改为直接复用同一份，并原样再导出，
-// 保证既有 import 不受影响。
+// ★ tEXt 扫描与载荷解码的唯一实现在 utils/png.js：两份拷贝的关键字覆盖会漂移，
+// 这里直接复用同一份并原样再导出，保证既有 import 不受影响。
 import { extractTextChunk as extractPngTextChunk } from '../utils/png.js';
 
 export { extractPngTextChunk as extractTextChunk };
@@ -64,8 +63,8 @@ export function convertToUtopia(data, format) {
   switch (format) {
     case 'utopia-v3.1':
     case 'utopia-v3':
-      // 审计 C-5：原生格式此前零守卫直接返回，对象型的 personality / description
-      // 会原样进入提示词（模板拼接时静默变成 [object Object]）。
+      // 对象型的 personality / description 必须做安全转换：零守卫进入提示词时
+      // 会在模板拼接中静默变成 [object Object]。
       // 这里只把文本字段做安全转换，结构化字段（personalityParameters /
       // emotionState / bodyState / schema 等）原样透传，不改变既有语义。
       return sanitizeUtopiaTextFields(data);
@@ -128,7 +127,7 @@ export function convertToUtopia(data, format) {
     // ★ 透传 profile（可能为 null）
     bodyProfile,
     emotionProfile,
-    // ★ 世界书 / 备用开场白透传（ST 卡往返不丢失，审计 P1-7）
+    // ★ 世界书 / 备用开场白透传（ST 卡往返不丢失）
     characterBook: base.characterBook || null,
     alternateGreetings: base.alternateGreetings || null,
     lastSentMessageCount: 0,
@@ -185,7 +184,7 @@ function fromSTV2(data) {
     avatar: data.avatar || '',
     bodyProfile,
     emotionProfile,
-    // ★ 世界书（character_book）透传，避免静默丢失（审计 P1-7）
+    // ★ 世界书（character_book）透传，避免静默丢失
     characterBook: data.character_book ?? null,
     alternateGreetings: Array.isArray(data.alternate_greetings) ? data.alternate_greetings : null,
   };
@@ -222,7 +221,7 @@ function fromSTV3(data) {
     avatar: d.avatar || '',
     bodyProfile,
     emotionProfile,
-    // ★ 世界书（character_book）透传，避免静默丢失（审计 P1-7）
+    // ★ 世界书（character_book）透传，避免静默丢失
     characterBook: d.character_book ?? null,
     alternateGreetings: Array.isArray(d.alternate_greetings) ? d.alternate_greetings : null,
   };
@@ -238,9 +237,8 @@ const TEXT_FIELDS = [
 /**
  * 把任意值安全转为文本，避免对象/数组被隐式转成 `[object Object]` 进入提示词。
  *
- * 审计 C-5：原仅用于 ST v2/v3 的 personality 字段，通用格式与原生直通路径
- * 没有守卫，遇到对象型字段会静默变成 `[object Object]`。现作为通用工具，
- * 供所有进入提示词的文本字段使用。
+ * 作为通用工具供所有进入提示词的文本字段使用：只守卫 ST v2/v3 的 personality
+ * 字段的话，通用格式与原生直通路径遇到对象型字段会静默变成 `[object Object]`。
  */
 function toSafeText(v) {
   if (v === null || v === undefined) return '';
@@ -251,10 +249,10 @@ function toSafeText(v) {
 }
 
 /**
- * 对 Utopia 原生格式的文本字段做安全转换（审计 C-5）。
+ * 对 Utopia 原生格式的文本字段做安全转换。
  *
  * 只处理 TEXT_FIELDS 白名单内且存在的字段：
- *  - 存在的对象/数组型字段 → 转文本，不再变成 [object Object]
+ *  - 存在的对象/数组型字段 → 转文本，避免变成 [object Object]
  *  - 不存在的字段 → 不塞默认值，保持原样（避免改变既有语义）
  * 结构化字段（personalityParameters / emotionState / bodyState 等）一律原样透传。
  */
@@ -303,8 +301,8 @@ function fromCAI(data) {
  */
 function fromGeneric(data) {
   return {
-    // 审计 C-5：所有进入提示词的文本字段统一走 toSafeText 守卫。
-    // 对象/数组型的 personality、description 等不再被隐式转成 [object Object]。
+    // 所有进入提示词的文本字段统一走 toSafeText 守卫：
+    // 对象/数组型的 personality、description 会被隐式转成 [object Object]。
     name: toSafeText(data.name),
     description: toSafeText(data.description),
     firstMessage: toSafeText(data.firstMessage),

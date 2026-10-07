@@ -96,8 +96,8 @@ let _allVarKeysCache = null;
  * 所有内置主题 CSS 变量键的并集。
  *
  * 结果缓存：THEME_PRESETS 是静态常量，运行时不会增删键。
- * 主题制作器此前手工列举 light/dark/cyberpunk 的键做清理，既重复又会漏
- * （漏了 wechat / wechat-dark），统一走这里。
+ * 手工列举 light/dark/cyberpunk 的键做清理既重复又会漏
+ * （漏掉 wechat / wechat-dark），统一走这里。
  *
  * @returns {string[]}
  */

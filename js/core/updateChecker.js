@@ -1,14 +1,12 @@
 // js/core/updateChecker.js - 版本检测与应用更新
 //
-// 背景（P3-10 阶段 B）：原先的更新检测是「鸡生蛋」——
-//   checkAppVersion() 拿 APP_VERSION（**已加载的代码**里的常量）去比对 localStorage，
-//   而 Service Worker 对静态资源是 stale-while-revalidate：首次打开先返回旧缓存。
-//   于是用户长期不关页面时，跑的一直是旧代码、APP_VERSION 也是旧的，
-//   与 localStorage 里存的旧值相同 → 永远不提示，也永远加载不到新版本。
+// 版本号不能取自**正在运行的代码**：Service Worker 对静态资源是
+// stale-while-revalidate，首次打开先返回旧缓存；用户长期不关页面时跑的一直是
+// 旧代码、APP_VERSION 也是旧的，与 localStorage 里存的旧值相同 → 永远不提示，
+// 也永远加载不到新版本。
 //
-// 修法：新增一个**不进缓存**的版本通道 version.json（由 sw.js 保证网络直通），
-// 版本号不再依赖「正在运行的代码」。同时把阻塞式 confirm() 换成非阻塞横幅，
-// 补上定期 + 恢复可见两种触发时机。
+// 因此走一个**不进缓存**的版本通道 version.json（由 sw.js 保证网络直通），
+// 提示用非阻塞横幅而非 confirm()，并补上定期 + 恢复可见两种触发时机。
 //
 // 离线时静默降级：fetch 失败当作「无法判断」，不打扰用户。
 

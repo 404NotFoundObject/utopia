@@ -1,15 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 
 /**
- * 群聊「二次进入无响应」回归。
+ * 群聊重复进入同一会话时的通知语义。
  *
- * 现象（移动端微信主题）：进入群聊 → 返回列表层 → 再点同一个群，
- * 界面停在列表层不动；必须先随便进一个单聊再退出来，群聊才进得去。
- *
- * 根因：state 对「相同值」直接 return、不通知订阅者。返回列表层时
- * currentGroupId 并未清空，于是再次 openGroupChat(同一 id) 时
- * set 被判定为无变化 → wechatTheme 里负责切到对话页的订阅者收不到通知。
- * selectCharacter（单聊）早有「先置 null 再设值」的防呆，群聊此前没有。
+ * state 对「相同值」直接 return、不通知订阅者；而返回列表层时 currentGroupId
+ * 并未清空，于是再次 openGroupChat(同一 id) 时 set 被判定为无变化，
+ * wechatTheme 里负责切到对话页的订阅者就收不到通知——界面停在列表层不动。
+ * 因此群聊进入也要像 selectCharacter（单聊）那样「先置 null 再设值」。
  *
  * 这里断言：连续两次 openGroupChat(同一 id)，订阅者每次都收到通知。
  */

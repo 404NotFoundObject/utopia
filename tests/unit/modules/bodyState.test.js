@@ -1,12 +1,11 @@
 /**
- * js/modules/bodyState 单元测试：睡眠债建模与梦境生成（审计 P3-6 / P3-8）。
+ * js/modules/bodyState 单元测试：睡眠债建模与梦境生成。
  *
  * 背景：
- * - P3-6：totalSleepHours / dreamContent / lastNapDate 三个字段「写了从不读」。
- *   totalSleepHours 改为「当日已睡」并被债务结算与身体描述消费；
+ * - totalSleepHours 记「当日已睡」并被债务结算与身体描述消费；
  *   dreamContent 由睡醒时的梦境生成写入；lastNapDate 用于「今日已午休」展示。
- * - P3-8：FAQ 承诺「长期不睡会生病」，但代码里生病只看 health < 50，
- *   熬几个通宵也毫无影响。现在睡眠债过重会独立触发生病判定。
+ * - FAQ 承诺「长期不睡会生病」，因此睡眠债过重会独立触发生病判定：
+ *   只看 health < 50 的话，熬几个通宵也毫无影响。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -88,7 +87,7 @@ function makeCharacter(bodyOverrides = {}, overrides = {}) {
   };
 }
 
-describe('modules/bodyState · 睡眠债（审计 P3-6 / P3-8）', () => {
+describe('modules/bodyState · 睡眠债', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.now = new Date('2026-10-02T08:00:00').getTime();
@@ -190,7 +189,7 @@ describe('modules/bodyState · 睡眠债（审计 P3-6 / P3-8）', () => {
   });
 });
 
-describe('modules/bodyState · 睡眠债致生病（审计 P3-8）', () => {
+describe('modules/bodyState · 睡眠债致生病', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.settings = { engineFlags: { bodyState: true } };
@@ -203,7 +202,7 @@ describe('modules/bodyState · 睡眠债致生病（审计 P3-8）', () => {
     vi.restoreAllMocks();
   });
 
-  it('健康值很高但欠觉严重时也会生病（此前只看 health<50）', async () => {
+  it('健康值很高但欠觉严重时也会生病（不能只看 health<50）', async () => {
     const char = makeCharacter({ sleepStatus: '清醒', health: 90, sleepDebtHours: 12 });
     await updateBodyByTime(char, 1);
     expect(char.bodyState.illness.type).toBeTruthy();
@@ -224,7 +223,7 @@ describe('modules/bodyState · 睡眠债致生病（审计 P3-8）', () => {
   });
 });
 
-describe('modules/bodyState · 长离线分段推进（审计 S-1 / S-2）', () => {
+describe('modules/bodyState · 长离线分段推进', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.now = new Date('2026-10-02T08:00:00').getTime();
@@ -251,7 +250,7 @@ describe('modules/bodyState · 长离线分段推进（审计 S-1 / S-2）', () 
     vi.restoreAllMocks();
   });
 
-  it('睡意到位就自然入睡，「困倦」不再是死胡同', async () => {
+  it('睡意到位就自然入睡，「困倦」不是死胡同', async () => {
     const char = makeCharacter({ sleepStatus: '清醒', sleepiness: 100, energy: 80 });
     await updateBodyByTime(char, 1);
     // 白天的就寝阈值 = 80 - (8-7)*3 = 77，睡意 100 已经越过
@@ -349,7 +348,7 @@ describe('modules/bodyState · 提示词与描述', () => {
   });
 });
 
-describe('modules/bodyState · 梦境生成（审计 P3-6）', () => {
+describe('modules/bodyState · 梦境生成', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.now = new Date('2026-10-02T08:00:00').getTime();

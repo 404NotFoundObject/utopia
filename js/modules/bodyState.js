@@ -16,9 +16,8 @@ const ENERGY_DECAY_RATE = 2;
 const SLEEPINESS_INCREASE_RATE = 3;
 const HEALTH_DECAY_RATE = 0.5;
 const RECOVERY_RATE_SLEEP = 8;
-// 审计 P3-6：RECOVERY_RATE_REST / MIN_SLEEP_HOURS 为死常量（仅声明、从未读取），已删除。
 
-// ---------- 睡眠债（审计 P3-6 / P3-8） ----------
+// ---------- 睡眠债 ----------
 // 睡眠债以「小时」计量：清醒时把每日睡眠需求摊到 24 小时持续累积，
 // 睡眠时按实际睡眠时长 × 睡眠质量偿还，永不为负。
 // 在此之前代码里没有任何「没睡够」的概念：生病只看 health < 50，
@@ -100,16 +99,15 @@ export function getDefaultBodyState() {
       expectedDurationHours: 0,
     },
     lastWakeTime: now,
-    // 审计 P3-6：totalSleepHours 原为「累计睡眠时长」，写了从不读。
-    // 现改为「当日已睡小时数」（含午休），跨游戏日自动清零，
+    // 当日已睡小时数（含午休），跨游戏日自动清零，
     // 由睡眠债结算、身体描述与 /inspect 共同消费。
     totalSleepHours: 0,
     sleepLedgerDate: null,
     sleepQuality: 1.0,
-    // 审计 P3-6：dreamContent 原为死字段，现由睡醒时的梦境生成写入（见 generateDream）。
+    // 由睡醒时的梦境生成写入（见 generateDream）。
     dreamContent: '',
     lastDreamDate: null,
-    // 审计 P3-6 / P3-8：睡眠债（小时）。见 applySleepDebt。
+    // 睡眠债（小时）。见 applySleepDebt。
     sleepDebtHours: 0,
     lastUpdate: now,
     napStartTime: 0,
@@ -174,7 +172,7 @@ export function getInitialBodyState(gameTime, personality) {
 }
 
 // ---------- 获取当前时段 ----------
-// 审计 P3-5：清晨边界与 time.js 的 getPeriod 统一为 5–8（原为 6–8），
+// 清晨边界与 time.js 的 getPeriod 统一为 5–8，
 // 消除「5:00–6:00 时段划分不一致」的漂移。
 // 注：本模块沿用「午间」命名（区别于 time.js 的「中午」），因 bodyState
 // 内部多处字符串判断依赖「午间」，二者各自自洽，仅此处边界需对齐。
@@ -210,7 +208,7 @@ function getDateKey(gameDate) {
 }
 
 // ============================================================
-// 睡眠债（审计 P3-6 / P3-8）
+// 睡眠债
 // ============================================================
 
 /**
@@ -318,7 +316,7 @@ function processNapping(state, profile, gameDate, gameNow) {
     state.sleepStatus = '清醒';
     state.consciousness = '清醒';
     state.lastWakeTime = gameNow;
-    // 审计 P3-6：午休时长计入当日睡眠并按较低效率偿还睡眠债
+    // 午休时长计入当日睡眠并按较低效率偿还睡眠债
     applySleepDebt(state, profile, napElapsedHours, 'nap');
     state.sleepiness = Math.max(0, state.sleepiness - 40);
     state.energy = Math.min(100, state.energy + 20);
@@ -348,20 +346,19 @@ function processNapping(state, profile, gameDate, gameNow) {
   return 'nap-start';
 }
 
-// ---------- 分段推进（审计 S-2） ----------
-// 单次 updateBodyByTime 会收到「好几天没开应用」攒下的巨大 hours。此前整段
-// 只做一次「睡 / 醒」判定、并把全部时长一次性套用：入睡态把整段全算成睡觉，
-// 清醒态把整段全算成清醒 —— 后者尤其致命：角色连续清醒几十个游戏小时、睡眠债
-// 一口气顶到 3 倍上限，回归后立刻被「缺觉致病」判定判病，而玩家只觉得莫名其妙。
+// ---------- 分段推进 ----------
+// 单次 updateBodyByTime 会收到「好几天没开应用」攒下的巨大 hours。整段只做一次
+// 「睡 / 醒」判定并一次性套用时长的话：入睡态把整段全算成睡觉，清醒态把整段
+// 全算成清醒 —— 后者尤其致命：角色连续清醒几十个游戏小时、睡眠债一口气顶到
+// 3 倍上限，回归后立刻被「缺觉致病」判定判病，而玩家只觉得莫名其妙。
 // 这里把长跨度切成 ≤1 游戏小时的小步逐段推进，让睡/醒转换、昼夜节律与债务
 // 结算在跨度内部自然发生。步数上限兜底，避免超长离线把主线程卡住。
 const BODY_STEP_HOURS = 1;
 const BODY_MAX_STEPS = 720;   // 30 天 @1h；更长的跨度自动放大步长
 
-// ---------- 自然入睡（审计 S-1） ----------
-// 此前「困倦」是个死胡同：只有 energy<10 且 sleepiness>90 才会睡着，
-// 等价于「必须先昏厥才能睡觉」。于是角色几十小时不睡、债务打满、一睡又是长睡
-// 不起。这里补上困倦 → 入睡的正常通道。
+// ---------- 自然入睡 ----------
+// 「困倦」必须有通往入睡的正常通道：若只有 energy<10 且 sleepiness>90 才允许睡着，
+// 等价于「必须先昏厥才能睡觉」，角色会几十小时不睡、债务打满、一睡又是长睡不起。
 const SLEEP_ONSET_BEDTIME = 60;    // 夜间（夜晚/深夜/清晨）就寝的睡意阈值
 const SLEEP_DEEP_THRESHOLD = 70;   // 刚躺下、睡意仍重 → 转深睡（前半夜睡得沉）
 const INSOMNIA_BASE_RATE = 0.05;   // 「困但睡不着」的每小时基础概率（× 神经质）
@@ -389,7 +386,7 @@ function simulateBodyStep(character, profile, hours, at, verbose) {
   const circadian = getCircadianMultiplier(gameDate.getHours(), profile);
   const period = getTimePeriod(gameDate);
 
-  // 睡眠债（审计 P3-6 / P3-8）：本步用「进入时的债务」影响各项速率，
+  // 睡眠债：本步用「进入时的债务」影响各项速率，
   // 步末再按实际睡/醒结算，避免同一次计算里自相矛盾。
   ensureSleepDebtFields(state);
   rollSleepLedger(state, gameDate);
@@ -471,7 +468,7 @@ function simulateBodyStep(character, profile, hours, at, verbose) {
       state.sleepStatus = '清醒';
       state.consciousness = '清醒';
       state.lastWakeTime = nowTs;
-      // 本步的睡眠时长由末尾 applySleepDebt 统一结算（不再在此处重复累加）
+      // 本步的睡眠时长由末尾 applySleepDebt 统一结算（避免在此处重复累加）
       wokeUpNaturally = true;
     } else if (state.sleepStatus === '浅睡' && state.sleepiness >= SLEEP_DEEP_THRESHOLD) {
       // 刚躺下、睡意还重 → 沉下去；后半夜睡意退了再自然转回浅睡
@@ -479,7 +476,7 @@ function simulateBodyStep(character, profile, hours, at, verbose) {
     }
   } else {
     const sleepinessThreshold = 80 - (profile.sleepNeedHours - 7) * 3;
-    // ★ 自然入睡通道（审计 S-1）：困倦不再只是个展示用的中间态，睡意到位就躺下。
+    // ★ 自然入睡通道：困倦不只是展示用的中间态，睡意到位就躺下。
     //   夜间阈值更低（到点就寝），白天要攒够睡意才会睡。
     const isBedtime = period === '夜晚' || period === '深夜' || period === '清晨';
     const onsetThreshold = isBedtime
@@ -551,8 +548,8 @@ function simulateBodyStep(character, profile, hours, at, verbose) {
   // ============================================================
   // 生病概率
   // ============================================================
-  // 审计 P3-8：生病不再只看健康值。睡眠债过重会压低免疫力，即使健康值还很高
-  // 也可能病倒——这才是 FAQ 一直承诺、但代码里从未实现的「长期不睡会生病」。
+  // 生病不只取决于健康值：睡眠债过重会压低免疫力，即使健康值还很高
+  // 也可能病倒——即「长期不睡会生病」。
   if (!state.illness.type) {
     const resistanceFactor = 2 - profile.illnessResistance * 2;
     let illnessChance = 0;
@@ -633,7 +630,7 @@ function simulateBodyStep(character, profile, hours, at, verbose) {
   }
 
   // ============================================================
-  // 睡眠债结算（审计 P3-6）：本步睡了就按睡眠质量还债，醒着就继续欠
+  // 睡眠债结算：本步睡了就按睡眠质量还债，醒着就继续欠
   // ============================================================
   const isNapping = isSleeping && state.napStartTime > 0;
   applySleepDebt(state, profile, hours, isSleeping ? (isNapping ? 'nap' : 'sleep') : 'awake');
@@ -684,7 +681,7 @@ export async function updateBodyByTime(character, hours) {
   }
 
   // ============================================================
-  // ★ 分段推进（审计 S-2）
+  // ★ 分段推进
   // ============================================================
   // 起点取「本角色上次结算时刻」，但不早于本次跨度的起点，避免时间倒流或
   // 与 emotionState 共用 lastUpdate 时把身体多推进一段。
@@ -747,8 +744,8 @@ export function getWakeChance(character, callCount = 1) {
   let base = 0.3;
   if (state.sleepStatus === '浅睡') base *= 1.8;
   else if (state.sleepStatus === '深睡') base *= 0.4;
-  // 审计 P3-9：原「磨到醒」——反复叫从 0.3 爬到 0.7，深睡也几乎会被磨醒。
-  // 改为深睡下 callCount 加成减半，让「深睡难醒」更名副其实，浅睡仍可快速唤醒。
+  // 深睡下 callCount 加成减半，让「深睡难醒」名副其实、浅睡仍可快速唤醒：
+  // 若按统一加成累计，反复呼唤会从 0.3 爬到 0.7，深睡也会被磨醒。
   const callCountBonus = Math.min(callCount, 5) * 0.08;
   base += (state.sleepStatus === '深睡' ? callCountBonus * 0.5 : callCountBonus);
   base *= (1 + extraversion * 0.15);
@@ -847,7 +844,7 @@ export async function handleBodyEvent(character, eventType, intensity = 0.5) {
       break;
   }
 
-  // 事件驱动路径统一 clamp 到 0–100，避免与时间驱动路径不一致导致漂出（审计 P2-12）
+  // 事件驱动路径统一 clamp 到 0–100，避免与时间驱动路径不一致导致漂出
   state.energy = Math.max(0, Math.min(100, state.energy));
   state.health = Math.max(0, Math.min(100, state.health));
 
@@ -963,7 +960,7 @@ export function getBodyDescription(character) {
   parts.push(`精力:${Math.round(state.energy)}`);
   parts.push(`睡意:${Math.round(state.sleepiness)}`);
   parts.push(`健康:${Math.round(state.health)}`);
-  // 审计 P3-6：睡眠债与当日睡眠时长此前从不展示，是「写了从不读」的死字段
+  // 睡眠债与当日睡眠时长必须有展示入口，否则就是「写了从不读」的死字段
   const debtHours = Number.isFinite(state.sleepDebtHours) ? state.sleepDebtHours : 0;
   if (debtHours >= 0.5) parts.push(`睡眠债:${debtHours.toFixed(1)}h`);
   const sleptHours = Number.isFinite(state.totalSleepHours) ? state.totalSleepHours : 0;
@@ -977,7 +974,7 @@ export function getBodyDescription(character) {
     parts.push(`受伤:${injuryDesc}(${Math.round(state.injury.severity)})`);
   }
   if (state.napStartTime > 0) parts.push('午休中');
-  // 审计 P3-6：lastNapDate 写了从不读，现用于「今日已午休」展示
+  // lastNapDate 用于「今日已午休」展示
   else if (state.lastNapDate && state.lastNapDate === getDateKey(getGameDate())) parts.push('今日已午休');
   if (profile.special) {
     const specialLabel = profile.special;
@@ -1030,7 +1027,7 @@ export function buildBodyPrompt(character) {
 
   } else if (state.sleepStatus === '深睡') {
     // ---------- 夜间深睡 ----------
-    // 审计 P3-7 说明：此分支在「单聊」路径不可达（单聊发消息前会 tryWakeUp，
+    // 此分支在「单聊」路径不可达（单聊发消息前会 tryWakeUp，
     // 成功→变浅睡，失败→直接 return 拒绝），但在群聊 / 通话 / 自主对话 / 首消息
     // 等「不经过 tryWakeUp」的路径中可达。保留此分支，勿当作死代码删除。
     let depthHint;
@@ -1232,7 +1229,7 @@ export function buildBodyPrompt(character) {
   prompt += buildSleepDebtPrompt(state, profile);
 
   // ============================================================
-  // 梦境（审计 P3-6：dreamContent 由死字段变为真实消费）
+  // 梦境
   // ============================================================
   if (!isSleeping && state.dreamContent) {
     prompt += `\n\n【刚做的梦】你醒来前正在做一个梦：${state.dreamContent}
@@ -1277,7 +1274,7 @@ export function buildSleepDebtPrompt(state, profile) {
 }
 
 // ============================================================
-// 梦境生成（审计 P3-6：dreamContent 写了从不读 → 睡醒时真实生成并注入）
+// 梦境生成：睡醒时真实生成 dreamContent 并注入
 // ============================================================
 
 /** 每日每角色最多生成一次梦境 */

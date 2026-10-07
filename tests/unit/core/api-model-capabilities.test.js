@@ -1,9 +1,9 @@
 /**
  * js/core/api.js · getModelCapabilities 单元测试。
  *
- * 覆盖审计报告 P2-14 的修复：
- *  - 原硬编码正则只认 o[134] 与 claude-4，漏掉新推理模型 / 带版本号变体 → 发 sampling 参数 → 400
- *  - 现在覆盖 o 系列、deepseek reasoner/r1、qwen/qwq、glm reasoning、gpt-5、claude 3.7+/4 等
+ * 推理模型判定的覆盖范围：
+ *  - 正则只认 o[134] 与 claude-4 的话，会漏掉新推理模型 / 带版本号变体 → 发 sampling 参数 → 400
+ *  - 需覆盖 o 系列、deepseek reasoner/r1、qwen/qwq、glm reasoning、gpt-5、claude 3.7+/4 等
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -17,7 +17,7 @@ vi.mock('../../../js/core/runtimeParams.js', () => ({
 
 import { getModelCapabilities, buildGoogleStreamUrl } from '../../../js/core/api.js';
 
-describe('core/api · getModelCapabilities（审计 P2-14）', () => {
+describe('core/api · getModelCapabilities', () => {
   it('普通模型保留全部采样参数', () => {
     const caps = getModelCapabilities('gpt-4o');
     expect(caps.temperature).toBe(true);
@@ -35,7 +35,7 @@ describe('core/api · getModelCapabilities（审计 P2-14）', () => {
     }
   });
 
-  it('带版本号/日期后缀的 o 系列变体也被识别（审计 P2-14 核心）', () => {
+  it('带版本号/日期后缀的 o 系列变体也被识别', () => {
     const caps = getModelCapabilities('o4-mini-2026-10-01');
     expect(caps.temperature).toBe(false);
     expect(caps.top_p).toBe(false);
@@ -75,7 +75,7 @@ describe('core/api · getModelCapabilities（审计 P2-14）', () => {
     expect(getModelCapabilities('DeepSeek-R1').temperature).toBe(false);
   });
 
-  it('带供应商前缀的模型 id 也能识别（审计 C-2）', () => {
+  it('带供应商前缀的模型 id 也能识别', () => {
     // 回归：分隔符字符类是 [-_.] 不含 '/'，前缀与模型名之间的 '/' 断裂匹配，
     // 导致 openai/o3-mini 这类 id 被当成普通模型 → 发 sampling 参数 → 400。
     expect(getModelCapabilities('openai/o3-mini').temperature).toBe(false);
@@ -84,21 +84,21 @@ describe('core/api · getModelCapabilities（审计 P2-14）', () => {
     expect(getModelCapabilities('deepseek/deepseek-reasoner').temperature).toBe(false);
   });
 
-  it('供应商前缀不影响非推理模型的判定（审计 C-2）', () => {
+  it('供应商前缀不影响非推理模型的判定', () => {
     // 剥离前缀后 qwen-max 仍应保留采样参数，不能因为带了前缀就误判
     expect(getModelCapabilities('openai/gpt-4o').temperature).toBe(true);
     expect(getModelCapabilities('alibaba/qwen-max').temperature).toBe(true);
   });
 
-  it('repetition_penalty 不被推理模型判定禁用（审计 C-3：日志与行为一致）', () => {
-    // 日志已改为逐项列举实际禁用字段，repetition_penalty 由适配器决定是否发送，
+  it('repetition_penalty 不被推理模型判定禁用', () => {
+    // 日志逐项列举实际禁用字段，repetition_penalty 由适配器决定是否发送，
     // 不应被"是否推理模型"一刀切禁用。
     expect(getModelCapabilities('o3').repetition_penalty).toBe(true);
     expect(getModelCapabilities('gpt-4o').repetition_penalty).toBe(true);
   });
 });
 
-describe('core/api · buildGoogleStreamUrl（审计 B-2）', () => {
+describe('core/api · buildGoogleStreamUrl', () => {
   it('标准 generateContent URL 替换为 streamGenerateContent 并补 alt=sse', () => {
     const out = buildGoogleStreamUrl('https://generativelanguage.googleapis.com/v1beta/models/x:generateContent');
     expect(out).toContain(':streamGenerateContent');

@@ -131,7 +131,7 @@ function toColorInputValue(value) {
 
 /**
  * 校验一个值是否为「安全的 CSS 颜色」。
- * 审计 P2-22：导入主题时，任意键值会写入 :root，`url(https://…)` 之类可作追踪信标。
+ * 导入主题的键值会写入 :root，`url(https://…)` 之类可作追踪信标。
  * 这里只接受明确的颜色字面量（hex / rgb / hsl / 命名色），拒绝 url()、表达式等。
  */
 export function isValidColorValue(value) {
@@ -212,7 +212,7 @@ export function openThemeMaker(options = {}) {
 }
 
 function onModalClose() {
-  // 审计 P2-21：关闭时立即中止在途委托（否则 controller 只在「下次打开」时才 abort，
+  // 关闭时立即中止在途委托（否则 controller 只在「下次打开」时才 abort，
   // 取消后委托监听仍活在 #modalContent 上）。
   if (_abortController) {
     try { _abortController.abort(); } catch (_) {}
@@ -893,8 +893,8 @@ function applyEditingThemeToRoot() {
   const baseVars = THEME_PRESETS[_editingTheme.baseTheme]?.variables
     || THEME_PRESETS.light.variables;
 
-  // 用「所有内置主题变量键的并集」清理。此前这里手工列举
-  // light/dark/cyberpunk 三份键，既重复又会漏掉 wechat / wechat-dark，
+  // 用「所有内置主题变量键的并集」清理。手工列举
+  // light/dark/cyberpunk 三份键既重复又会漏掉 wechat / wechat-dark，
   // 导致编辑器预览里残留上一个主题的卡片色与聚焦色。
   const toClear = new Set(getAllThemeVarKeys());
 
@@ -1151,8 +1151,8 @@ export function validateImportedTheme(data) {
   const base = THEME_PRESETS[data.baseTheme] ? data.baseTheme : 'light';
 
   // 构建允许的键名白名单（COLOR_GROUPS 中定义的所有颜色变量）。
-  // 审计 P2-22：此前任意键都会写入 :root，可覆盖任意应用变量；
-  // 现在只接受白名单内的颜色变量，且值必须是合法颜色。
+  // 任意键都写入 :root 就能覆盖任意应用变量，
+  // 因此只接受白名单内的颜色变量，且值必须是合法颜色。
   const allowedKeys = new Set();
   for (const group of COLOR_GROUPS) {
     for (const item of group.items) {

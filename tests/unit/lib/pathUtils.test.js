@@ -1,8 +1,8 @@
 /**
  * lib/pathUtils.js 单测。
  *
- * 审计 P3-5：路径取值此前有两份实现（api-adapter/utils.getByPath 与
- * context-injector-core 的私有 safeGetByPath），现收敛到本模块。
+ * 路径取值收敛到本模块：两份实现（api-adapter/utils.getByPath 与
+ * context-injector-core 的私有 safeGetByPath）会让容错行为漂移。
  * 这里锁定两者共有的调用形式（`a.b.c` / `a[0].b` / `a.b[0].c`）与容错行为。
  */
 import { describe, it, expect } from 'vitest';

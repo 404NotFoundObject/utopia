@@ -1,8 +1,8 @@
 /**
- * 群成员查询去重（审计 P3-5）。
+ * 群成员查询。
  *
- * 原缺陷：getGroupMembers 在 groupChat.js（导出）与 groupChatEngine.js（私有
- * getGroupMembersWithDetails）各有一份逐行相同的实现，补全逻辑修一处漏一处。
+ * getGroupMembers 若在 groupChat.js（导出）与 groupChatEngine.js（私有
+ * getGroupMembersWithDetails）各放一份，补全逻辑就会修一处漏一处。
  * 现统一由 js/modules/groupMembers.js 提供，groupChat.js 保留 re-export 兼容既有调用方。
  *
  * 本测试同时锁定行为与「唯一实现」约束（re-export 必须指向同一个函数对象）。
@@ -14,7 +14,7 @@ import { getGroupMembers as getGroupMembersViaGroupChat } from '../../js/modules
 
 const uniq = () => Math.random().toString(36).slice(2);
 
-describe('modules/groupMembers#getGroupMembers（P3-5 去重）', () => {
+describe('modules/groupMembers#getGroupMembers', () => {
   it('角色成员补 character，用户成员补 user', async () => {
     const stores = await getStores();
     const gid = `g-${uniq()}`;

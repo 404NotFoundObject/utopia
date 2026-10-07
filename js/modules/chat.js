@@ -179,8 +179,8 @@ export async function sendMessage(content) {
     return;
   }
 
-  // 真实发送路径触发 before 钩子（修复审计 P1-5：此前用户发消息不经过 _api 代理，
-  // chat.sendMessage:before 钩子只在插件自身发起的 RPC 时触发）。
+  // 真实发送路径触发 before 钩子：用户发消息不经过 _api 代理时，
+  // chat.sendMessage:before 只在插件自身发起的 RPC 上触发。
   // 插件可改写 content（如敏感词过滤），或返回 { cancelled: true } 中断发送。
   let finalContent = content;
   try {
@@ -325,7 +325,7 @@ export async function sendMessage(content) {
       { skipReload: true }
     );
 
-    // 情感/身体状态更新与受伤检查（审计 P1-6：抽为共享单元，原逻辑不变）
+    // 情感/身体状态更新与受伤检查（抽为共享单元，逻辑不变）
     character = await applyEngineEffects({ character, userMessage: content });
 
     const stores = await getStores();
@@ -425,7 +425,7 @@ export async function sendMessage(content) {
 
     const modelName = settings?.modelName;
 
-    // 朋友圈回流（审计 P2-7）：让角色在聊天时「看到」好友近期的动态与评论
+    // 朋友圈回流：让角色在聊天时「看到」好友近期的动态与评论
     try {
       const socialPrompt = await buildSocialContext(character);
       if (socialPrompt) {

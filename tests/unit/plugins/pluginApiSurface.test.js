@@ -15,11 +15,10 @@ import { getRequiredPermission } from '../../../js/plugins/permissionChecker.js'
  * 于是结论是：**只要从 emotionEngine 导出的函数，就是插件可以调用的公开
  * 契约**，哪怕主应用里一个调用点都没有。
  *
- * 曾经有人（早期审计结论）把 emotion.refreshEmotion 当成「无调用方的死
- * 代码」准备删除，但它对插件是可达的。这里把它钉住。
+ * emotion.refreshEmotion 看似没有调用方，但对插件是可达的。这里把它钉住。
  *
- * 模块装载现已改为惰性（首次访问触发），pluginApi / modules/index 作为任意
- * 入口直接 import 都不会再触发 TDZ（见 pluginApiEntry / modulesIndexEntry 守护）。
+ * 模块装载为惰性（首次访问触发），pluginApi / modules/index 作为任意
+ * 入口直接 import 都不会触发 TDZ（见 pluginApiEntry / modulesIndexEntry 守护）。
  * 本文件只守「导出面 = 契约」这一条结论本身。
  */
 describe('emotionEngine 导出面即插件契约', () => {

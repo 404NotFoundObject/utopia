@@ -202,7 +202,7 @@ registerCommand('print', async (args, context) => {
       }
       if (char.bodyState) {
         lines.push(`⚡ 精力:${Math.round(char.bodyState.energy)} 睡意:${Math.round(char.bodyState.sleepiness)} 健康:${Math.round(char.bodyState.health)}`);
-        // 审计 P3-6：睡眠债与当日睡眠此前无任何展示入口
+        // 睡眠债与当日睡眠必须有展示入口
         const debt = Number(char.bodyState.sleepDebtHours);
         if (Number.isFinite(debt) && debt >= 0.5) {
           lines.push(`😪 睡眠债: ${debt.toFixed(1)}h（今日已睡 ${(Number(char.bodyState.totalSleepHours) || 0).toFixed(1)}h）`);
@@ -812,8 +812,8 @@ registerCommand('inspect', async (args, context) => {
   lines.push('📋 当前生效的注入规则');
   lines.push(`基础规则 (${baseRules.length} 条): ${baseRules.join(', ')}`);
 
-  // 估算基础注入的 token 量（审计 P1-10：基础注入在预算剪裁之后追加，
-  // 不计入 systemBudget，此处单独标注，避免 /inspect 低估真实请求）
+  // 估算基础注入的 token 量（基础注入在预算剪裁之后追加，不计入 systemBudget，
+  // 此处单独标注，避免 /inspect 低估真实请求）
   try {
     const { getBaseRules } = await import('./injector.js');
     const { estimateTokens } = await import('./tokenBudget.js');
@@ -1743,8 +1743,8 @@ registerCommand('call', async (args, context) => {
       consoleType: 'error',
     };
   }
-  // 审计 P3-8：关掉身体引擎后，残留的 sleepStatus 不应再挡住通话；
-  // 且「昏厥」在 bodyState 中记为 consciousness，而非 sleepStatus（原判断是死代码）。
+  // 关掉身体引擎后，残留的 sleepStatus 不应再挡住通话；
+  // 且「昏厥」在 bodyState 中记为 consciousness，而非 sleepStatus。
   const bodyStateEnabled = (state.get('settings')?.engineFlags?.bodyState) !== false;
   const sleepStatus = char.bodyState?.sleepStatus;
   if (bodyStateEnabled && (sleepStatus === '深睡' || sleepStatus === '浅睡')) {

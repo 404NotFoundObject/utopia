@@ -15,7 +15,7 @@ async function getS() {
   return _stores;
 }
 
-// ---------- 持久化调度（P2-5：评论/回复的延时任务不再依赖内存 setTimeout，关标签页可重建） ----------
+// ---------- 持久化调度（评论/回复的延时任务不依赖内存 setTimeout，关标签页可重建） ----------
 const SOCIAL_SCHEDULE_KEY = 'social_schedule';
 
 async function _readSchedule() {
@@ -187,7 +187,7 @@ export async function publishPostByCharacter(character) {
   await stores.posts.add(post);
   console.log('[Social] 帖子已保存:', post.id);
 
-  // 情感回路闭合（审计 B-6）：角色发帖是自主动作，做一次轻微的「主动分享」情感演化。
+  // 情感回路闭合：角色发帖是自主动作，做一次轻微的「主动分享」情感演化。
   // 朋友圈是角色之间的社交（非与用户互动），影响用更低的强度，避免喧宾夺主。
   try {
     const { handleInteraction } = await import('./emotionEngine.js');
@@ -416,10 +416,10 @@ export async function generateCommentsForPost(postId) {
 
     const allCharacters = await stores.characters.getAll();
     let candidates = allCharacters.filter(c => c.id !== post.authorId);
-    // 审计修复：候选为空（例如只有 1 个角色时）直接返回，避免空评论
+    // 候选为空（例如只有 1 个角色时）直接返回，避免空评论
     if (candidates.length === 0) return;
-    // 评论数 1~2 个（旧实现 num=Math.floor(Math.random()*3) 有 1/3 概率为 0，
-    // 导致角色从不对帖子评论）。改为至少 1 个，最多不超过候选数。
+    // 评论数至少 1 个、最多不超过候选数：若取 Math.floor(Math.random()*3)，
+    // 有 1/3 概率得到 0，角色就永远不会评论帖子。
     const num = Math.min(candidates.length, 1 + Math.floor(Math.random() * 2));
     const selected = candidates.sort(() => Math.random() - 0.5).slice(0, num);
 
@@ -607,8 +607,8 @@ export async function checkAutoPost() {
     charCounts.set(p.authorId, (charCounts.get(p.authorId) || 0) + 1);
   }
 
-  // 全局当日总数（跨角色累加），随每次发帖递增。审计 B-4：旧实现用
-  // `totalToday + n`（n 是单角色计数）判断上限，多角色时各自越过 maxPerDay。
+  // 全局当日总数（跨角色累加），随每次发帖递增。
+  // 若用 `totalToday + n`（n 是单角色计数）判断上限，多角色时各自都会越过 maxPerDay。
   let globalToday = totalToday;
 
   for (const char of allCharacters) {

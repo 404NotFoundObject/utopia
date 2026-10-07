@@ -1,8 +1,8 @@
 /**
- * 角色更新串行锁去重（审计 P3-5）。
+ * 角色更新串行锁。
  *
- * 原缺陷：character.js 的 _withCharacterLock 与 db.js 的 withKeyLock 实现逐行相同。
- * 现 updateCharacter 统一复用 withKeyLock('character', id, ...)。
+ * updateCharacter 统一复用 db.js 的 withKeyLock('character', id, ...)：
+ * 锁实现各写一份的话，语义会分叉。
  *
  * 本测试通过并发写入来锁定「串行语义」：若锁被移除或失效，
  * 两个并发的读-改-写会互相覆盖，必然丢失其中一个字段。
@@ -12,7 +12,7 @@ import { getStores } from '../../js/core/db.js';
 import { getAppState } from '../../js/core/state.js';
 import { updateCharacter } from '../../js/modules/character.js';
 
-describe('modules/character#updateCharacter 串行锁（P3-5 去重后仍生效）', () => {
+describe('modules/character#updateCharacter 串行锁', () => {
   it('并发的读-改-写不会互相覆盖（锁有效）', async () => {
     const stores = await getStores();
     const cid = `lock-${Math.random().toString(36).slice(2)}`;

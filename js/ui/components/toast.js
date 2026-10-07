@@ -1,8 +1,8 @@
 // Toast 提示
 import { escapeHtml } from '../../core/utils.js';
 
-// 审计 P2-23：不在模块加载期捕获 DOM（壳重建后旧引用会静默失效），
-// 改为每次调用时惰性获取。
+// 不在模块加载期捕获 DOM（壳重建后旧引用会静默失效），
+// 每次调用时惰性获取。
 function getContainer() {
   return document.getElementById('toastContainer');
 }

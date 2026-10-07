@@ -451,7 +451,7 @@ function getEventImpact(eventType, intensity, factors) {
       base.intimacy = 8 * intensity * (1 + expressiveness * 0.4);
       break;
 
-    // ---------- 主动分享：角色自主发起消息，轻微满足分享欲（审计 B-6） ----------
+    // ---------- 主动分享：角色自主发起消息，轻微满足分享欲 ----------
     // 这是「自主动作」而非「响应用户输入」，影响保持轻微，避免主动发言反过来
     // 大幅改写角色情绪。重点是归属感与愉悦感的微小提升 + 唤醒略降（表达后的放松）。
     case 'proactive_share':

@@ -1,17 +1,16 @@
 /**
  * lib/event-bus/event-bus-core 单元测试：off 语义。
  *
- * 语义沿革：
- *  - P2-25 曾把 off 从「移除首个」改为「移除全部」（filter），用于清理重复注册。
- *  - 审计 C-10 判定该改动是回归：两方共用同一 handler 时，一方 unsubscribe
- *    会把另一方的订阅一起注销（静默失效）。业界标准（Node EventEmitter、
- *    EventTarget.removeEventListener）均为「一次只移除一个」，故回退该变更。
+ * off 的语义是「一次只移除一个」：
+ *  - 若用 filter 移除全部同名回调，两方共用同一 handler 时，一方 unsubscribe
+ *    会把另一方的订阅一起注销（静默失效）。
+ *  - 业界标准（Node EventEmitter、EventTarget.removeEventListener）同样如此。
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createEventBus } from '../../../lib/event-bus/event-bus-core.js';
 
 describe('lib/event-bus/event-bus-core · off', () => {
-  it('两个订阅者共用同一回调引用时，off 只移除首个（审计 C-10）', () => {
+  it('两个订阅者共用同一回调引用时，off 只移除首个', () => {
     const bus = createEventBus();
     const cb = vi.fn();
     bus.on('evt', cb);
@@ -61,7 +60,7 @@ describe('lib/event-bus/event-bus-core · off', () => {
     expect(bus.getEventNames()).not.toContain('evt');
   });
 
-  it('once 触发后只清理自己，不误删同函数的持久订阅（审计 C-10 · 按 ID 解绑）', () => {
+  it('once 触发后只清理自己，不误删同函数的持久订阅', () => {
     const bus = createEventBus();
     const handler = vi.fn();
     bus.on('evt', handler);   // 持久订阅，先注册
@@ -97,7 +96,7 @@ describe('lib/event-bus/event-bus-core · off', () => {
     expect(bus.getSubscribers('evt')).toHaveLength(1);
   });
 
-  it('通配符订阅者能收到粘性重放（审计 C-12）', () => {
+  it('通配符订阅者能收到粘性重放', () => {
     const bus = createEventBus({ historySize: 5 });
     bus.emit('user:login', { id: 1 }); // 先产生历史
     bus.emit('user:logout', { id: 2 });
@@ -111,7 +110,7 @@ describe('lib/event-bus/event-bus-core · off', () => {
     expect(cb.mock.calls[0][1]).toEqual({ id: 2 });
   });
 
-  it('粘性重放回放的是快照，不受发布后外部修改影响（审计 C-13）', () => {
+  it('粘性重放回放的是快照，不受发布后外部修改影响', () => {
     const bus = createEventBus({ historySize: 5 });
     const payload = { id: 1, tags: ['a'] };
     bus.emit('evt', payload);

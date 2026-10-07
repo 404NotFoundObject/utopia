@@ -2,12 +2,11 @@
  * @module ui/screens/settingsUI/sections/about
  * @description 关于 section（版本号展示 + 主动检查更新 + 缓存重载）
  *
- * P3-10 阶段 B：
- *   - 此前版本号只存在于 app.js 内部常量，界面上无处可查，
- *     「用户跑的是哪一版」全靠猜（v3.9.3 反馈「修复没生效」时无法自证）
- *   - 检查更新原先依赖「已加载代码里的 APP_VERSION」，而 Service Worker
+ *   - 版本号必须能在界面上查到，否则「用户跑的是哪一版」只能靠猜，
+ *     排障时无法自证。
+ *   - 检查更新不能依赖「已加载代码里的 APP_VERSION」：Service Worker
  *     对静态资源走 stale-while-revalidate → 长期不关页面就永远探测不到新版本。
- *     这里改为调用 js/core/updateChecker 的独立版本通道 version.json。
+ *     这里调用 js/core/updateChecker 的独立版本通道 version.json。
  */
 
 import {

@@ -226,11 +226,11 @@ export async function createCharacter(data, opts = {}) {
   showToast('角色创建成功', 'success');
 
   const userProvidedProfile = !!(data.bodyProfile || data.emotionProfile);
-  // 审计 C-4：角色卡自带性格参数时不再强制量化。
-  // force 的语义应是「尚未量化，需要补齐」，而非「无论如何都重掷一次」。
+  // 角色卡自带性格参数时不强制量化：force 的语义是「尚未量化，需要补齐」，
+  // 而非「无论如何都重掷一次」。
   const hasProvidedPersonality = !!character.personalityParameters;
-  // ★ 动态 import 本身也可能失败（分块加载失败 / 模块链异常），此前只给内层
-  // 的 autoQuantifyIfNeeded 挂了 catch，import 的拒绝会冒成 unhandledrejection。
+  // ★ 动态 import 本身也可能失败（分块加载失败 / 模块链异常）：只给内层的
+  // autoQuantifyIfNeeded 挂 catch 时，import 的拒绝会冒成 unhandledrejection。
   import('./personality.js').then(({ autoQuantifyIfNeeded }) => {
     autoQuantifyIfNeeded(character, !hasProvidedPersonality, {
       preserveProfiles: userProvidedProfile,
@@ -246,8 +246,7 @@ export async function createCharacter(data, opts = {}) {
 
 // ============================================================
 // updateCharacter（串行队列保护）
-// 审计 P3-5：原 _withCharacterLock 与 db.js 的 withKeyLock 实现逐行相同，
-// 现统一复用 withKeyLock（namespace 'character'）。
+// 统一复用 db.js 的 withKeyLock（namespace 'character'），避免锁实现分叉。
 // ============================================================
 export async function updateCharacter(id, updates, opts = {}) {
   return withKeyLock('character', id, async () => {

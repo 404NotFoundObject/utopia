@@ -37,7 +37,7 @@ export async function loadSettings() {
     if (!settings.emotionPerception || typeof settings.emotionPerception !== 'object') {
       settings.emotionPerception = {
         ...defaults.emotionPerception,
-        // 迁移：旧的独立 LLM 开关并入新配置，避免用户此前的选择被重置
+        // 迁移：独立 LLM 开关并入新配置，避免用户已做出的选择被重置
         useLLMArbiter: settings.useLLMForEmotion === true,
       };
       needUpdate = true;
@@ -113,7 +113,7 @@ export function getDefaultSettings() {
       bodyState: true,
       time: true,
     },
-    // 梦境生成（审计 P3-6）：角色睡醒时用 AI 生成一段梦境写入 dreamContent。
+    // 梦境生成：角色睡醒时用 AI 生成一段梦境写入 dreamContent。
     // 默认关闭——开启后每次睡醒会消耗一次 API 调用。
     dreamGeneration: {
       enabled: false,

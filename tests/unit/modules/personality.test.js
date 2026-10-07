@@ -1,5 +1,5 @@
 /**
- * js/modules/personality 单元测试：autoQuantifyIfNeeded 的重掷保护（审计 C-4）。
+ * js/modules/personality 单元测试：autoQuantifyIfNeeded 的重掷保护。
  *
  * 背景：原生卡导入时自带 personalityParameters，但通常没有 lastQuantifiedAt。
  * 旧逻辑的跳过条件要求「有参数 && 有时间戳 && !force」，创建角色时 force=true，
@@ -42,7 +42,7 @@ function makeCharacter(overrides = {}) {
   };
 }
 
-describe('modules/personality · autoQuantifyIfNeeded（审计 C-4）', () => {
+describe('modules/personality · autoQuantifyIfNeeded', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // quantifyCharacter 重试间隔是 1s，共 3 次；压掉等待避免测试变慢

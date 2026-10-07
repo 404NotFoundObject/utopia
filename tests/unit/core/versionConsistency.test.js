@@ -11,7 +11,7 @@ const read = (rel) => readFileSync(resolve(root, rel), 'utf8');
  *
  * 版本号有四份：运行期真源 appMeta、更新探测通道 version.json（SW 缓存名的来源）、
  * package.json、README 徽章。任一份漏改，表现各不相同却都很隐蔽：
- *   - version.json 没更新 → 客户端永远探测不到新版本（P3-10 的本质问题）
+ *   - version.json 没更新 → 客户端永远探测不到新版本
  *   - appMeta 没更新     → 设置页显示的版本与实际不符，排障时被误导
  * 统一由 scripts/release.mjs 更新，这里防止有人手工改漏。
  */

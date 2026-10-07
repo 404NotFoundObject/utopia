@@ -1,7 +1,7 @@
 // js/modules/chatContext.js - 共享聊天上下文构建层
 //
-// 审计 P1-6 修复：此前「单聊 / 群聊 / 通话 / 自主对话」四处各自重建提示词管线，
-// 导致世界书预算、applyInjection、降级方案四处逐字重复，且情感/身体状态只在单聊闭环。
+// 「单聊 / 群聊 / 通话 / 自主对话」四条提示词管线若各自重建，世界书预算、
+// applyInjection、降级方案就会四处逐字重复，且情感/身体状态只在单聊闭环。
 // 本模块抽取三条共享路径，作为后续所有同类分叉的孵化器：
 //
 //   1. buildChatContext   —— 统一 context 对象（角色/情感/身体/用户/时间上下文）
@@ -26,7 +26,7 @@ import {
 
 /**
  * 构建统一的注入上下文对象。
- * 各处管线原先手工拼接的 character/emotionState/bodyState/user/conversation/time 字段在此归一。
+ * character/emotionState/bodyState/user/conversation/time 字段在此归一，各管线不再手工拼接。
  *
  * @param {object} opts
  * @param {object} opts.character  当前角色（含 emotionState/bodyState）
@@ -55,7 +55,7 @@ export function buildChatContext({ character, userMessage = '', conversation = n
 }
 
 /**
- * 计算世界书预算与系统预算覆盖量。四处管线原先逐字重复的计算在此归一。
+ * 计算世界书预算与系统预算覆盖量：四处管线逐字重复的计算在此归一。
  *
  * @param {string} modelName
  * @param {object} settings
@@ -163,9 +163,9 @@ export async function buildFinalMessages({
 }
 
 /**
- * 情感/身体状态更新（审计 P1-6 核心修复）。
- * 原逻辑只在 chat.js 单聊路径执行；通话、自主对话、群聊、朋友圈均只读取不更新，
- * 导致角色在其它交互路径上的情感完全不动。此函数把这段更新抽为可复用单元。
+ * 情感/身体状态更新。
+ * 这段更新若只在单聊路径执行，通话、自主对话、群聊、朋友圈就都只读取不更新，
+ * 角色在其它交互路径上的情感完全不动。此函数把它抽为可复用单元。
  *
  * @param {object} opts
  * @param {object} opts.character  角色对象（会被重新从 state 刷新）
@@ -240,8 +240,8 @@ export async function applyEngineEffects({
 export { systemMsg, PRIORITY, formatBudgetReport } from './tokenBudget.js';
 
 /**
- * 朋友圈回流（审计 P2-7）：构建「朋友圈动态」系统提示，让角色在聊天时能看到好友近期的动态与评论。
- * 原实现无任何代码读取 posts store，AI 社交是单向的（角色 A 发帖、B 评论，但 A 看不到 B 的评论）。
+ * 朋友圈回流：构建「朋友圈动态」系统提示，让角色在聊天时能看到好友近期的动态与评论。
+ * 不读取 posts store 的话，AI 社交是单向的（角色 A 发帖、B 评论，但 A 看不到 B 的评论）。
  *
  * 规则：
  *  - 只取最近 24 小时（游戏时间）内的动态

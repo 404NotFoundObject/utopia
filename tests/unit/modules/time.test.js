@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeSegmentedAdvance } from '../../../js/modules/time.js';
 
-describe('modules/time#computeSegmentedAdvance（审计 P2-13 分段倍速积分）', () => {
+describe('modules/time#computeSegmentedAdvance', () => {
   const HOUR = 60 * 60 * 1000;
 
   it('无速度变更时，等于 时长 × 当前速度', () => {

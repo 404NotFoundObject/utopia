@@ -50,7 +50,7 @@ const subscribedEvents = new Map();
 const eventUnsubscribers = new Map();
 
 // 事件广播器：由 pluginRuntime 注入，用于把主线程 emit 的事件回传给 Worker。
-// 修复审计 P1-4：Worker 的 api.events.on 订阅后，此前全链路无任何代码向 Worker post event:emit。
+// Worker 的 api.events.on 订阅后，必须有代码向 Worker post event:emit。
 //
 // 注意：必须用 var 而非 let/const。pluginApi 经
 // pluginApi → modules/index → chat → chatUI → uiBridge → pluginRuntime → pluginApi
@@ -261,7 +261,7 @@ const _api = {
 // ============================================================
 // 惰性执行：模块求值期（pluginApi 经 chat→chatUI→uiBridge→pluginRuntime 成环
 // 被嵌套求值时），直接遍历 ModulesIndex 会命中"尚未求值完成的模块命名空间"，
-// 在部分构建/测试环境下抛 Object.keys(undefined)。改为首次访问时再装载——
+// 在部分构建/测试环境下抛 Object.keys(undefined)。首次访问时再装载——
 // 此时应用早已启动完成、所有模块就绪，API 形态与运行时行为完全不变。
 
 let modulesLoaded = false;

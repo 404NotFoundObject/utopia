@@ -113,11 +113,11 @@ export async function extractJSONFromPNG(pngBlob) {
 /**
  * 从 PNG 的 tEXt 块提取 JSON 字符串。
  *
- * ★ 全项目唯一实现（审计 A-1 / S-3）：此前 js/utils/png.js 与
- * js/modules/characterAdapter.js 各维护一份 tEXt 扫描与载荷解码，且已经漂移——
+ * ★ 全项目唯一实现：tEXt 扫描与载荷解码若在 js/utils/png.js 与
+ * js/modules/characterAdapter.js 各维护一份，关键字覆盖就会漂移——
  * 前者只认 `chara\0` / `chara ` 两种前缀，后者还认 `chara` 直连载荷与裸 JSON。
  * 应用实际导入走的是 characterAdapter 那份，于是「改了一边、另一边没跟上」
- * 的漂移只会体现在测试里，问题被掩盖。现在两份合并成这一份，两边都调用它。
+ * 的漂移只会体现在测试里，问题被掩盖。两份合并成这一份，两边都调用它。
  *
  * @param {ArrayBuffer} buffer
  * @returns {string|null} JSON 字符串，或 null

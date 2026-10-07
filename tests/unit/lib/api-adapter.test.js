@@ -1,7 +1,7 @@
 /**
  * lib/api-adapter 单元测试：SSE CRLF 解析、响应方向归一、safeJsonParse。
  *
- * 覆盖审计报告 P0-2 / P0-6 / P2-11 的修复：
+ * 覆盖 SSE 解析与响应归一的边界：
  *  - sse-parser 剥离行尾 CR，避免 data 值残留 \r 导致 JSON.parse 失败
  *  - google/cohere 适配器 transformResponse 把 candidates/text 归一为顶层 choices
  *  - safeJsonParse 字符串解析失败时返回 fallback（而非 __parse_error 对象）
@@ -40,7 +40,7 @@ describe('lib/api-adapter/sse-parser', () => {
     expect(JSON.parse(events[0].data)).toEqual({ a: 1 });
   });
 
-  it('两个 CRLF 分隔的事件分别产出 2 条（审计 B-1：边界分发而非 EOF 倾倒）', async () => {
+  it('两个 CRLF 分隔的事件分别产出 2 条', async () => {
     // 关键：必须两个事件都在流中间用空行分隔，而非依赖流结束时的兜底 flush
     const events = await collect(bytesOf('data: {"a":1}\r\n\r\ndata: {"b":2}\r\n\r\n'));
     expect(events).toHaveLength(2);
@@ -92,7 +92,7 @@ describe('lib/api-adapter/adapters · 非流式响应归一', () => {
     expect(std.choices[0].message.content).toBe('你好');
   });
 
-  it('cohere v2 非流式响应 message.content[0].text 提升为 choices（审计 B-3）', () => {
+  it('cohere v2 非流式响应 message.content[0].text 提升为 choices', () => {
     const adapter = createAdapter(cohereConfig);
     const vendorResp = {
       message: { content: [{ type: 'text', text: '你好' }] },
@@ -104,7 +104,7 @@ describe('lib/api-adapter/adapters · 非流式响应归一', () => {
     expect(std.text).toBeUndefined();
   });
 
-  it('cohere v2 请求体为单一 messages 数组（审计 B-3：不再产出 preamble/chat_history）', () => {
+  it('cohere v2 请求体为单一 messages 数组', () => {
     const adapter = createAdapter(cohereConfig);
     const req = adapter.adaptRequest({
       model: 'command-r-plus',
@@ -145,7 +145,7 @@ describe('lib/api-adapter/adapters · 非流式响应归一', () => {
     expect(chunk.choices[0].delta.content).toBe('你好');
   });
 
-  it('cohere v2 命名事件 content-delta 映射为 delta（审计 P2-17）', () => {
+  it('cohere v2 命名事件 content-delta 映射为 delta', () => {
     const adapter = createAdapter(cohereConfig);
     const chunk = adapter.adaptStreamChunk(
       { type: 'content-delta', delta: { message: { content: { text: '你好' } } } },

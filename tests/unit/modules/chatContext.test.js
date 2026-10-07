@@ -47,7 +47,7 @@ describe('modules/chatContext · 世界书预算计算', () => {
   });
 });
 
-describe('modules/chatContext · 朋友圈回流 (P2-7)', () => {
+describe('modules/chatContext · 朋友圈回流', () => {
   const NOW = 1700000000000;
 
   beforeEach(() => {

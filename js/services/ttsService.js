@@ -2,7 +2,6 @@
 // 增强版：添加重试机制、音色分组、有效性检查
 
 import { getAppState } from '../core/state.js';
-// 审计 P3-6：showToast 原在此 import 但从未使用，已移除。
 
 // ---------- 配置 ----------
 const TTS_MAX_RETRIES = 3;
@@ -17,9 +16,8 @@ let currentUtterance = null;
 let currentAudioContext = null;
 let currentAudioSource = null;
 let isPlaying = false;
-// 审计 P3-6：onEndCallbacks 原为死变量（仅声明、从未 push/读取），已移除。
 
-// 审计 P2-3：追踪在途的 Kokoro fetch 与 Web Speech 重试 timer，
+// 追踪在途的 Kokoro fetch 与 Web Speech 重试 timer，
 // 使 stop() 能真正取消尚未完成的合成/重试，而非等它返回后再播放。
 let kokoroAbortController = null;
 let webSpeechRetryTimer = null;
@@ -170,7 +168,7 @@ function getTTSConfig(character) {
     const provider = ttsSettings.provider || 'web-speech';
     const kokoroUrl = ttsSettings.kokoroUrl || 'http://localhost:8880/v1/audio/speech';
     const kokoroModel = ttsSettings.kokoroModel || 'kokoro-v0.19';
-    // 审计 P2-4：此前 getTTSConfig 漏返回 kokoroApiKey，导致 Authorization 头从不发送
+    // kokoroApiKey 必须由 getTTSConfig 一并返回，否则 Authorization 头不会发送
     const kokoroApiKey = ttsSettings.kokoroApiKey || '';
 
     return { voice, speed, pitch, provider, kokoroUrl, kokoroModel, kokoroApiKey };
@@ -199,7 +197,7 @@ function speakWithWebSpeech(text, config, options) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const trySpeak = () => {
-            // 已被 stop() 取消，不再发声（审计 P2-3）
+            // 已被 stop() 取消，不再发声
             if (stopped) return;
 
             if (!window.speechSynthesis) {
@@ -263,7 +261,7 @@ function speakWithWebSpeech(text, config, options) {
                     attempts++;
                     const delay = TTS_RETRY_DELAY_BASE * Math.pow(2, attempts - 1);
                     console.warn(`[TTS] 错误 "${e.error}"，${delay}ms 后重试 (${attempts}/${TTS_MAX_RETRIES})`);
-                    // 追踪重试 timer，使 stop() 能取消（审计 P2-3）
+                    // 追踪重试 timer，使 stop() 能取消
                     webSpeechRetryTimer = setTimeout(() => {
                         webSpeechRetryTimer = null;
                         if (!stopped) trySpeak();
@@ -304,7 +302,7 @@ function speakWithWebSpeech(text, config, options) {
 
 // ---------- 2.2 Kokoro API ----------
 async function speakWithKokoro(text, config, options) {
-    // 审计 P2-3：为在途 fetch 挂 AbortController，使 stop() 能取消尚未完成的合成
+    // 为在途 fetch 挂 AbortController，使 stop() 能取消尚未完成的合成
     kokoroAbortController = new AbortController();
 
     try {
@@ -324,7 +322,7 @@ async function speakWithKokoro(text, config, options) {
             signal: kokoroAbortController.signal,
         });
 
-        // 已被 stop() 取消，丢弃结果（审计 P2-3）
+        // 已被 stop() 取消，丢弃结果
         if (stopped) return;
 
         if (!response.ok) {
@@ -383,7 +381,7 @@ async function speakWithKokoro(text, config, options) {
         });
 
     } catch (error) {
-        // stop() 触发的 abort 不降级、不报错（审计 P2-3）
+        // stop() 触发的 abort 不降级、不报错
         if (error.name === 'AbortError' || stopped) {
             return;
         }
@@ -404,13 +402,13 @@ async function speakWithKokoro(text, config, options) {
 export function stop() {
     stopped = true;
 
-    // 取消在途的 Kokoro fetch（审计 P2-3）
+    // 取消在途的 Kokoro fetch
     if (kokoroAbortController) {
         try { kokoroAbortController.abort(); } catch (_) {}
         kokoroAbortController = null;
     }
 
-    // 取消 Web Speech 的待执行重试 timer（审计 P2-3）
+    // 取消 Web Speech 的待执行重试 timer
     if (webSpeechRetryTimer) {
         clearTimeout(webSpeechRetryTimer);
         webSpeechRetryTimer = null;

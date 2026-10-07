@@ -18,7 +18,7 @@
 // - .wx-social-cover  朋友圈封面（仅微信主题注入；移动端全屏页面 /
 //                     PC 悬浮窗共用）：背景图（可上传，localStorage
 //                     持久化）、右下角用户头像与昵称；
-//                     动态列表 / 发布 / 评论逻辑复用 socialUI.js 原实现。
+//                     动态列表 / 发布 / 评论逻辑复用 socialUI.js 的实现。
 //
 // 边界：
 // - 不改动 sidebar.js 的抽屉与按钮重建逻辑：非微信主题下一切照旧；
@@ -410,7 +410,7 @@ export function ensureSocialCover() {
 
     const uploadInput = topbar.querySelector('.wx-cover-upload-input');
     // 与微信一致：相机按钮 = 发表动态。转发给发布按钮（微信主题下该按钮
-    // 隐藏但监听仍在），发布框开合逻辑完全复用 socialUI.js 原实现。
+    // 隐藏但监听仍在），发布框开合逻辑完全复用 socialUI.js 的实现。
     topbar.querySelector('.wx-cover-camera').addEventListener('click', () => {
       document.getElementById('socialTogglePublishBtn')?.click();
     });
@@ -515,7 +515,7 @@ export function ensureInjectedNodes() {
 // 皮肤生命周期
 //
 // 注入节点、MutationObserver、state 订阅与 DOM 监听器都是「只在微信主题下
-// 才需要」的副作用。此前用一次性布尔守卫装配，装配后永不卸载：切到别的
+// 才需要」的副作用。用一次性布尔守卫装配的话，装配后永不卸载：切到别的
 // 主题时这些节点（被 css/wechat.css 全局 display:none 兜住，看不见）连同
 // 监听器与 observer 一起滞留到会话结束。
 //
@@ -560,7 +560,7 @@ function removeInjectedNodes() {
  * 按需加载皮肤样式表：wechat.css 不在 index.html 常驻（非微信主题下
  * 几十 KB 规则全程参与 CSSOM 匹配），激活时注入、停用时移除。
  * 插入点必须在 titlebar.css 之前——窗口装饰器样式表依赖加载顺序
- * 覆盖 wechat 的变量（原先由 index.html 的静态顺序保证）。
+ * 覆盖 wechat 的变量。
  *
  * @returns {Promise<void>} 样式表加载完成（或失败，失败不阻塞装配）
  */
@@ -731,7 +731,7 @@ let initialized = false;
  */
 /**
  * 常驻调度器：主题切换事件 → 皮肤 activate / deactivate。
- * 刻意不随皮肤回收（切走后还要能切回来）。
+ * 不随皮肤回收（切走后还要能切回来）。
  *
  * @returns {Promise<void>} 若启动时已处于微信主题，resolve 于皮肤完全
  *   就绪（样式表加载完成、注入节点装配完毕）；否则立即 resolve。

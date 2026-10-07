@@ -11,9 +11,9 @@ import {
 /**
  * 统一心跳的到期判定与后台补偿。
  *
- * 原先三条 setInterval 在 `document.hidden` 时 return 却**不顺延**，切回
+ * 三条独立 setInterval 若在 `document.hidden` 时 return 却**不顺延**，切回
  * 前台要等满一个周期才恢复执行（character 滞后 60s、social 滞后 600s）。
- * 这里锁住「后台只走时间、回前台立刻补跑」这条新语义。
+ * 这里锁住「后台只走时间、回前台立刻补跑」这条语义。
  */
 describe('worldTick 统一心跳', () => {
   beforeEach(() => {

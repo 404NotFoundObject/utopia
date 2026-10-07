@@ -1,8 +1,8 @@
 /**
  * js/core/vectorMath.js 单测。
  *
- * 审计 P3-5：余弦相似度此前在 conversationState / memory / worldBook 各有一份，
- * 现收敛为唯一实现。这里锁定其边界行为，防止后续改动破坏任一调用方的语义。
+ * 余弦相似度收敛为唯一实现（分散在各调用方时判定口径会漂移）。
+ * 这里锁定其边界行为，防止后续改动破坏任一调用方的语义。
  */
 import { describe, it, expect, vi } from 'vitest';
 import { cosineSimilarity } from '../../../js/core/vectorMath.js';

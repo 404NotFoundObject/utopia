@@ -60,7 +60,7 @@ describe('characterAdapter · ST v2 信封转换', () => {
   });
 });
 
-describe('characterAdapter · 往返保真（P1-7）', () => {
+describe('characterAdapter · 往返保真', () => {
   it('ST v3 导入 → 导出 → 再导入不丢 character_book 与 alternate_greetings', () => {
     const card = {
       spec: 'chara_card_v3',
@@ -114,9 +114,9 @@ describe('characterAdapter · PNG 端到端解码（A-1）', () => {
   });
 });
 
-describe('characterAdapter · 文本字段类型守卫（审计 C-5）', () => {
+describe('characterAdapter · 文本字段类型守卫', () => {
   it('原生 Utopia 格式的对象型 personality 不再变成 [object Object]', () => {
-    // 回归：utopia-v3 分支此前 `return data` 零守卫，对象字段原样透传
+    // utopia-v3 分支若 `return data` 零守卫，对象字段会原样透传
     const out = convertToUtopia({
       schema: 'utopia-character/v3.1',
       name: '小兰',

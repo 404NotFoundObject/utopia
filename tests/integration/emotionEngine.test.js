@@ -438,7 +438,7 @@ describe('modules/emotionEngine · 集成', () => {
       await expect(handleInteraction(char, 'not-an-event', 0.5)).resolves.toBeUndefined();
     });
 
-    it('proactive_share 轻微提升愉悦与归属，量级弱于 praise（审计 B-6）', async () => {
+    it('proactive_share 轻微提升愉悦与归属，量级弱于 praise', async () => {
       const byShare = await seedCharacter();
       const shareBefore = byShare.emotionState.valence;
       const shareBelongingBefore = byShare.emotionState.needs.belonging;

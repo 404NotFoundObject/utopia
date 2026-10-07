@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { calculateActiveLevel } from '../../../js/modules/groupActivity.js';
 
-describe('modules/groupActivity#calculateActiveLevel（审计 P3-5 去重共享）', () => {
+describe('modules/groupActivity#calculateActiveLevel', () => {
   const MIN = 60 * 1000;
   // 未初始化 time 模块时，getGameTime() 回退为 Date.now()，
   // 因此这里直接用真实时间戳构造成员的 lastActiveAt（游戏时间域在未推进时 ≈ 真实时间）。

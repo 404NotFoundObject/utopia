@@ -3,10 +3,11 @@ import { describe, test, expect } from 'vitest';
 /**
  * 入口健壮性：以 modules/index.js 为顶层入口直接 import 不得抛错。
  *
- * 历史缺陷（已修）：以 modules/index 为入口时，pluginApi 的自动装载循环在 chat.js
+ * 以 modules/index 为入口时，pluginApi 的自动装载循环若在 chat.js
  * 仍在求值时执行 Object.entries(ModulesIndex)，未完成模块的命名空间为 undefined，
- * 抛 `TypeError: Cannot convert undefined or null to object`。修复：模块装载改为惰性
- * （首次访问触发，此时所有模块已就绪），并对未就绪命名空间做防御跳过。
+ * 会抛 `TypeError: Cannot convert undefined or null to object`。
+ * 因此模块装载为惰性（首次访问触发，此时所有模块已就绪），
+ * 并对未就绪命名空间做防御跳过。
  */
 describe('modules/index 作为顶层入口', () => {
   test('直接 import 不抛错，且经 pluginApi 惰性装载后 API 面完整', async () => {

@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * 守住三个曾在实机反馈中出问题的行为：
  *   1. 用户回复角色评论后，「回复对象名称」必须出现在回复行（A 回复 B: 内容）
  *   2. 回复必须真正落库，并带上 replyToAuthorType / replyToAuthorId
- *   3. 必须调度角色接话任务（此前 hasCharacterReply 守卫会把后续接话全部掐断，
+ *   3. 必须调度角色接话任务（hasCharacterReply 守卫若把后续接话全部掐断，
  *      表现为「角色只肯回一次」）
  *
  * 数据直接注入 IndexedDB，绕过 AI 生成（评论由角色发起需要真实 API），

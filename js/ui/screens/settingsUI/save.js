@@ -80,7 +80,7 @@ async function handleSave(modalContent, ctx) {
   const engineEmotion = q('#settingsEngineEmotion')?.checked ?? true;
   const engineBody = q('#settingsEngineBody')?.checked ?? true;
   const engineTime = q('#settingsEngineTime')?.checked ?? true;
-  // 审计 P3-6：梦境生成开关（默认关闭）
+  // 梦境生成开关（默认关闭）
   const dreamGenerationEnabled = q('#settingsDreamGeneration')?.checked ?? false;
 
   // ---- 情绪识别 ----

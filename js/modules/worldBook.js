@@ -633,7 +633,7 @@ export async function getEnabledRules(context = null) {
 
   // 组级语义展开：把「规则组」的互斥 / 动态链 / 父子关系映射到组内规则，
   // 复用注入器既有的规则级 exclusiveGroup + activateRules/deactivateRules 机制，
-  // 使组级承诺（互斥组、规则链）真正生效（审计 P1-2）。
+  // 使组级承诺（互斥组、规则链）真正生效。
   return expandGroupSemantics(enabled, groups);
 }
 

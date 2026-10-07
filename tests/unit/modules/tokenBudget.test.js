@@ -244,7 +244,7 @@ describe('modules/tokenBudget', () => {
       expect(result).not.toContain('[3]');
     });
 
-    it('条目跨多行时不被切一半（审计 C-6）', () => {
+    it('条目跨多行时不被切一半', () => {
       const text = `${header}\n${entry(1)}\n${entry(2)}\n${entry(3)}`;
       // 预算：头部 + 条目 1 完整（问+答），再加条目 2 的「问」行——
       // 刚好容不下条目 2 的「答」行。

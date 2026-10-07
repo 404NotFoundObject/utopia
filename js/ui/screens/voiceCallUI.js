@@ -474,7 +474,7 @@ async function startListeningLoop(call) {
     console.log('[通话] 通话已结束，停止监听循环');
     return;
   }
-  // 浏览器不支持语音识别时直接停止，避免 onError 无限重启（审计 P2-2）
+  // 浏览器不支持语音识别时直接停止，避免 onError 无限重启
   if (!isSpeechSupported) {
     console.warn('[通话] 浏览器不支持语音识别，停止监听循环');
     updateCallStatus(call, CALL_STATE.PROCESSING, '⚠️ 当前浏览器不支持语音识别');
@@ -623,7 +623,7 @@ async function processUserMessage(call) {
     const stores = await getStores();
     const conv = await stores.conversations.get(convId);
 
-    // 情感/身体状态更新（审计 P1-6：通话此前只读取不更新情感，这里补上闭环）
+    // 情感/身体状态更新（通话同样要更新情感，这里补上闭环）
     try {
       character = await applyEngineEffects({ character, userMessage: call.userMessage });
     } catch (e) {
@@ -666,7 +666,7 @@ async function processUserMessage(call) {
       systemMessages.push(systemMsg(memoryContext.join('\n\n'), 'memory', PRIORITY.MEMORY));
     }
 
-    // 朋友圈回流（审计 B-5）：通话角色同样应能「看到」好友动态与评论
+    // 朋友圈回流：通话角色同样应能「看到」好友动态与评论
     try {
       const socialPrompt = await buildSocialContext(character);
       if (socialPrompt) {

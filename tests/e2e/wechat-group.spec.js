@@ -10,7 +10,7 @@ import { waitForWxStylesheet } from './helpers/wx-theme-ready.js';
  *    尾巴抬至头像中部，用户短消息不被压瘪
  * 3. 群名不带前缀图标
  * 4. 群聊对话页可被返回手势 / 返回键退回列表层，且能再次进入
- *    （此前「返回后再点同一个群无反应」）
+ *    （返回后再点同一个群同样要能进入）
  *
  * 主题经 localStorage 预置；数据用应用自身的模块造（与 wechat-theme.spec.js
  * 同一套路），不走 UI 创建流程。
@@ -70,7 +70,7 @@ test.describe('微信主题 · 移动端群聊', () => {
     await openWithTheme(page, 'wechat');
 
     const { groupId } = await seedGroup(page, '布局验证群');
-    // 用户短消息：此前容器为内容自适应宽度 + 40px 缩进，短消息会被压成一字一行
+    // 用户短消息：容器为内容自适应宽度 + 40px 缩进时，短消息会被压成一字一行
     await page.evaluate(async (gid) => {
       const { getStores } = await import('/js/core/db.js');
       const stores = await getStores();
@@ -92,7 +92,7 @@ test.describe('微信主题 · 移动端群聊', () => {
 
     await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'chat');
 
-    // 群名不带任何前缀图标（原为「👥 群名」）
+    // 群名不带任何前缀图标
     await expect(page.locator('#charName')).toHaveText('布局验证群');
 
     const layout = await page.evaluate(() => {
@@ -127,12 +127,12 @@ test.describe('微信主题 · 移动端群聊', () => {
     expect(layout.bubbleBox.left).toBeGreaterThanOrEqual(Math.round(layout.avatarBox.right));
     // 气泡与昵称同列（左缘对齐）
     expect(Math.abs(layout.bubbleBox.left - layout.nameBox.left)).toBeLessThanOrEqual(1);
-    // 尾巴贴在气泡顶边、随之抬到头像中部（此前单独上移会让尾巴脱离气泡边缘）
+    // 尾巴贴在气泡顶边、随之抬到头像中部（单独上移会让尾巴脱离气泡边缘）
     expect(layout.tailTop).toBe('0px');
-    // 气泡紧贴昵称下方：间距不超过 4px（此前昵称独占一行且气泡下沉很远）
+    // 气泡紧贴昵称下方：间距不超过 4px（昵称独占一行时气泡会下沉很远）
     expect(Math.round(layout.bubbleBox.top - layout.nameBox.bottom)).toBeLessThanOrEqual(2);
     // 用户短消息保持单行、内容自适应宽：不被百分比 max-width 压瘪
-    // （此前「怎么了」一字一行）。单行实测约 36px 高；2 行即 56px+。
+    // （例如「怎么了」被压成一字一行）。单行实测约 36px 高；2 行即 56px+。
     expect(layout.ownBubble).not.toBeNull();
     expect(layout.ownBubble.width).toBeGreaterThanOrEqual(60);
     expect(layout.ownBubble.height).toBeLessThan(45);
@@ -156,7 +156,7 @@ test.describe('微信主题 · 移动端群聊', () => {
     await page.waitForTimeout(300);
     await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'list');
 
-    // 再次点同一个群：此前因 state 同值不通知订阅而「点了没反应」
+    // 再次点同一个群：state 同值若不通知订阅，就会「点了没反应」
     await page.locator(`.group-item[data-id="${groupId}"]`).click();
     await page.waitForTimeout(400);
     await expect(page.locator('body')).toHaveAttribute('data-wx-mobile-view', 'chat');
@@ -202,7 +202,7 @@ test.describe('微信主题 · 移动端群聊', () => {
   });
 
   test('顶栏名称居中、无关系行；浅/深色尾巴都存在', async ({ page }) => {
-    // 深色主题一并验证：此前尾巴的形状声明只写在 wechat 下，
+    // 深色主题一并验证：形状声明若只写在 wechat 下，
     // 深色只覆盖颜色（缺 content），伪元素不存在、尾巴整条消失
     await openWithTheme(page, 'wechat-dark');
 

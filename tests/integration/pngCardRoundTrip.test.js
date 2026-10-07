@@ -1,14 +1,14 @@
 /**
- * PNG 角色卡端到端往返（审计 S-3）。
+ * PNG 角色卡端到端往返。
  *
- * 此前 PNG 相关测试全部建立在「手搓夹具」上：fixtures.js 自己拼 tEXt 块字节，
- * 直接喂给 extractTextChunk / extractJSONFromPNG。这条链路绕开了应用真正走的
- * 路径——写入端是 png.js 的 embedJSONToPNG，读取端是 characterAdapter 的
- * parsePNG（FileReader → extractTextChunk → JSON.parse）。两边各有一份解码实现
- * 且已经漂移，而夹具测试恰好把它们分别覆盖，漂移因此长期无人发现。
+ * 只用手搓夹具（fixtures.js 自己拼 tEXt 块字节，直接喂给 extractTextChunk /
+ * extractJSONFromPNG）会绕开应用真正走的路径——写入端是 png.js 的 embedJSONToPNG，
+ * 读取端是 characterAdapter 的 parsePNG（FileReader → extractTextChunk →
+ * JSON.parse）。两边若各有一份解码实现且已漂移，夹具测试恰好把它们分别覆盖，
+ * 漂移就长期无人发现。
  *
- * 本文件改为：真实写入 → 真实读取 → 真实格式识别 → 真实转换 → 真实落库，
- * 全程不碰手搓的 tEXt 字节。
+ * 因此这里全程走真实链路：真实写入 → 真实读取 → 真实格式识别 → 真实转换 →
+ * 真实落库，不碰手搓的 tEXt 字节。
  */
 import { describe, it, expect } from 'vitest';
 import { embedJSONToPNG, extractJSONFromPNG, extractTextChunk } from '../../js/utils/png.js';

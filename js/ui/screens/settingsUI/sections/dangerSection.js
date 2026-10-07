@@ -2,12 +2,12 @@
  * @module ui/screens/settingsUI/sections/danger
  * @description 危险操作 section（使用指南 + 数据备份导出/导入 + 重置所有数据）
  *
- * 审计 C-8：备份原先「写得出、导不回」——
- *   1. 漏掉 lastMode / lastCharacterId / lastGroupId（这三个键不以 utopia 开头，被前缀过滤漏掉）
- *   2. 漏掉插件 VFS 库（插件记录、插件文件、插件 KV）
- *   3. 无版本头，无法校验备份文件是否可用
- *   4. 完全没有恢复路径
- * 现补齐上述四项：备份带版本头并覆盖插件库，同时提供导入恢复。
+ * 备份必须避免「写得出、导不回」——
+ *   1. lastMode / lastCharacterId / lastGroupId 不以 utopia 开头，会被前缀过滤漏掉
+ *   2. 插件 VFS 库（插件记录、插件文件、插件 KV）容易被漏掉
+ *   3. 无版本头就无法校验备份文件是否可用
+ *   4. 没有恢复路径的备份等于没有备份
+ * 因此备份带版本头并覆盖插件库，同时提供导入恢复。
  */
 
 import { deleteDatabase, getStores } from '../../../../core/db.js';
@@ -35,7 +35,7 @@ const KNOWN_CLEANUP_KEYS = [
   'utopia:custom-themes',
   'utopia:dev-monitor',
   'utopia:wx-social-cover',
-  'utopia:pending-call-end', // 审计 C-7：通话未正常结束的挂起标记，原先漏清理
+  'utopia:pending-call-end', // 通话未正常结束的挂起标记
 ];
 
 // ============================================================
@@ -110,14 +110,14 @@ export async function collectBackupData() {
     const key = localStorage.key(i);
     if (key && key.startsWith('utopia')) dump.localStorage[key] = localStorage.getItem(key);
   }
-  // 审计 C-8：这三个键不以 utopia 开头，前缀过滤取不到，必须显式补上
+  // 这三个键不以 utopia 开头，前缀过滤取不到，必须显式补上
   for (const key of APP_STATE_KEYS) {
     const value = localStorage.getItem(key);
     if (value !== null) dump.localStorage[key] = value;
   }
 
   // ---------- 插件 VFS 库 ----------
-  // 审计 C-8：原备份完全没有插件库，恢复后插件会全部丢失
+  // 原备份完全没有插件库，恢复后插件会全部丢失
   try {
     const pluginRecords = await getAllPlugins();
     for (const record of pluginRecords) {
@@ -283,7 +283,7 @@ export function bindDangerSection(modalContent, ctx) {
     });
   }
 
-  // ---------- 导入恢复（审计 C-8：原先完全没有恢复路径） ----------
+  // ---------- 导入恢复 ----------
   const importBtn = modalContent.querySelector('#importBackupBtn');
   const fileInput = modalContent.querySelector('#importBackupFile');
   if (importBtn && fileInput) {
@@ -342,7 +342,7 @@ export function bindDangerSection(modalContent, ctx) {
         results.push('插件库：❌ 删除失败（可能残留插件数据）');
       }
 
-      // ---------- localStorage 清理（审计 C-7） ----------
+      // ---------- localStorage 清理 ----------
       // 先收集再删除：删除过程中 localStorage.length 会变化，边遍历边删会漏项
       const keysToRemove = new Set([...KNOWN_CLEANUP_KEYS, ...APP_STATE_KEYS]);
       for (let i = 0; i < localStorage.length; i++) {

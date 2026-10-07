@@ -99,7 +99,7 @@ export const PRIORITY = {
   WORLDBOOK: 50,
   MEMORY: 45,
   EXAMPLES: 40,
-  // 朋友圈回流：比记忆更低，预算紧张时最先被裁剪（审计 B-5：不再与长期记忆抢预算）
+  // 朋友圈回流：比记忆更低，预算紧张时最先被裁剪（不与长期记忆抢预算）
   SOCIAL: 38,
   SUMMARY: 35,
 };
@@ -245,8 +245,8 @@ function fitSystemMessagesDropLowest(messages, budget) {
         dropped.push({ ...msg, tokens, reason: 'no_budget_left_for_undroppable' });
       }
     } else if (msg.tag === 'memory') {
-      // 审计 P2-19：长期记忆是「一条消息」，超预算时不再整块丢弃，
-      // 而是按条目裁剪保留头部（记忆检索结果已按相关性排序，头部最相关）。
+      // 长期记忆是「一条消息」，超预算时按条目裁剪保留头部而非整块丢弃
+      // （记忆检索结果已按相关性排序，头部最相关）。
       const remaining = budget - usedTokens;
       if (remaining > MIN_TOKENS_PER_MESSAGE) {
         const truncated = truncateMemoryEntries(msg.content, remaining);
@@ -538,7 +538,7 @@ function truncateToTokens(text, maxTokens) {
 /**
  * 按「条目」裁剪长期记忆，保留头部条目直到逼近预算。
  * 记忆条目形如 `[1] 您曾问："..."`，以行首 `[数字]` 或换行分隔。
- * 审计 P2-19：长期记忆是一条消息，超预算时应逐条裁剪而非整块丢弃。
+ * 长期记忆是一条消息，超预算时逐条裁剪而非整块丢弃。
  */
 export function truncateMemoryEntries(text, maxTokens) {
   if (!text) return '';
@@ -555,7 +555,7 @@ export function truncateMemoryEntries(text, maxTokens) {
   const headerTokens = estimateTokens(headerText);
   const entryBudget = Math.max(0, maxTokens - headerTokens);
 
-  // 审计 C-6：先按「条目」切分，再逐条累加。
+  // 先按「条目」切分，再逐条累加。
   // 一个条目可能跨多行（如 `[1] 您曾问："..."\n   回答：...`）。旧实现按行累加，
   // 预算耗尽时正好切在条目中间，留下「只有问没有答」的悬空片段。
   const startIdx = firstEntryIdx > 0 ? firstEntryIdx : 0;

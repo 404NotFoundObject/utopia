@@ -1,8 +1,7 @@
 // js/modules/groupActivity.js - 群活跃度计算（共享工具）
 //
-// 审计 P3-5：`calculateActiveLevel` 原在 groupChat.js 与 groupChatEngine.js
-// 各有一份逐字相同的拷贝，已漂移隐患（引擎侧改用真实时间戳后两处判定口径
-// 需保持一致）。这里抽取为单一实现，两处统一引用。
+// `calculateActiveLevel` 在两处各放一份拷贝会产生漂移隐患（引擎侧用真实时间戳
+// 后，两处判定口径需保持一致）。这里抽取为单一实现，两处统一引用。
 
 import { getGameTime } from './time.js';
 

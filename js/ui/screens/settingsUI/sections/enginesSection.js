@@ -14,7 +14,7 @@ export function renderEnginesSection(settings, ctx) {
   const engineEmotion = engineFlags.emotion !== false;
   const engineBody = engineFlags.bodyState !== false;
   const engineTime = engineFlags.time !== false;
-  // 审计 P3-6：梦境生成默认关闭，开启后每次睡醒消耗一次 AI 调用
+  // 梦境生成默认关闭，开启后每次睡醒消耗一次 AI 调用
   const dreamEnabled = settings.dreamGeneration?.enabled === true;
 
   const perception = settings.emotionPerception || {};

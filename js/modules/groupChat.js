@@ -40,7 +40,7 @@ function toFiniteNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-// 审计 P2-10：群聊角色成员数上限（FAQ 声明表单限制 2-10 人，此处落实代码层硬上限）
+// 群聊角色成员数上限（FAQ 声明表单限制 2-10 人，此处落实代码层硬上限）
 const MAX_GROUP_CHARACTERS = 10;
 
 function sleep(ms) {
@@ -305,7 +305,7 @@ ${taskInstruction}
     systemMessages.push(systemMsg(`【群聊摘要】${group.summary}`, 'summary', PRIORITY.SUMMARY));
   }
 
-  // 朋友圈回流（审计 B-5）：群聊角色同样应能「看到」好友动态与评论。
+  // 朋友圈回流：群聊角色同样应能「看到」好友动态与评论。
   // 群聊同步路径 generateCharacterReplySync 复用本函数，因此一并获得回流。
   try {
     const socialPrompt = await buildSocialContext(character);
@@ -494,7 +494,7 @@ export async function getGroupsByUser(userId = 'user') {
 export async function addGroupMember(groupId, memberId, memberType, role = 'member') {
   const stores = await getStores();
 
-  // 审计 P2-10：限制角色成员数，避免无限膨胀（用户自己不计入）
+  // 限制角色成员数，避免无限膨胀（用户自己不计入）
   if (memberType === 'character') {
     const existing = await stores.group_members.getByIndex('groupId', groupId);
     const charCount = existing.filter(m => m.memberType === 'character').length;
@@ -549,7 +549,7 @@ export async function removeGroupMember(groupId, memberId, memberType) {
   return true;
 }
 
-// 审计 P3-5：实现已抽到 groupMembers.js（与 groupChatEngine 共用），此处保留
+// 实现在 groupMembers.js（与 groupChatEngine 共用），此处保留
 // 对外导出以维持既有 API（groupChatUI / groupSettingsUI / commandEngine 等仍从此处取）。
 // 注意：必须 import 后再 export —— `export { x } from '...'` 纯再导出语法不会在
 // 本模块作用域创建绑定，本文件内部的调用（sendUserGroupMessage 等）会抛
@@ -628,7 +628,7 @@ export async function sendGroupMessage(groupId, senderId, senderType, content, m
   const member = members.find(m => m.memberId === senderId && m.memberType === senderType);
   if (member) {
     member.lastActiveAt = getGameTime();
-    // 审计 P2-9：额外记录真实时间戳，供自动发言概率用真实时间计算 elapsed，
+    // 额外记录真实时间戳，供自动发言概率用真实时间计算 elapsed，
     // 避免倍速越高（游戏时间走得越快）角色越爱插话。
     member.lastActiveAtReal = Date.now();
     member.speakCount = (member.speakCount || 0) + 1;
@@ -786,7 +786,7 @@ export async function generateCharacterReplyStream(groupId, characterId, userMes
     }
   }
 
-  // 情感/身体状态更新（审计 P1-6：群聊此前只读取不更新情感）。
+  // 情感/身体状态更新。
   // 仅当 mentionDepth === 0（用户真实发言触发）时更新；递归传来的角色台词不更新，
   // 避免「B 的情感被 A 的台词改写」。
   if (mentionDepth === 0 && userMessage && userMessage.trim()) {
@@ -868,7 +868,7 @@ export async function generateCharacterReplyStream(groupId, characterId, userMes
 
       // 仅当 mentionDepth === 0（用户真实发言触发）时写记忆。
       // 递归路径（mentionDepth ≥ 1）传来的 userMessage 是「上一个角色的台词」，
-      // 若照写会把 A 的台词当成「用户曾说」污染 B 的记忆（审计 P2-8）。
+      // 若照写会把 A 的台词当成「用户曾说」污染 B 的记忆。
       if (mentionDepth === 0) {
         try {
           const { addMemory } = await import('./memory.js');
@@ -930,8 +930,8 @@ export async function generateCharacterReplySync(groupId, characterId, userMessa
     }
   }
 
-  // 情感/身体状态更新（审计 B-6）：同步路径此前漏了 applyEngineEffects，
-  // 与流式路径 generateCharacterReplyStream 的 mentionDepth===0 行为对齐。
+  // 情感/身体状态更新：同步路径同样要走 applyEngineEffects，
+  // 才能与流式路径 generateCharacterReplyStream 的 mentionDepth===0 行为对齐。
   if (userMessage && userMessage.trim()) {
     try {
       character = await applyEngineEffects({ character, userMessage });
