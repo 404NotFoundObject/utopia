@@ -89,7 +89,7 @@ export function renderHelpModal() {
       </style>
 
       <h1>📖 Utopia 使用指南</h1>
-      <p class="note">版本 v3.9.8 · 文档更新于 2026-10-07</p>
+      <p class="note">版本 v3.9.9 · 文档更新于 2026-10-07</p>
 
       <section>
         <h2>✨ 概述</h2>
@@ -110,6 +110,8 @@ export function renderHelpModal() {
           <li><strong>😊 表情托盘</strong><span class="new-badge">v3.9.8</span>：电脑上点输入框左下角的笑脸图标弹出面板，「最近使用」+「所有表情」两节网格，Esc 或点外部关闭；手机上点语音与发送之间的表情键，托盘从输入栏下方展开，右下角带删除键。选中的表情插入到<strong>光标处</strong>，「最近使用」记在本地（去重置顶、上限 24 个）。所有主题可用。</li>
           <li><strong>手机端输入栏对齐微信</strong><span class="new-badge">v3.9.8</span>：语音（麦克风）按钮移进输入框内部右端（各主题统一），发送按钮<strong>只在有内容时才显示为绿色「发送」</strong>，空输入时显示为 <strong>⊕ 圆圈十字</strong>（角色回复期间保持禁用的「发送」，与原先一致）。</li>
           <li><strong>朋友圈留白</strong><span class="new-badge">v3.9.8</span>：背景图与帖子之间的距离加大，发表动态的输入框展开后不再被自己的头像压住，输入区也更高一些。</li>
+          <li><strong>手机端输入框默认一行高</strong><span class="new-badge">v3.9.9</span>：输入框默认只占一行文字的高度，输入多行时仍会自动增高，清空内容后回落到一行。</li>
+          <li><strong>表情托盘不再抢走输入法</strong><span class="new-badge">v3.9.9</span>：手机上展开表情托盘后再点输入框，一次点击即可同时收起托盘并唤出输入法；托盘与键盘互斥，连点表情时键盘不会反复起落。</li>
           <li><strong>🔊 语音合成 (TTS)</strong>：Web Speech API / Kokoro，每角色可独立配置音色。</li>
           <li><strong>🎤 语音输入 (STT)</strong>：长按麦克风或按住 Ctrl/Alt 说话。</li>
           <li><strong>📞 主动语音通话</strong>：状态机驱动的交替对话，字幕显示。通话结束具备补偿机制。</li>
@@ -1177,7 +1179,7 @@ __engineMonitor.state.apiLog.at(-1).messages</code></pre>
       </section>
 
       <div style="text-align:right;font-size:0.8rem;color:var(--color-text-muted);margin-top:1rem;border-top:1px solid var(--color-border);padding-top:0.5rem;">
-        Utopia v3.9.8 · 2026-10-07
+        Utopia v3.9.9 · 2026-10-07
       </div>
     </div>
   `;

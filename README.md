@@ -3,7 +3,7 @@
 > AI 角色扮演 Agent —— 一个让角色"活起来"的工具集。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.8-green.svg)]()
+[![Version](https://img.shields.io/badge/version-3.9.9-green.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/404NotFoundObject/utopia/issues)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-utopia-blue)](https://404NotFoundObject.github.io/utopia/)
 
@@ -260,6 +260,16 @@ Utopia 内置完整的交互式文档：
 ## 更新记录
 
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v3.9.9
+
+**手机端输入体验收尾：输入框默认一行高，表情托盘不再抢走输入法；代码注释清理。**
+
+- **输入框一行高**：默认只占一行文字，输入多行仍自动增高，清空后回落到一行
+- **表情托盘不抢输入法**：展开托盘后点输入框，一次点击就同时收托盘、起输入法；托盘与键盘互斥，连点表情时键盘不反复起落
+- **内部**：清理源码与测试中残留的审计编号和开发过程注释（JSDoc、设计约束与边界警告全部保留）
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v3.9.8
 
