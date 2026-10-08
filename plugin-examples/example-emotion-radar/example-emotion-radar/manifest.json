@@ -1,0 +1,19 @@
+{
+  "id": "com.utopia.example-emotion-radar",
+  "name": "角色状态雷达图",
+  "version": "2.2.0",
+  "description": "在聊天头部注入雷达图按钮，实时可视化角色的情感六维、身体状态和关系维度。支持单聊与群聊（群聊下可从成员中切换查看）",
+  "author": "Utopia Team",
+  "license": "MIT",
+  "homepage": "https://github.com/utopia-project/example-emotion-radar",
+  "main": "worker.js",
+  "ui": "ui.js",
+  "permissions": [
+    "ui:inject",
+    "character:read",
+    "event:subscribe",
+    "storage:indexeddb"
+  ],
+  "utopia": { "minVersion": "1.0.0" },
+  "tags": ["visualization", "dashboard"]
+}

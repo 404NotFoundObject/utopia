@@ -24,12 +24,11 @@ import 'fake-indexeddb/auto';
 import { installDomSkeleton, resetDom } from '../helpers/dom-skeleton.js';
 
 // ---- 浏览器 API 垫片 ----
-// jsdom 未实现 requestAnimationFrame（banner.js 用它触发进场动画）。
-// 用 setTimeout(0) 近似一帧，语义足够：回调最终会被执行一次。
-if (typeof globalThis.requestAnimationFrame !== 'function') {
-  globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
-  globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
-}
+// jsdom 未实现 requestAnimationFrame（banner.js 用它触发进场动画），且某些
+// 配置下即便提供了函数也不会真正回调，会导致 `await new Promise(rAF…)` 永久挂起。
+// 故无条件强制一个基于 setTimeout 的可用垫片：语义足够（回调最终执行一次）。
+globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
+globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
 // jsdom 未实现 matchMedia（主题模块用于探测暗色偏好）
 if (typeof globalThis.matchMedia !== 'function') {

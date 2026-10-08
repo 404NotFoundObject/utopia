@@ -1,0 +1,21 @@
+{
+  "id": "com.utopia.example-edit-reply",
+  "name": "回复编辑",
+  "version": "2.1.0",
+  "description": "在 AI 回复上右键，可编辑消息内容并保存到对话历史。支持单聊与群聊（群聊消息同样可编辑）",
+  "author": "Utopia Team",
+  "license": "MIT",
+  "homepage": "https://github.com/utopia-project/example-edit-reply",
+  "main": "worker.js",
+  "ui": "ui.js",
+  "permissions": [
+    "hook:register",
+    "ui:inject",
+    "conversation:read",
+    "conversation:write",
+    "chat:read",
+    "storage:indexeddb"
+  ],
+  "utopia": { "minVersion": "1.0.0" },
+  "tags": ["utility", "chat"]
+}
