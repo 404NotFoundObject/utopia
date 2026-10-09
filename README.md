@@ -176,6 +176,17 @@ Utopia 选择另一条路：**把底层引擎内置**。
 
 Worker 隔离、钩子系统（before / after / error）、UI 槽位系统、方法级权限声明。插件崩溃不影响主应用。
 
+#### 官方示例插件
+
+仓库内置两个**官方示例插件**（位于 [`plugin-examples/`](plugin-examples/) 目录），既是开箱即用的小工具，也是插件 API 的参考实现：
+
+- **角色状态雷达图** · `com.utopia.example-emotion-radar` · v2.2.0
+  在聊天头部注入雷达图按钮，点击后弹出模态框，实时可视化角色的情感六维（愉悦 / 唤醒 / 支配 / 关注 / 意外 / 精力）与身体、关系状态。订阅情感 / 身体更新事件实时刷新；支持单聊与群聊——群聊下从群成员列表中选择角色查看，多个角色时顶部出现切换下拉。
+- **回复编辑** · `com.utopia.example-edit-reply` · v2.1.0
+  在 AI 回复上右键（移动端长按）弹出「编辑此回复」，修改后保存回对话历史。同时支持单聊（写入 `conversations`）与群聊（写入 `group_messages` 并局部刷新气泡）。
+
+两个插件均随仓库分发，可在插件管理器中「从文件安装」选择对应的 `plugin-examples/*.zip` 直接试用。其行为已被 `tests/integration/plugin-examples.test.js`（8 个用例）覆盖，验证单聊 / 群聊 / 移动长按等价路径均正确。插件内部结构、权限清单与安装方式见各子目录内的 README。
+
 ### 🧪 自动化测试
 
 - **Vitest**：26 个文件 / 521 个用例，覆盖纯逻辑单元、DOM 组件（含 XSS 转义）、存储与引擎集成
@@ -414,12 +425,13 @@ utopia/
 │   ├── setup/                    # Vitest 全局前置
 │   └── helpers/                  # DOM 骨架与测试夹具
 │
-└── lib/                          # 打包的第三方库
-    ├── transformers.min.js       # Transformers.js
-    ├── ort/                      # ONNX Runtime Web
-    ├── api-adapter/              # API 适配器
-    ├── context-injector/         # 上下文注入器
-    └── event-bus/                # 事件总线
+├── lib/                          # 打包的第三方库
+│   ├── transformers.min.js       # Transformers.js
+│   ├── ort/                      # ONNX Runtime Web
+│   ├── api-adapter/              # API 适配器
+│   ├── context-injector/         # 上下文注入器
+│   └── event-bus/                # 事件总线
+└── plugin-examples/              # 官方示例插件（开箱即用 + 开发参考）
 ```
 
 ---
