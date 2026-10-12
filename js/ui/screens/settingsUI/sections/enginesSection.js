@@ -22,6 +22,7 @@ export function renderEnginesSection(settings, ctx) {
     ? perception.semanticMode
     : 'auto';
   const llmArbiter = perception.useLLMArbiter === true;
+  const devMonitorEnabled = settings.devMonitor?.enabled === true;
 
   return `
     <!-- 引擎控制 -->
@@ -80,6 +81,23 @@ export function renderEnginesSection(settings, ctx) {
         <label>识别调试</label>
         <button class="btn btn-sm" id="emotionDebugBtn">打开调试面板</button>
         <span class="help-text">查看子句切分、否定与施事判定、各层得分与最终结论</span>
+      </div>
+    </div>
+
+    <!-- 开发者工具 -->
+    <div class="settings-section">
+      <h3>🛠️ 开发者工具</h3>
+      <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:0.8rem;">
+        面向开发的调试开关，仅用于排查引擎问题，日常使用建议保持关闭。
+      </p>
+      <div class="setting-row">
+        <label>引擎监控</label>
+        ${ctx.toggleHtml('settingsDevMonitorEnabled', devMonitorEnabled)}
+        <span class="help-text">
+          在控制台实时打印引擎事件（情感/身体/时间/世界书/注入器/插件等）并拦截
+          <code>fetch</code> 记录 API 请求。开启后可用
+          <code>__engineMonitor.report()</code>、<code>.snapshot()</code>、<code>.diff()</code> 等命令排查。
+        </span>
       </div>
     </div>
   `;

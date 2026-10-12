@@ -113,6 +113,12 @@ export function getDefaultSettings() {
       bodyState: true,
       time: true,
     },
+    // 开发者引擎监控（Engine Monitor）。默认关闭——开启后会在控制台实时打印
+    // 引擎事件并拦截 fetch 记录 API 请求，用于调试引擎执行路径。
+    // 开启/关闭会同步写入 localStorage 'utopia:dev-monitor'，下次启动据此自动挂载。
+    devMonitor: {
+      enabled: false,
+    },
     // 梦境生成：角色睡醒时用 AI 生成一段梦境写入 dreamContent。
     // 默认关闭——开启后每次睡醒会消耗一次 API 调用。
     dreamGeneration: {

@@ -1,25 +1,38 @@
 // js/dev/engineMonitor.js - 开发者监控模块
 // 用途：订阅引擎事件、拦截 API 调用、记录副作用变化，辅助验证引擎执行路径
-// 加载：默认关闭，通过 localStorage 'utopia:dev-monitor' = 'on' 开启自动启动
+// 加载：默认关闭。通过设置里的「开发者工具 → 引擎监控」开关启用（写入 localStorage
+//       'utopia:dev-monitor' = 'on'，app.js 启动时据此自动挂载），也可用控制台开启。
 // 控制：window.__engineMonitor.{start,stop,report,clear,snapshot,diff,setVerbose}
 
+// ★ 订阅清单。改动引擎事件时请同步这里，否则开发者工具会出现盲区。
+//   维护约定：以 `globalEventBus.emit('…')` 为准，新增事件必须登记；
+//   注入器侧三个事件由底层库 lib/context-injector-core.js 直接发出。
 const ENGINE_EVENTS = [
+  // ---------- 引擎 ----------
   'emotion:interaction', 'emotion:updated',
-  'body:updated', 'body:wakeup',
+  'body:updated', 'body:wakeup', 'body:injury',
   'time:updated', 'time:advanced', 'time:reset',
   'memory:vector-init-done',
-  'worldbook:rule-triggered',
-  'worldbook:rule-added', 'worldbook:rule-updated', 'worldbook:rule-deleted',
+  // ---------- 世界书（含组级增删改与导入导出）----------
+  'worldbook:rule-added', 'worldbook:rule-updated', 'worldbook:rule-deleted', 'worldbook:rule-toggled',
+  'worldbook:group-added', 'worldbook:group-updated', 'worldbook:group-deleted', 'worldbook:group-toggled',
+  'worldbook:rules-imported', 'worldbook:groups-imported',
   'worldbook:vectors-synced',
-  'injector:rule-triggered', 'injector:worldbook-updated', 'injector:error',
-  'injector:delayed-ready',
+  // ---------- 注入器（底层库直接发出）----------
+  'injector:rule-triggered', 'injector:worldbook-updated', 'injector:error', 'injector:delayed-ready',
+  // ---------- 消息 / 角色 ----------
   'message:before-send', 'message:received',
   'character:switched',
-  'group:created', 'group:message',
+  // ---------- 群聊（含解散）----------
+  'group:created', 'group:disbanded', 'group:message',
   'group:member-added', 'group:member-removed',
   'group:member-muted', 'group:member-unmuted',
+  // ---------- 主动对话 / 语音 ----------
   'proactive:new', 'voice:call-ended',
-  'plugin:enabled', 'plugin:disabled',
+  // ---------- 插件（含配置变更）----------
+  'plugin:enabled', 'plugin:disabled', 'plugin:config-changed',
+  // ---------- 主题 / 应用 ----------
+  'theme:changed',
   'app:started', 'settings:updated',
 ];
 
@@ -38,20 +51,43 @@ const _state = {
 };
 
 // ---------- 事件订阅 ----------
+function _brief(v, n = 8) {
+  if (v === null || v === undefined) return v;
+  return String(v).slice(0, n);
+}
+
 function _summarizePayload(payload) {
   if (!payload || typeof payload !== 'object') return payload;
   const out = {};
-  if (payload.characterId) out.角色 = payload.characterId.slice(0, 8);
-  if (payload.ruleId) out.规则 = payload.ruleId.slice(0, 8);
-  if (payload.groupId) out.群组 = payload.groupId.slice(0, 8);
+  if (payload.characterId) out.角色 = _brief(payload.characterId);
+  if (payload.ruleId) out.规则 = _brief(payload.ruleId);
+  if (payload.groupId) out.群组 = _brief(payload.groupId);
+  if (payload.pluginId) out.插件 = _brief(payload.pluginId, 16);
+  if (payload.key) out.配置项 = payload.key;
+  if (payload.themeId) out.主题 = _brief(payload.themeId, 16);
   if (payload.eventType) out.事件 = payload.eventType;
   if (payload.intensity !== undefined) out.强度 = Number(payload.intensity).toFixed(2);
   if (payload.type) out.类型 = payload.type;
-  if (payload.content) out.内容 = String(payload.content).slice(0, 40);
+  if (payload.content) out.内容 = _brief(payload.content, 40);
   if (payload.ready !== undefined) out.就绪 = payload.ready;
   if (payload.model) out.模型 = payload.model;
   if (payload.updated !== undefined) out.更新 = payload.updated;
   if (payload.skipped !== undefined) out.跳过 = payload.skipped;
+  if (payload.editedDuringSync !== undefined) out.编辑跳过 = payload.editedDuringSync;
+  // worldbook:rule-*/group-* 携带完整对象，取名称便于人读
+  if (payload.rule?.name) out.规则名 = _brief(payload.rule.name, 16);
+  if (payload.group?.name) out.组名 = _brief(payload.group.name, 16);
+  if (payload.id) out.Id = _brief(payload.id);
+  // body:injury 携带受伤对象
+  if (payload.injury?.type) out.伤势 = payload.injury.type;
+  if (payload.injury?.location) out.部位 = payload.injury.location;
+  // worldbook:*-imported 返回条数
+  if (payload.count !== undefined) out.数量 = payload.count;
+  // time:advanced 记录推进量（游戏毫秒）
+  if (payload.delta !== undefined) out.推进 = `${Math.round(payload.delta / 60000)}分`;
+  // voice:call-ended
+  if (payload.reason) out.原因 = payload.reason;
+  if (payload.duration !== undefined) out.时长秒 = payload.duration;
   return out;
 }
 
@@ -262,6 +298,29 @@ function stop() {
   console.log('[Monitor] 已停止');
 }
 
+// ---------- 设置开关联动 ----------
+const STORAGE_KEY = 'utopia:dev-monitor';
+
+/**
+ * 按设置里的开关同步监控状态（供设置页保存时调用）。
+ * 开启 → 写入 localStorage 并立即 start（下次启动也会自动挂载）；
+ * 关闭 → 写入 localStorage 并 stop（恢复原生 fetch、取消全部订阅）。
+ * @param {boolean} enabled
+ * @returns {boolean} 生效后的状态
+ */
+function applyEnabled(enabled) {
+  const on = !!enabled;
+  try {
+    localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off');
+  } catch (_) { /* 隐私模式下 localStorage 可能不可用，忽略即可 */ }
+  if (on) {
+    start();
+  } else {
+    stop();
+  }
+  return on;
+}
+
 const monitor = {
   start,
   stop,
@@ -270,6 +329,7 @@ const monitor = {
   snapshot,
   diff,
   setVerbose,
+  applyEnabled,
   get state() { return _state; },
 };
 
@@ -278,3 +338,4 @@ if (typeof window !== 'undefined') {
 }
 
 export default monitor;
+export { applyEnabled };

@@ -696,7 +696,7 @@ export function renderHelpModal() {
         <p>内置的引擎监控工具，用于在真实使用中观测引擎执行路径与 API 请求。</p>
 
         <h3>🔧 启用</h3>
-        <p>在浏览器控制台执行一次（跨会话持久化）：</p>
+        <p>推荐在 <b>设置 → 开发者工具 → 引擎监控</b> 里开关（保存后立即生效并跨会话保持）。也可在浏览器控制台执行一次：</p>
         <pre><code>localStorage.setItem('utopia:dev-monitor', 'on');
 location.reload();</code></pre>
         <p>关闭：</p>
@@ -720,7 +720,7 @@ location.reload();</code></pre>
               <tr><td><code>body:updated</code></td><td>身体状态因时间驱动变化</td></tr>
               <tr><td><code>body:wakeup</code></td><td>角色被唤醒</td></tr>
               <tr><td><code>body:injury</code><span class="new-badge">v3.7</span></td><td>受伤引擎判定角色受伤并写入状态</td></tr>
-              <tr><td><code>worldbook:rule-triggered</code></td><td>世界书规则触发</td></tr>
+              <tr><td><code>injector:rule-triggered</code></td><td>注入器判定世界书规则命中并注入</td></tr>
               <tr><td><code>message:before-send</code> / <code>message:received</code></td><td>消息发送前后</td></tr>
             </tbody>
           </table>

@@ -19,6 +19,20 @@ export function bindSaveButton(modalContent, ctx) {
   });
 }
 
+/**
+ * 切换引擎监控（Engine Monitor）的运行状态。
+ * 由「开发者工具 → 引擎监控」开关驱动：开启即挂载并写入 localStorage，
+ * 下次启动自动恢复；关闭则停止订阅并恢复原生 fetch。
+ */
+async function applyDevMonitor(enabled) {
+  try {
+    const m = await import('../../../dev/engineMonitor.js');
+    m.applyEnabled(enabled);
+  } catch (err) {
+    console.warn('[Settings/Save] 切换引擎监控失败:', err);
+  }
+}
+
 async function handleSave(modalContent, ctx) {
   // ============================================================
   // 0. 检测每个 section 是否渲染
@@ -82,6 +96,8 @@ async function handleSave(modalContent, ctx) {
   const engineTime = q('#settingsEngineTime')?.checked ?? true;
   // 梦境生成开关（默认关闭）
   const dreamGenerationEnabled = q('#settingsDreamGeneration')?.checked ?? false;
+  // 开发者工具：引擎监控开关（默认关闭）
+  const devMonitorEnabled = q('#settingsDevMonitorEnabled')?.checked ?? false;
 
   // ---- 情绪识别 ----
   const emotionSemanticMode = q('#settingsEmotionSemanticMode')?.value || 'auto';
@@ -223,6 +239,9 @@ async function handleSave(modalContent, ctx) {
       enabled: dreamGenerationEnabled,
       maxPerDay: 1,
     };
+    payload.devMonitor = {
+      enabled: devMonitorEnabled,
+    };
   }
 
   if (sections.memory) {
@@ -333,6 +352,11 @@ async function handleSave(modalContent, ctx) {
     }
 
     await updateSettings(payload);
+
+    // 引擎监控开关联动（仅在渲染了该分区时）
+    if (sections.engines) {
+      await applyDevMonitor(devMonitorEnabled);
+    }
 
     if (sections.time) {
       if (speedSelect) {
