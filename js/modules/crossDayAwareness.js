@@ -68,7 +68,15 @@ export function buildCrossDayPrompt(conv, character, options = {}) {
 
   const phase = getConversationPhase(conv);
 
-  if (phase.phase === PHASE.EMPTY || phase.phase === PHASE.ACTIVE) {
+  if (phase.phase === PHASE.EMPTY) return '';
+
+  // 即便是"进行中"但已离开一阵（>=30 分钟），也给一条轻量"回来"提示，
+  // 制造"活人感"——用户反馈：间隔一小时也该有点时间意识，而不是无缝续话题。
+  if (phase.phase === PHASE.ACTIVE) {
+    if (phase.hoursSince >= 0.5) {
+      const mins = Math.round(phase.hoursSince * 60);
+      return `【时间感知】你和用户的上一句对话是约 ${mins} 分钟前。可以自然地打个招呼或随口问一句"回来啦 / 刚在忙什么"，不要生硬地接续上一句话的尾巴。`;
+    }
     return '';
   }
 
@@ -103,9 +111,13 @@ export function buildCrossDayPrompt(conv, character, options = {}) {
       parts.push(`你上次的回复被中断了。请在回复中自然延续。`);
     }
   } else if (phase.phase === PHASE.ENDED) {
-    parts.push(`上次对话是自然结束的。请不要刻意提及"上次聊到哪"，像正常人一样开场即可。`);
+    parts.push(`上次对话是自然结束的。这是一次新的开场，可以自然地问候或开启新话题，不必硬接上一句。`);
   } else {
-    parts.push(`上次对话没有明确结束。请自然接续，不需要刻意提及时间跨度。`);
+    // PAUSED（没有明确结束）：跨天或长时间间隔都该"新开场"，而不是硬接上一句
+    const gapText = days >= 1
+      ? '已经跨天了'
+      : `已经过去约 ${Math.max(1, Math.round(hours))} 小时`;
+    parts.push(`${gapText}。这是一次新的对话开场，自然地开启新话题或问候即可，不必硬接上一句话的尾巴。`);
   }
 
   if (scene === 'proactive') {
